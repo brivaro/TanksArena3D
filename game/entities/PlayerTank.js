@@ -2,36 +2,265 @@
 import * as THREE from 'three';
 import { Tank } from './Tank.js';
 
+export const PLAYER_SKINS = {
+  classic: {
+    bodyColor: 0x0074D9,
+    trimColor: 0x004b8d,
+    stripeColor: 0xffffff,
+    roughness: 0.22,
+    metalness: 0.18
+  },
+  gold: {
+    bodyColor: 0xffca28,
+    trimColor: 0x1e293b,
+    stripeColor: 0xfff8e1,
+    roughness: 0.16,
+    metalness: 0.85,
+    trimMetalness: 0.7
+  },
+  camo: {
+    bodyColor: 0x4b6043,
+    trimColor: 0x2e3b28,
+    stripeColor: 0xdca868,
+    roughness: 0.55,
+    metalness: 0.12
+  },
+  cyber: {
+    bodyColor: 0x0f172a,
+    trimColor: 0x00e5ff,
+    stripeColor: 0x00e5ff,
+    roughness: 0.18,
+    metalness: 0.75,
+    trimEmissive: 0x00e5ff,
+    trimEmissiveIntensity: 0.65
+  },
+  crimson: {
+    bodyColor: 0xb71c1c,
+    trimColor: 0x212121,
+    stripeColor: 0xff9100,
+    roughness: 0.24,
+    metalness: 0.4,
+    emissive: 0x4a0000,
+    emissiveIntensity: 0.35
+  }
+};
+
 export class PlayerTank extends Tank {
-  constructor(scene, x, z, inputManager) {
-    super(scene, x, z, 0x0074D9); // Deep Vibrant Blue
+  constructor(scene, x, z, inputManager, skinId = 'classic', perkId = 'ricochet') {
+    const skinCfg = PLAYER_SKINS[skinId] || PLAYER_SKINS.classic;
+    super(scene, x, z, skinCfg.bodyColor, skinCfg);
     this.input = inputManager;
-    this.speed = 15;
+    this.skinId = skinId;
+    this.perkId = perkId;
+
+    // Apply Tactical Module (Perk) stats
+    this.speed = perkId === 'overdrive' ? 18.6 : 15.5;
+    this.rotationSpeed = perkId === 'overdrive' ? 3.65 : 3.0;
     this.needsMine = false;
     this.mineCooldown = 0;
+    this.maxMineCooldown = perkId === 'ordnance' ? 1.05 : 1.8;
+    this.bonusBounces = perkId === 'ricochet' ? 1 : 0;
+    this.bulletSpeedMultiplier = perkId === 'ricochet' ? 1.18 : 1.0;
+
+    this.invulnerableTimer = 0;
+    this.bufferedMineTime = 0;
+
+    // Power-Up States
+    this.shieldActive = false;
+    this.rapidFireTimer = 0;
+    this.speedBoostTimer = 0;
+    this.boostVelocity = new THREE.Vector3();
+
+    // Heroic Racing Stripes on Turret & Hull
+    const stripeMat = new THREE.MeshBasicMaterial({ color: skinCfg.stripeColor || 0xffffff });
+    const hullStripeGeo = new THREE.BoxGeometry(0.45, 0.97, 3.44);
+    const hullStripe = new THREE.Mesh(hullStripeGeo, stripeMat);
+    hullStripe.position.set(0, 0.9, 0);
+    if (this.chassis) this.chassis.add(hullStripe);
+
+    const turretStripeGeo = new THREE.BoxGeometry(0.35, 0.8, 2.18);
+    const turretStripe = new THREE.Mesh(turretStripeGeo, stripeMat);
+    if (this.turret) this.turret.add(turretStripe);
+
+    // Visual Shield Bubble (Hexagonal energy dome + inner glow)
+    const shieldGeo = new THREE.IcosahedronGeometry(2.65, 2);
+    const shieldMat = new THREE.MeshPhysicalMaterial({
+        color: 0x00E5FF,
+        emissive: 0x00B0FF,
+        emissiveIntensity: 0.7,
+        transparent: true,
+        opacity: 0.38,
+        roughness: 0.08,
+        metalness: 0.1,
+        clearcoat: 1.0,
+        wireframe: false,
+        depthWrite: false
+    });
+    this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+    this.shieldMesh.position.y = 1.25;
+    this.shieldMesh.visible = false;
+
+    // Outer Wireframe Energy Lattice on Shield
+    const wireMat = new THREE.MeshBasicMaterial({
+        color: 0x80d8ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.45
+    });
+    const wireMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(2.68, 1), wireMat);
+    this.shieldMesh.add(wireMesh);
+
+    this.mesh.add(this.shieldMesh);
   }
 
-  // New Signature: accepts collisionObstacles (Walls+Holes) and visionObstacles (unused by player input logic currently)
+  applyPowerUp(type) {
+    if (type === 'shield') {
+      this.shieldActive = true;
+      this.shieldMesh.visible = true;
+    } else if (type === 'rapid') {
+      this.rapidFireTimer = 8.0; // 8 seconds of rapid-fire
+    } else if (type === 'speed') {
+      this.speedBoostTimer = 6.5; // 6.5 seconds of super speed
+    }
+  }
+
+  applyBoost(dirX, dirZ, force = 30) {
+    this.boostVelocity.set(dirX, 0, dirZ).normalize().multiplyScalar(force);
+  }
+
+  triggerHit() {
+    if (this.invulnerableTimer > 0) return false;
+    
+    // Shield absorbs the blow!
+    if (this.shieldActive) {
+      this.shieldActive = false;
+      this.shieldMesh.visible = false;
+      this.invulnerableTimer = 0.9; // Grace period
+      return 'shield_absorbed';
+    }
+
+    this.invulnerableTimer = 1.8; // 1.8 seconds invulnerability
+    return true;
+  }
+
+  isInvulnerable() {
+    return this.invulnerableTimer > 0;
+  }
+
   update(dt, collisionObstacles, visionObstacles, entities) {
     this.updateCooldown(dt);
     if (this.mineCooldown > 0) this.mineCooldown -= dt;
+    if (this.warpCooldown > 0) this.warpCooldown -= dt;
 
-    // 1. Movement
+    // Handle Power-Up Timers
+    if (this.rapidFireTimer > 0) {
+      this.rapidFireTimer -= dt;
+    }
+    if (this.speedBoostTimer > 0) {
+      this.speedBoostTimer -= dt;
+    }
+
+    // Shield Animation
+    if (this.shieldActive && this.shieldMesh) {
+      this.shieldMesh.rotation.y += dt * 1.8;
+      this.shieldMesh.rotation.x += dt * 0.9;
+    }
+
+    if (this.invulnerableTimer > 0) {
+      this.invulnerableTimer -= dt;
+      const flash = Math.floor(this.invulnerableTimer * 12) % 2 === 0;
+      this.mesh.visible = flash;
+      if (this.invulnerableTimer <= 0) {
+        this.mesh.visible = true;
+      }
+    } else {
+      this.mesh.visible = true;
+    }
+
+    // 1. Movement & Speed calculation
+    const currentBaseSpeed = this.speedBoostTimer > 0 ? this.speed * 1.45 : this.speed;
     const move = this.input.getMovementVector();
-    const moveSpeed = move.forward * this.speed;
-    const turnSpeed = move.turn * this.rotationSpeed;
+    const prevPos = this.mesh.position.clone();
+    let activeForwardSpeed = 0;
+    let activeTurnSpeed = 0;
 
-    this.mesh.rotation.y += turnSpeed * dt;
+    if (move.hasDirectInput) {
+      // Direct directional steering (virtual touch joystick)
+      const targetAngle = Math.atan2(move.directX, move.directZ);
+      let angleDiff = targetAngle - this.mesh.rotation.y;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      
+      const rotStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), this.rotationSpeed * 2.8 * dt);
+      this.mesh.rotation.y += rotStep;
+      activeTurnSpeed = rotStep / Math.max(dt, 0.001);
 
-    if (moveSpeed !== 0) {
+      const moveMag = Math.min(1, Math.hypot(move.directX, move.directZ));
+      activeForwardSpeed = currentBaseSpeed * moveMag;
+      const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
+      const newPos = this.mesh.position.clone().add(forward.multiplyScalar(activeForwardSpeed * dt));
+
+      if (!this.checkCollision(newPos, collisionObstacles, entities)) {
+        this.mesh.position.copy(newPos);
+      } else {
+        // Smooth wall-sliding along X or Z axis so tank never gets stuck on corners
+        const slideX = this.mesh.position.clone();
+        slideX.x = newPos.x;
+        const slideZ = this.mesh.position.clone();
+        slideZ.z = newPos.z;
+        if (!this.checkCollision(slideX, collisionObstacles, entities)) {
+          this.mesh.position.copy(slideX);
+        } else if (!this.checkCollision(slideZ, collisionObstacles, entities)) {
+          this.mesh.position.copy(slideZ);
+        }
+      }
+    } else {
+      // Classic tank controls (WASD / Arrow Keys)
+      const moveSpeed = move.forward * currentBaseSpeed;
+      const turnSpeed = move.turn * this.rotationSpeed;
+      activeForwardSpeed = moveSpeed;
+      activeTurnSpeed = turnSpeed;
+
+      this.mesh.rotation.y += turnSpeed * dt;
+
+      if (moveSpeed !== 0) {
         const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
         const newPos = this.mesh.position.clone().add(forward.multiplyScalar(moveSpeed * dt));
 
-        // Use full collision list to prevent walking into walls OR falling in holes
         if (!this.checkCollision(newPos, collisionObstacles, entities)) {
-            this.mesh.position.copy(newPos);
+          this.mesh.position.copy(newPos);
+        } else {
+          // Smooth wall-sliding along X or Z axis
+          const slideX = this.mesh.position.clone();
+          slideX.x = newPos.x;
+          const slideZ = this.mesh.position.clone();
+          slideZ.z = newPos.z;
+          if (!this.checkCollision(slideX, collisionObstacles, entities)) {
+            this.mesh.position.copy(slideX);
+          } else if (!this.checkCollision(slideZ, collisionObstacles, entities)) {
+            this.mesh.position.copy(slideZ);
+          }
         }
+      }
     }
+
+    // Apply Speed Booster Impulse (if active)
+    if (this.boostVelocity.lengthSq() > 0.05) {
+      const boostDelta = this.boostVelocity.clone().multiplyScalar(dt);
+      const boostedPos = this.mesh.position.clone().add(boostDelta);
+      if (!this.checkCollision(boostedPos, collisionObstacles, entities)) {
+        this.mesh.position.copy(boostedPos);
+      }
+      this.boostVelocity.multiplyScalar(Math.max(0, 1 - dt * 3.5));
+    }
+
+    // Update true velocity vector so tread marks and exhaust smoke spawn accurately!
+    if (dt > 0) {
+      this.velocity.subVectors(this.mesh.position, prevPos).divideScalar(dt);
+    }
+
+    // Animate road wheels & suspension pitch/roll
+    this.animateSuspension(dt, activeForwardSpeed, activeTurnSpeed);
 
     // 2. Aiming
     const mousePos = this.input.getAimPosition();
@@ -42,15 +271,48 @@ export class PlayerTank extends Tank {
         this.turret.rotation.y = angle - this.mesh.rotation.y; 
     }
 
-    // 3. Shooting
+    // 3. Shooting (Super-fast if rapid fire powerup active!)
     if (this.input.checkShoot()) {
         this.tryShoot();
     }
 
-    // 4. Mines
-    if (this.input.checkMine() && this.mineCooldown <= 0) {
-        this.needsMine = true;
-        this.mineCooldown = 2.0; // 2 seconds cooldown
+    // 4. Mines (with input buffering so taps are never ignored)
+    if (this.input.checkMine()) {
+        this.bufferedMineTime = 0.5;
+    }
+
+    if (this.bufferedMineTime > 0) {
+        this.bufferedMineTime -= dt;
+        if (this.mineCooldown <= 0) {
+            this.needsMine = true;
+            this.mineCooldown = this.maxMineCooldown;
+            this.bufferedMineTime = 0;
+        }
+    }
+  }
+
+  tryShoot() {
+    if (this.cooldown <= 0) {
+      this.needsShoot = true;
+      this.cooldown = this.rapidFireTimer > 0 ? 0.12 : this.maxCooldown;
+      this.recoilImpulse = 1.0;
+      if (this.barrel) {
+        this.barrel.position.z = 0.82;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  dropMine() {
+    if (this.mineCooldown <= 0) {
+      this.needsMine = true;
+      this.mineCooldown = this.maxMineCooldown;
+      this.bufferedMineTime = 0;
+      return true;
+    } else {
+      this.bufferedMineTime = 0.6;
+      return false;
     }
   }
 }

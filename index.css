@@ -1,0 +1,160 @@
+* {
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0b111e;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #f8fafc;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* --- Professional Menu & Death-Transition Animations --- */
+@keyframes overlayFadeIn {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(12px);
+  }
+}
+
+@keyframes cardReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes defeatCardBlend {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+    filter: brightness(1.6) blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1) blur(0px);
+  }
+}
+
+@keyframes deathVignettePulse {
+  0% {
+    opacity: 0;
+    background: radial-gradient(circle at center, rgba(255, 87, 34, 0.45) 0%, rgba(183, 28, 28, 0.75) 55%, rgba(10, 12, 20, 0.92) 100%);
+  }
+  25% {
+    opacity: 1;
+    background: radial-gradient(circle at center, rgba(255, 23, 68, 0.25) 0%, rgba(183, 28, 28, 0.68) 50%, rgba(10, 12, 20, 0.94) 100%);
+  }
+  100% {
+    opacity: 1;
+    background: radial-gradient(circle at center, rgba(15, 20, 32, 0.55) 0%, rgba(12, 16, 28, 0.85) 60%, rgba(8, 10, 18, 0.95) 100%);
+  }
+}
+
+@keyframes cinemaBarTop {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes cinemaBarBottom {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes deathAlertBanner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.25);
+    letter-spacing: 8px;
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    letter-spacing: 3px;
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -62%) scale(0.94);
+  }
+}
+
+/* Interactive Tactical Buttons */
+.tactical-btn-primary {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.16s ease, filter 0.16s ease;
+}
+.tactical-btn-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+  box-shadow: 0 10px 26px rgba(255, 179, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.35) inset !important;
+}
+.tactical-btn-primary:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.tactical-btn-secondary {
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.tactical-btn-secondary:hover {
+  transform: translateY(-1.5px);
+  background-color: rgba(51, 65, 85, 0.95) !important;
+  border-color: rgba(148, 163, 184, 0.55) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35) !important;
+}
+.tactical-btn-secondary:active {
+  transform: translateY(1px);
+}
+
+.tactical-level-card {
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.tactical-level-card:not(:disabled):hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45) !important;
+}
+.tactical-level-card:not(:disabled):active {
+  transform: translateY(0px) scale(0.98);
+}
+
+/* Custom sleek scrollbar for modals */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 193, 7, 0.65);
+}
