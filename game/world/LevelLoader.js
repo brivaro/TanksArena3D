@@ -1,8 +1,8 @@
 
 export class LevelLoader {
   static getLevelCount() {
-      // 72 full campaign missions across 9 themed biomes (8 per biome)
-      return 72; 
+      // 80 full campaign missions across 10 themed biomes (8 per biome)
+      return 80; 
   }
 
   static getLevel(levelIndex) {
@@ -1093,6 +1093,124 @@ export class LevelLoader {
               ['S', ' ', 'W', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
               ['S', '4', ' ', 'T', 'R', ' ', 'L', 'B', 'H', 'U', 'H', 'B', 'L', ' ', 'R', 'T', ' ', '4', 'S'],
               ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+
+          // ==========================================
+          // BIOME 10: OPERACIONES DE SIGILO NOCTURNO (M73 - M80)
+          // ==========================================
+          // 73. MOONLIGHT INFILTRATION (Central sweeping searchlight & shadow cover walls)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'W', ' ', ' ', 'C', 'B', 'C', ' ', ' ', 'W', ' ', '2', 'S'],
+              ['S', ' ', ' ', 'W', ' ', 'T', ' ', 'U', ' ', 'T', ' ', 'W', ' ', ' ', 'S'],
+              ['S', 'W', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'W', 'S'],
+              ['S', ' ', ' ', 'T', ' ', 'S', ' ', '2', ' ', 'S', ' ', 'T', ' ', ' ', 'S'],
+              ['S', 'C', 'U', ' ', ' ', ' ', ' ', 'L', ' ', ' ', ' ', ' ', 'U', 'C', 'S'],
+              ['S', ' ', ' ', 'T', ' ', 'S', ' ', '2', ' ', 'S', ' ', 'T', ' ', ' ', 'S'],
+              ['S', 'W', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'W', 'S'],
+              ['S', ' ', ' ', 'W', ' ', 'T', ' ', 'U', ' ', 'T', ' ', 'W', ' ', ' ', 'S'],
+              ['S', '2', ' ', 'W', ' ', ' ', 'C', 'B', 'C', ' ', ' ', 'W', ' ', '3', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 74. SEARCHLIGHT PERIMETER (Twin interlocking searchlights & stealth flanking lanes)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', ' ', 'W', ' ', 'B', 'U', 'B', ' ', 'W', ' ', ' ', '3', 'S'],
+              ['S', ' ', 'W', ' ', 'C', ' ', ' ', ' ', ' ', ' ', 'C', ' ', 'W', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'L', ' ', 'S', '3', 'S', ' ', 'L', ' ', ' ', ' ', 'S'],
+              ['S', 'W', 'C', ' ', ' ', ' ', 'T', ' ', 'T', ' ', ' ', ' ', 'C', 'W', 'S'],
+              ['S', ' ', 'U', ' ', 'S', ' ', 'B', 'Y', 'B', ' ', 'S', ' ', 'U', ' ', 'S'],
+              ['S', 'W', 'C', ' ', ' ', ' ', 'T', ' ', 'T', ' ', ' ', ' ', 'C', 'W', 'S'],
+              ['S', ' ', ' ', ' ', 'L', ' ', 'S', '3', 'S', ' ', 'L', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'W', ' ', 'C', ' ', ' ', ' ', ' ', ' ', 'C', ' ', 'W', ' ', 'S'],
+              ['S', '2', ' ', ' ', 'W', ' ', 'B', 'U', 'B', ' ', 'W', ' ', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 75. SILENT HARBOR (Nocturnal dock canals & coastal lighthouses)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'W', 'H', 'H', ' ', 'U', ' ', 'H', 'H', 'W', ' ', '3', 'S'],
+              ['S', ' ', ' ', ' ', 'H', 'H', 'B', 'L', 'B', 'H', 'H', ' ', ' ', ' ', 'S'],
+              ['S', 'W', ' ', 'T', ' ', 'A', ' ', ' ', ' ', 'A', ' ', 'T', ' ', 'W', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', ' ', '3', ' ', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', 'U', 'C', ' ', ' ', 'Y', '4', 'Y', ' ', ' ', 'C', 'U', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', ' ', '3', ' ', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'W', ' ', 'T', ' ', 'A', ' ', ' ', ' ', 'A', ' ', 'T', ' ', 'W', 'S'],
+              ['S', ' ', ' ', ' ', 'H', 'H', 'B', 'L', 'B', 'H', 'H', ' ', ' ', ' ', 'S'],
+              ['S', '3', ' ', 'W', 'H', 'H', ' ', 'U', ' ', 'H', 'H', 'W', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 76. BLACKOUT RADAR BASE (4 sweeping radar lighthouses & shadow bunkers)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'W', ' ', ' ', 'C', 'B', 'U', 'B', 'C', ' ', ' ', 'W', ' ', '3', 'S'],
+              ['S', ' ', ' ', 'W', ' ', 'L', ' ', ' ', ' ', ' ', ' ', 'L', ' ', 'W', ' ', ' ', 'S'],
+              ['S', 'W', ' ', ' ', ' ', ' ', ' ', 'S', 'T', 'S', ' ', ' ', ' ', ' ', ' ', 'W', 'S'],
+              ['S', ' ', ' ', 'T', 'S', ' ', 'C', 'B', '3', 'B', 'C', ' ', 'S', 'T', ' ', ' ', 'S'],
+              ['S', ' ', 'U', ' ', ' ', ' ', 'B', '4', 'Y', '4', 'B', ' ', ' ', ' ', 'U', ' ', 'S'],
+              ['S', ' ', ' ', 'T', 'S', ' ', 'C', 'B', '3', 'B', 'C', ' ', 'S', 'T', ' ', ' ', 'S'],
+              ['S', 'W', ' ', ' ', ' ', ' ', ' ', 'S', 'T', 'S', ' ', ' ', ' ', ' ', ' ', 'W', 'S'],
+              ['S', ' ', ' ', 'W', ' ', 'L', ' ', ' ', ' ', ' ', ' ', 'L', ' ', 'W', ' ', ' ', 'S'],
+              ['S', '4', ' ', 'W', ' ', ' ', 'C', 'B', 'U', 'B', 'C', ' ', ' ', 'W', ' ', '3', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 77. SHADOW AMBUSH (Nocturnal forest & pillar cover against searchlights)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'R', ' ', 'Y', ' ', 'B', 'U', 'B', ' ', 'Y', ' ', 'R', ' ', '3', 'S'],
+              ['S', ' ', 'W', ' ', ' ', ' ', ' ', ' ', 'L', ' ', ' ', ' ', ' ', ' ', 'W', ' ', 'S'],
+              ['S', 'R', ' ', ' ', 'S', 'C', ' ', 'T', ' ', 'T', ' ', 'C', 'S', ' ', ' ', 'R', 'S'],
+              ['S', ' ', ' ', 'S', '3', 'B', ' ', ' ', '4', ' ', ' ', 'B', '3', 'S', ' ', ' ', 'S'],
+              ['S', 'Y', ' ', 'C', 'B', 'U', ' ', 'L', 'Y', 'L', ' ', 'U', 'B', 'C', ' ', 'Y', 'S'],
+              ['S', ' ', ' ', 'S', '3', 'B', ' ', ' ', '4', ' ', ' ', 'B', '3', 'S', ' ', ' ', 'S'],
+              ['S', 'R', ' ', ' ', 'S', 'C', ' ', 'T', ' ', 'T', ' ', 'C', 'S', ' ', ' ', 'R', 'S'],
+              ['S', ' ', 'W', ' ', ' ', ' ', ' ', ' ', 'L', ' ', ' ', ' ', ' ', ' ', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'R', ' ', 'Y', ' ', 'B', 'U', 'B', ' ', 'Y', ' ', 'R', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 78. BEACON LABYRINTH (Dynamic shadow corridors & demolition shortcuts)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'C', 'W', ' ', 'L', ' ', 'U', ' ', 'L', ' ', 'W', 'C', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'C', 'W', ' ', ' ', ' ', 'B', ' ', ' ', ' ', 'W', 'C', 'W', ' ', 'S'],
+              ['S', 'C', 'C', ' ', ' ', ' ', 'S', 'C', '3', 'C', 'S', ' ', ' ', ' ', 'C', 'C', 'S'],
+              ['S', 'W', 'W', ' ', 'S', ' ', 'C', 'B', ' ', 'B', 'C', ' ', 'S', ' ', 'W', 'W', 'S'],
+              ['S', ' ', ' ', ' ', ' ', 'A', ' ', '4', 'L', '4', ' ', 'A', ' ', ' ', ' ', ' ', 'S'],
+              ['S', 'W', 'W', ' ', 'S', ' ', 'C', 'B', ' ', 'B', 'C', ' ', 'S', ' ', 'W', 'W', 'S'],
+              ['S', 'C', 'C', ' ', ' ', ' ', 'S', 'C', '3', 'C', 'S', ' ', ' ', ' ', 'C', 'C', 'S'],
+              ['S', ' ', 'W', 'C', 'W', ' ', ' ', ' ', 'B', ' ', ' ', ' ', 'W', 'C', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'C', 'W', ' ', 'L', ' ', 'U', ' ', 'L', ' ', 'W', 'C', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 79. MIDNIGHT FORTRESS (High-security night bastion with interlocking searchlights)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'T', ' ', 'L', ' ', 'B', 'U', 'B', ' ', 'L', ' ', 'T', ' ', '4', 'S'],
+              ['S', ' ', 'S', 'S', ' ', ' ', ' ', 'C', ' ', 'C', ' ', ' ', ' ', 'S', 'S', ' ', 'S'],
+              ['S', 'T', 'S', '3', ' ', 'W', 'C', 'B', ' ', 'B', 'C', 'W', ' ', '3', 'S', 'T', 'S'],
+              ['S', ' ', ' ', ' ', ' ', 'C', 'U', ' ', '4', ' ', 'U', 'C', ' ', ' ', ' ', ' ', 'S'],
+              ['S', 'L', ' ', 'W', 'C', 'B', ' ', 'Y', 'A', 'Y', ' ', 'B', 'C', 'W', ' ', 'L', 'S'],
+              ['S', ' ', ' ', ' ', ' ', 'C', 'U', ' ', '4', ' ', 'U', 'C', ' ', ' ', ' ', ' ', 'S'],
+              ['S', 'T', 'S', '3', ' ', 'W', 'C', 'B', ' ', 'B', 'C', 'W', ' ', '3', 'S', 'T', 'S'],
+              ['S', ' ', 'S', 'S', ' ', ' ', ' ', 'C', ' ', 'C', ' ', ' ', ' ', 'S', 'S', ' ', 'S'],
+              ['S', '4', ' ', 'T', ' ', 'L', ' ', 'B', 'U', 'B', ' ', 'L', ' ', 'T', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 80. PHANTOM OF THE NIGHT (Grand Finale Night Stealth Boss Battle)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'W', ' ', 'L', 'B', ' ', 'H', 'U', 'H', ' ', 'B', 'L', ' ', 'W', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', ' ', ' ', '4', ' ', ' ', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', ' ', 'T', '4', 'Y', 'A', 'U', 'A', 'Y', '4', 'T', ' ', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', ' ', ' ', '4', ' ', ' ', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'W', ' ', 'L', 'B', ' ', 'H', 'U', 'H', ' ', 'B', 'L', ' ', 'W', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
           ]
       ];
 
@@ -1107,7 +1225,7 @@ export class LevelLoader {
   }
 
   static getBiome(levelIndex) {
-      const idx = ((levelIndex - 1) % 72) + 1;
+      const idx = ((levelIndex - 1) % 80) + 1;
       if (idx <= 8) return 'workshop';        // M1 - M8: Warm cozy oak wood workshop
       if (idx <= 16) return 'desert';         // M9 - M16: Sandstone ruins & terracotta
       if (idx <= 24) return 'cyber';          // M17 - M24: Neon cyberpunk grid & chrome
@@ -1116,7 +1234,8 @@ export class LevelLoader {
       if (idx <= 48) return 'jungle';         // M41 - M48: Emerald Jungle & Ancient Temples
       if (idx <= 56) return 'sunset_city';    // M49 - M56: Sunset/Night Metropolis
       if (idx <= 64) return 'matsuri';        // M57 - M64: Japanese Festival with String Lights
-      return 'tropical_island';               // M65 - M72: Tropical Paradise Island
+      if (idx <= 72) return 'tropical_island';// M65 - M72: Tropical Paradise Island
+      return 'night_stealth';                 // M73 - M80: Night Stealth Operations
   }
 
   static getAllLevelNames() {
@@ -1209,7 +1328,17 @@ export class LevelLoader {
           "Turquoise Archipelago",
           "Sunken Reef Fortress",
           "Hurricane Bay",
-          "Kraken of Tropical Paradise"
+          "Kraken of Tropical Paradise",
+
+          // Night Stealth Operations (M73 - M80)
+          "Moonlight Infiltration",
+          "Searchlight Perimeter",
+          "Silent Harbor",
+          "Blackout Radar Base",
+          "Shadow Ambush",
+          "Beacon Labyrinth",
+          "Midnight Fortress",
+          "Phantom of the Night"
       ];
   }
 

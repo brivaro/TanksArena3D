@@ -255,7 +255,7 @@ export class EnemyTank extends Tank {
     return this.hp <= 0;
   }
 
-  update(dt, collisionObstacles, visionObstacles, entities) {
+  update(dt, collisionObstacles, visionObstacles, entities, stealthContext = null) {
     this.updateCooldown(dt);
     if (this.warpCooldown > 0) this.warpCooldown -= dt;
 
@@ -291,21 +291,22 @@ export class EnemyTank extends Tank {
     const distToPlayer = vecToPlayer.length();
     vecToPlayer.normalize();
 
-    // -- 1. Turret Logic (Aiming) --
-    const turretTargetAngle = Math.atan2(vecToPlayer.x, vecToPlayer.z);
-    let turretDiff = turretTargetAngle - (this.mesh.rotation.y + this.turret.rotation.y);
-    while (turretDiff > Math.PI) turretDiff -= Math.PI * 2;
-    while (turretDiff < -Math.PI) turretDiff += Math.PI * 2;
-    
-    const aimSpeed = (this.diffProfile && this.diffProfile.turretAimSpeed) ? this.diffProfile.turretAimSpeed : 5.0;
-    this.turret.rotation.y += Math.sign(turretDiff) * Math.min(Math.abs(turretDiff), aimSpeed * dt);
+    const isNightStealth = Boolean(stealthContext && stealthContext.isNightStealth);
+    const isPlayerStealthed = Boolean(stealthContext && stealthContext.isPlayerStealthed);
+    const isSpottedByLighthouse = Boolean(stealthContext && stealthContext.isSpottedByLighthouse);
+
+    // Effective vision distance:
+    // - If illuminated by a Lighthouse searchlight: enemies across the entire arena (98u) spot your position!
+    // - If hidden in Night Stealth shadows: enemies can only detect you at very close proximity (14.5u)!
+    // - Standard visibility: 75u.
+    const maxSightDist = isSpottedByLighthouse ? 98.0 : (isPlayerStealthed ? 14.5 : 75.0);
 
     // Throttled Line of Sight check with Box3 broadphase (10x faster than per-frame full-scene raycast!)
     this.losTimer -= dt;
-    if (this.losTimer <= 0) {
-        this.losTimer = 0.11;
+    if (this.losTimer <= 0 || (isSpottedByLighthouse && !this.cachedCanSeePlayer)) {
+        this.losTimer = isSpottedByLighthouse ? 0.06 : 0.11;
         this.cachedCanSeePlayer = false;
-        if (distToPlayer < 75) {
+        if (distToPlayer < maxSightDist) {
             const start = new THREE.Vector3(this.mesh.position.x, 1.5, this.mesh.position.z);
             this.raycaster.set(start, vecToPlayer);
             this.raycaster.far = distToPlayer;
@@ -320,7 +321,6 @@ export class EnemyTank extends Tank {
                 if (!obs || !obs.userData) continue;
 
                 // Analytical 2D Line-of-Sight check for circular obstacles (Lighthouses 'L', Trees 'R', Columns 'Y')
-                // Prevents the Lighthouse's transparent spotlight cone from blinding enemies while its solid tower base properly blocks sight!
                 if (obs.userData.collisionRadius) {
                     const ox = obs.position.x - start.x;
                     const oz = obs.position.z - start.z;
@@ -373,16 +373,49 @@ export class EnemyTank extends Tank {
         }
     }
     const canSeePlayer = this.cachedCanSeePlayer;
+    this.wasAlertedToPlayer = canSeePlayer || isSpottedByLighthouse;
 
-    // Update visor glow color: bright red when locked onto player, amber when scanning
+    // -- 1. Turret Logic (Aiming vs Blind Night Patrol Scanning) --
+    let turretDiff = Math.PI;
+    const baseAimSpeed = (this.diffProfile && this.diffProfile.turretAimSpeed) ? this.diffProfile.turretAimSpeed : 5.0;
+    const aimSpeed = isSpottedByLighthouse ? baseAimSpeed * 1.45 : baseAimSpeed;
+
+    if (isNightStealth && isPlayerStealthed && !canSeePlayer && !isSpottedByLighthouse) {
+      // Player is hidden in the night shadows! Enemy does NOT know player position and scans forward along its hull
+      const patrolScanOffset = Math.sin(performance.now() * 0.002 + this.mesh.position.x * 0.5) * 0.42;
+      let scanDiff = patrolScanOffset - this.turret.rotation.y;
+      while (scanDiff > Math.PI) scanDiff -= Math.PI * 2;
+      while (scanDiff < -Math.PI) scanDiff += Math.PI * 2;
+      this.turret.rotation.y += Math.sign(scanDiff) * Math.min(Math.abs(scanDiff), aimSpeed * 0.55 * dt);
+    } else {
+      // Enemy knows player position (either direct LOS, daytime, or revealed by Lighthouse beam!)
+      const turretTargetAngle = Math.atan2(vecToPlayer.x, vecToPlayer.z);
+      turretDiff = turretTargetAngle - (this.mesh.rotation.y + this.turret.rotation.y);
+      while (turretDiff > Math.PI) turretDiff -= Math.PI * 2;
+      while (turretDiff < -Math.PI) turretDiff += Math.PI * 2;
+      this.turret.rotation.y += Math.sign(turretDiff) * Math.min(Math.abs(turretDiff), aimSpeed * dt);
+    }
+
+    // Update visor glow color:
+    // - Bright flashing red/white when about to shoot
+    // - Crimson red when locked onto player or alerted by Lighthouse searchlight
+    // - Cool cyan-blue when patrolling blindly in Night Stealth
     if (this.visorMat) {
       if (canSeePlayer && this.cooldown < 0.35) {
-        // Flash bright white/red telegraph right before firing!
         const flash = Math.floor(performance.now() * 0.02) % 2 === 0;
         this.visorMat.color.setHex(flash ? 0xffffff : 0xff1744);
+      } else if (canSeePlayer || isSpottedByLighthouse) {
+        this.visorMat.color.setHex(0xff1744);
+      } else if (isNightStealth && isPlayerStealthed) {
+        this.visorMat.color.setHex(0x38bdf8);
       } else {
-        this.visorMat.color.setHex(canSeePlayer ? 0xff1744 : 0xffab00);
+        this.visorMat.color.setHex(0xffab00);
       }
+    }
+
+    // When spotted by a Lighthouse searchlight, enemies recharge 35% faster to punish breaking stealth!
+    if (isSpottedByLighthouse && this.cooldown > 0) {
+      this.cooldown = Math.max(0, this.cooldown - dt * 0.35);
     }
 
     // Shoot if we see player and aim is roughly correct
@@ -400,9 +433,10 @@ export class EnemyTank extends Tank {
     }
 
     this.changeDirTimer -= dt;
-    if (this.changeDirTimer <= 0) {
-        this.pickNewDirection(vecToPlayer, canSeePlayer, distToPlayer);
+    if (this.changeDirTimer <= 0 || (isSpottedByLighthouse && !this._wasSpottedLastFrame)) {
+        this.pickNewDirection(vecToPlayer, canSeePlayer || isSpottedByLighthouse, distToPlayer);
     }
+    this._wasSpottedLastFrame = isSpottedByLighthouse;
 
     let angleDiff = this.targetAngle - this.mesh.rotation.y;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -440,7 +474,7 @@ export class EnemyTank extends Tank {
       if (behavior === 'AGGRESSIVE') {
           if (canSeePlayer) {
               const angle = Math.atan2(vecToPlayer.x, vecToPlayer.z);
-              this.targetAngle = angle + (Math.random() - 0.5) * 1.0; 
+              this.targetAngle = angle + (Math.random() - 0.5) * 0.85; 
               this.changeDirTimer = 0.5;
           } else {
                this.targetAngle = (Math.random() * Math.PI * 2);
@@ -453,17 +487,17 @@ export class EnemyTank extends Tank {
                this.targetAngle = (Math.random() * Math.PI * 2);
           } else {
                this.changeDirTimer = 0.5; 
-               this.targetAngle = this.mesh.rotation.y + (Math.random()-0.5);
+               this.targetAngle = Math.atan2(vecToPlayer.x, vecToPlayer.z) + (Math.random() - 0.5) * 0.6;
           }
       }
       else {
           if (canSeePlayer) {
-              if (Math.random() > 0.4) {
+              if (Math.random() > 0.45) {
                   const perp = new THREE.Vector3(-vecToPlayer.z, 0, vecToPlayer.x);
                   if (Math.random() > 0.5) perp.negate();
                   this.targetAngle = Math.atan2(perp.x, perp.z);
               } else {
-                   const angle = Math.atan2(vecToPlayer.x, vecToPlayer.z) + (Math.random() - 0.5);
+                   const angle = Math.atan2(vecToPlayer.x, vecToPlayer.z) + (Math.random() - 0.5) * 0.7;
                    this.targetAngle = angle;
               }
           } else {

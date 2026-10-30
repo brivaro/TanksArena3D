@@ -516,7 +516,7 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
 // --- Professional Tactical UI Components ---
 
 const BIOMES_LIST = [
-  { id: 'all', label: 'TODAS (72)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
+  { id: 'all', label: 'TODAS (80)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
   { id: 'workshop', label: 'Taller (1-8)', icon: '🌲', range: [1, 8], color: '#fbbf24', accent: 'rgba(251, 191, 36, 0.16)' },
   { id: 'desert', label: 'Desierto (9-16)', icon: '🏜️', range: [9, 16], color: '#fb923c', accent: 'rgba(251, 146, 60, 0.16)' },
   { id: 'cyber', label: 'Cyber Matrix (17-24)', icon: '⚡', range: [17, 24], color: '#22d3ee', accent: 'rgba(34, 211, 238, 0.18)' },
@@ -525,7 +525,8 @@ const BIOMES_LIST = [
   { id: 'jungle', label: 'Selva (41-48)', icon: '🌴', range: [41, 48], color: '#4ade80', accent: 'rgba(74, 222, 128, 0.18)' },
   { id: 'sunset_city', label: 'Ciudad Atardecer (49-56)', icon: '🌇', range: [49, 56], color: '#ff8a65', accent: 'rgba(255, 138, 101, 0.2)' },
   { id: 'matsuri', label: 'Festival Japonés (57-64)', icon: '🏮', range: [57, 64], color: '#f472b6', accent: 'rgba(244, 114, 182, 0.2)' },
-  { id: 'tropical_island', label: 'Isla Tropical (65-72)', icon: '🏝️', range: [65, 72], color: '#2dd4bf', accent: 'rgba(45, 212, 191, 0.2)' }
+  { id: 'tropical_island', label: 'Isla Tropical (65-72)', icon: '🏝️', range: [65, 72], color: '#2dd4bf', accent: 'rgba(45, 212, 191, 0.2)' },
+  { id: 'night_stealth', label: 'Sigilo Nocturno (73-80)', icon: '🌙', range: [73, 80], color: '#818cf8', accent: 'rgba(129, 140, 248, 0.22)' }
 ];
 
 const TANK_SKINS_LIST = [
@@ -817,7 +818,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
               borderRadius: '6px',
               letterSpacing: '1px'
             }}>
-              9 BIOMAS • 72 MISIONES
+              10 BIOMAS • 80 MISIONES
             </span>
             <span style={{
               backgroundColor: 'rgba(251, 191, 36, 0.16)',
@@ -840,7 +841,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
           </div>
 
           <p style={{ ...styles.subtitle, margin: '2px 0 0 0', fontSize: '13px' }}>
-            Combate táctico de blindados con balística de rebote, cohete bazoca de demolición y física reactiva
+            Combate táctico de blindados con balística de rebote, sigilo nocturno, faros dinámicos y bazoca demoledor
           </p>
         </div>
 
@@ -900,7 +901,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
                 <span style={styles.studioMenuIcon}>🗺️</span>
                 <div>
                   <div style={styles.studioMenuTitle}>SELECCIONAR MISIÓN</div>
-                  <div style={styles.studioMenuSub}>{totalLevels} operaciones tácticas en 9 biomas</div>
+                  <div style={styles.studioMenuSub}>{totalLevels} operaciones tácticas en 10 biomas</div>
                 </div>
               </div>
               <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24' }}>★ {totalStars}/{totalLevels * 3}</span>
@@ -1008,12 +1009,12 @@ const MainMenu: React.FC<MainMenuProps> = ({
                 </span>
               </div>
 
-              {/* Quick Direct Launch for the 3 New Biomes */}
+              {/* Quick Direct Launch for the 4 Featured Biomes */}
               <div style={{ marginTop: '10px', paddingTop: '9px', borderTop: '1px solid rgba(148, 163, 184, 0.16)' }}>
                 <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#fde047', letterSpacing: '0.8px', marginBottom: '6px' }}>
-                  ✨ NUEVOS BIOMAS DISPONIBLES (ACCESO RÁPIDO):
+                  ✨ NUEVOS BIOMAS Y SIGILO NOCTURNO (ACCESO RÁPIDO):
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
                   <button
                     type="button"
                     onClick={() => onQuickStartLevel(49)}
@@ -1022,8 +1023,8 @@ const MainMenu: React.FC<MainMenuProps> = ({
                       border: '1px solid rgba(255, 138, 101, 0.5)',
                       color: '#ffab91',
                       borderRadius: '7px',
-                      padding: '6px 4px',
-                      fontSize: '10px',
+                      padding: '6px 3px',
+                      fontSize: '9.5px',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
@@ -1039,8 +1040,8 @@ const MainMenu: React.FC<MainMenuProps> = ({
                       border: '1px solid rgba(244, 114, 182, 0.5)',
                       color: '#f9a8d4',
                       borderRadius: '7px',
-                      padding: '6px 4px',
-                      fontSize: '10px',
+                      padding: '6px 3px',
+                      fontSize: '9.5px',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
@@ -1056,14 +1057,31 @@ const MainMenu: React.FC<MainMenuProps> = ({
                       border: '1px solid rgba(45, 212, 191, 0.5)',
                       color: '#5eead4',
                       borderRadius: '7px',
-                      padding: '6px 4px',
-                      fontSize: '10px',
+                      padding: '6px 3px',
+                      fontSize: '9.5px',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
                     title="Jugar Misión #65: Isla Tropical Paradisíaca"
                   >
                     🏝️ Isla (M65)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStartLevel(73)}
+                    style={{
+                      backgroundColor: 'rgba(129, 140, 248, 0.22)',
+                      border: '1px solid rgba(129, 140, 248, 0.65)',
+                      color: '#c7d2fe',
+                      borderRadius: '7px',
+                      padding: '6px 3px',
+                      fontSize: '9.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                    title="Jugar Misión #73: Operaciones de Sigilo Nocturno con Faros"
+                  >
+                    🌙 Sigilo (M73)
                   </button>
                 </div>
               </div>
@@ -1625,6 +1643,8 @@ interface HUDProps {
   zoomLevel?: number;
   touchControlsEnabled?: boolean;
   isDying?: boolean;
+  stealthStatus?: 'STEALTH' | 'SPOTTED' | 'COMBAT' | null;
+  isNightMode?: boolean;
   onMenu: () => void;
   onToggleMute: () => void;
   onToggleMusic: () => void;
@@ -1633,6 +1653,7 @@ interface HUDProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onToggleTouchControls: () => void;
+  onToggleNightMode?: () => void;
   onMine: () => void;
   onBazooka: () => void;
 }
@@ -1657,6 +1678,8 @@ const HUD: React.FC<HUDProps> = ({
   cameraMode = 'overview',
   touchControlsEnabled = true,
   isDying = false,
+  stealthStatus = null,
+  isNightMode = false,
   onMenu,
   onToggleMute,
   onToggleMusic,
@@ -1665,6 +1688,7 @@ const HUD: React.FC<HUDProps> = ({
   onZoomIn,
   onZoomOut,
   onToggleTouchControls,
+  onToggleNightMode,
   onMine,
   onBazooka
 }) => {
@@ -1734,7 +1758,7 @@ const HUD: React.FC<HUDProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Camera Mode + Zoom & Touch Mode Toggle */}
+          {/* Row 2: Camera Mode + Zoom, Touch Toggle & Night Stealth Toggle */}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{
               ...styles.hudPanel,
@@ -1772,10 +1796,30 @@ const HUD: React.FC<HUDProps> = ({
                 📱 {touchControlsEnabled ? 'TÁCTIL: ON' : 'TÁCTIL: OFF'}
               </button>
             </div>
+
+            {onToggleNightMode && (
+              <div style={{
+                ...styles.hudPanel,
+                borderColor: isNightMode ? 'rgba(129, 140, 248, 0.7)' : 'rgba(148, 163, 184, 0.25)',
+                backgroundColor: isNightMode ? 'rgba(30, 27, 75, 0.92)' : 'rgba(15, 23, 42, 0.92)'
+              }}>
+                <button
+                  onClick={onToggleNightMode}
+                  style={{
+                    ...styles.hudButton,
+                    color: isNightMode ? '#a5b4fc' : '#94a3b8',
+                    fontSize: '11px'
+                  }}
+                  title="Activar / Desactivar Modo Sigilo Nocturno [Tecla N]"
+                >
+                  🌙 {isNightMode ? 'NOCHE: ON' : 'NOCHE: OFF'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Truly Centered Level, Biome & Boss Health Bar Header */}
+        {/* Truly Centered Level, Biome, Stealth Status & Boss Health Bar Header */}
         <div style={{
           position: 'absolute',
           left: '50%',
@@ -1807,6 +1851,43 @@ const HUD: React.FC<HUDProps> = ({
               {missionName ? ` • ${missionName.toUpperCase()}` : ''}
             </div>
           </div>
+
+          {/* Live Stealth / Lighthouse Detection Status Pill */}
+          {stealthStatus && (
+            <div style={{
+              ...styles.hudPanel,
+              padding: '4px 14px',
+              fontSize: '10.5px',
+              fontWeight: 900,
+              letterSpacing: '0.6px',
+              backgroundColor: stealthStatus === 'SPOTTED'
+                ? 'rgba(127, 29, 29, 0.94)'
+                : stealthStatus === 'STEALTH'
+                ? 'rgba(12, 74, 110, 0.92)'
+                : 'rgba(30, 41, 59, 0.92)',
+              borderColor: stealthStatus === 'SPOTTED'
+                ? '#ff1744'
+                : stealthStatus === 'STEALTH'
+                ? '#38bdf8'
+                : '#fbbf24',
+              color: stealthStatus === 'SPOTTED'
+                ? '#fecdd3'
+                : stealthStatus === 'STEALTH'
+                ? '#7dd3fc'
+                : '#fde047',
+              boxShadow: stealthStatus === 'SPOTTED'
+                ? '0 0 18px rgba(255, 23, 68, 0.6)'
+                : stealthStatus === 'STEALTH'
+                ? '0 0 14px rgba(56, 189, 248, 0.35)'
+                : 'none'
+            }}>
+              {stealthStatus === 'SPOTTED'
+                ? '🚨 ¡ILUMINADO POR EL FARO! POSICIÓN REVELADA'
+                : stealthStatus === 'STEALTH'
+                ? '🥷 OCULTO EN SIGILO NOCTURNO (+150 PTS BONUS)'
+                : '💥 DISPARO DETECTADO • REUBÍCATE EN LA SOMBRA'}
+            </div>
+          )}
 
           {/* Punto 1: Boss Dreadnought Health Bar */}
           {bossInfo && bossInfo.hp > 0 && (
@@ -2476,9 +2557,15 @@ const IntelModal: React.FC<IntelModalProps> = ({ onClose }) => (
               Dispara al cristal interruptor para desactivar o activar los campos de fuerza láser.
             </div>
           </div>
+          <div style={{ ...styles.intelCard, borderLeft: '3px solid #818cf8' }}>
+            <div style={{ fontWeight: 800, color: '#a5b4fc', fontSize: '13px' }}>🚨 Faro Centinela y Sigilo Nocturno (L)</div>
+            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
+              El haz de luz del faro se adapta a los muros en tiempo real. Si te ilumina de noche, revela tu posición a todos los enemigos; si abates enemigos desde las sombras ganas <strong>+150 PTS de Sigilo</strong> y recarga táctica.
+            </div>
+          </div>
         </div>
 
-        <h3 style={{ color: '#4ade80', margin: '14px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>🌍 9 BIOMAS DE CAMPAÑA (72 MISIONES)</h3>
+        <h3 style={{ color: '#4ade80', margin: '14px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>🌍 10 BIOMAS DE CAMPAÑA (80 MISIONES)</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '14px' }}>
           <div style={styles.intelCard}>
             <span style={{ fontWeight: 800, color: '#fbbf24', fontSize: '12px' }}>🌲 1. Taller de Juguetes (M1-M8)</span>
@@ -2515,6 +2602,10 @@ const IntelModal: React.FC<IntelModalProps> = ({ onClose }) => (
           <div style={styles.intelCard}>
             <span style={{ fontWeight: 800, color: '#2dd4bf', fontSize: '12px' }}>🏝️ 9. Isla Tropical (M65-M72)</span>
             <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Playa de arena coralina, laguna turquesa, cocoteros, sombrillas y cabañas Tiki.</div>
+          </div>
+          <div style={styles.intelCard}>
+            <span style={{ fontWeight: 800, color: '#818cf8', fontSize: '12px' }}>🌙 10. Sigilo Nocturno (M73-M80)</span>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Infiltración bajo luz de luna legible, faros con oclusión real en muros y bonificación por golpe de sigilo.</div>
           </div>
         </div>
       </div>
@@ -2587,6 +2678,8 @@ export const App = () => {
     biome: 'workshop',
     activePowerup: null as string | null,
     bossInfo: null as { name: string; hp: number; maxHp: number; enraged: boolean } | null,
+    stealthStatus: null as 'STEALTH' | 'SPOTTED' | 'COMBAT' | null,
+    isNightMode: false,
     won: false,
     mineReady: true,
     mineCooldownProgress: 1.0,
@@ -2652,7 +2745,10 @@ export const App = () => {
       const { combo, points, method } = event.data;
       let label = `💥 ¡BLANCO ELIMINADO! +${points}`;
       let color = '#ffeb3b';
-      if (method === 'RICOCHET') {
+      if (method === 'STEALTH') {
+        label = `🥷 ¡GOLPE DE SIGILO! +${points} (+RECARGA)`;
+        color = '#38bdf8';
+      } else if (method === 'RICOCHET') {
         label = `🎯 ¡TIRO DE REBOTE! +${points}`;
         color = '#00e5ff';
       } else if (combo >= 2) {
@@ -2770,6 +2866,8 @@ export const App = () => {
           engineRef.current.adjustZoom(0.15);
         } else if (e.code === 'KeyC') {
           toggleCamera();
+        } else if (e.code === 'KeyN') {
+          engineRef.current.toggleNightMode();
         }
       }
     };
@@ -3092,6 +3190,7 @@ export const App = () => {
             onZoomIn={zoomIn}
             onZoomOut={zoomOut}
             onToggleTouchControls={() => setTouchControlsEnabled(prev => !prev)}
+            onToggleNightMode={() => engineRef.current?.toggleNightMode()}
             onMine={() => engineRef.current?.triggerMine()}
             onBazooka={() => engineRef.current?.triggerBazooka()}
           />

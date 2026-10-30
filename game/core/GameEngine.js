@@ -58,8 +58,16 @@ export class GameEngine {
         zoomLevel: 0.9,
         biome: 'workshop',
         activePowerup: null,
-        bossInfo: null
+        bossInfo: null,
+        stealthStatus: null,
+        isNightMode: false
     };
+    this.nightModeOverride = false;
+    this.isPlayerStealthed = false;
+    this.isSpottedByLighthouse = false;
+    this.muzzleRevealTimer = 0;
+    this.lighthouseAlertCooldown = 0;
+    this.searchlightBeamTex = null;
     this.isRunning = false;
     this.isPaused = false;
     this.isDying = false;
@@ -232,8 +240,41 @@ export class GameEngine {
     this.cameraState.overviewZ = this.cameraState.overviewHeight * 0.65;
   }
 
+  isNightStealthActive() {
+    return this.currentBiome === 'night_stealth' || this.nightModeOverride === true;
+  }
+
+  toggleNightMode() {
+    this.nightModeOverride = !this.nightModeOverride;
+    this.applyBiomeLighting(this.currentBiome);
+    this.stats.isNightMode = this.isNightStealthActive();
+    this.updateUI();
+    return this.stats.isNightMode;
+  }
+
   applyBiomeLighting(biome) {
     if (!this.ambientLight || !this.dirLight) return;
+
+    if (biome === 'night_stealth' || this.nightModeOverride) {
+      // Tactical Moonlit Night Stealth: Crisp silver-blue moonlight so all 3D walls, bevels, and tanks remain clearly readable while searchlight beams pop!
+      this.scene.background = new THREE.Color(0x0b1326);
+      if (this.scene.fog) this.scene.fog.color.setHex(0x0b1326);
+      this.ambientLight.color.setHex(0x90caf9);
+      this.ambientLight.groundColor.setHex(0x1e293b);
+      this.ambientLight.intensity = 0.78;
+      this.dirLight.color.setHex(0xb3e5fc);
+      this.dirLight.intensity = 1.12;
+      if (this.fillLight) {
+        this.fillLight.color.setHex(0x64b5f6);
+        this.fillLight.intensity = 0.50;
+      }
+      if (this.tableMesh) this.tableMesh.material.color.setHex(0x0f172a);
+      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x090f1d);
+      this.baseAmbientIntensity = this.ambientLight.intensity;
+      this.baseDirIntensity = this.dirLight.intensity;
+      this.stageLightBoost = 0;
+      return;
+    }
 
     if (biome === 'workshop') {
       // Rich warm golden sunlight over vivid green meadow & oak table
@@ -1914,6 +1955,41 @@ export class GameEngine {
       };
       addProp(buildTikiCabana(1.0), outerWestX - 13, outerNorthZ - 12, -1.45);
       addProp(buildTikiCabana(0.95), outerEastX + 13, outerSouthZ + 12, -1.45);
+    } else if (biome === 'night_stealth') {
+      // --- NIGHT STEALTH PERIMETER: Moonlit Pines, Rotating Radar Domes & Guard Beacons ---
+      const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+      const pineLeafMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.65, flatShading: true });
+      const radarBaseMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.35 });
+      const radarDishMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.45, metalness: 0.5, roughness: 0.25 });
+
+      perimeterRing.forEach((p, idx) => {
+        if (idx % 3 === 0) {
+          const radar = new THREE.Group();
+          const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.9, 3.6, 8), radarBaseMat);
+          ped.position.y = 1.8;
+          radar.add(ped);
+          const dish = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.3, 10, 1, true), radarDishMat);
+          dish.position.y = 4.4;
+          dish.rotation.x = Math.PI / 3;
+          radar.add(dish);
+          this.envRotators.push({ mesh: dish, axis: 'y', speed: 1.5 });
+          radar.scale.setScalar(p.s);
+          addProp(radar, p.x, p.z, -1.45);
+        } else {
+          const pine = new THREE.Group();
+          const t = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.55, 2.2, 6), pineTrunkMat);
+          t.position.y = 1.1;
+          pine.add(t);
+          const c1 = new THREE.Mesh(new THREE.ConeGeometry(2.6, 4.2, 6), pineLeafMat);
+          c1.position.y = 3.4;
+          pine.add(c1);
+          const c2 = new THREE.Mesh(new THREE.ConeGeometry(1.9, 3.4, 6), pineLeafMat);
+          c2.position.y = 5.6;
+          pine.add(c2);
+          pine.scale.setScalar(p.s);
+          addProp(pine, p.x, p.z, -1.45);
+        }
+      });
     }
   }
 
@@ -2097,6 +2173,26 @@ export class GameEngine {
       ctx.fillRect(234, 14, 8, 8);
       ctx.fillRect(14, 234, 8, 8);
       ctx.fillRect(234, 234, 8, 8);
+    } else if (biome === 'night_stealth') {
+      // Moonlit Tactical Stealth Base Slate-Blue Floor Tiles: Clear readable geometry at night with silver-cyan tactical grid lines
+      ctx.fillStyle = '#25354d'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#2d405e';
+      ctx.fillRect(10, 10, 236, 236);
+      for (let i = 0; i < 300; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(144, 202, 249, 0.12)' : 'rgba(15, 23, 42, 0.35)';
+        ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 3);
+      }
+      // Crisp moonlit steel-cyan tile border so every cell shape is clearly visible at night
+      ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4;
+      ctx.strokeRect(3, 3, 250, 250);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(16, 16, 224, 224);
+      // Subtle tactical corner markers
+      ctx.fillStyle = '#7dd3fc';
+      ctx.fillRect(12, 12, 7, 7);
+      ctx.fillRect(237, 12, 7, 7);
+      ctx.fillRect(12, 237, 7, 7);
+      ctx.fillRect(237, 237, 7, 7);
     } else { // jungle
       // Vivid tropical lime-emerald turf tiles so dark tank tread marks pop with maximum contrast!
       ctx.fillStyle = '#9be548'; ctx.fillRect(0,0,256,256);
@@ -2467,6 +2563,13 @@ export class GameEngine {
           causticColor.setHex(0xe0f7fa);
           foamColor.setHex(0xffffff);
           opacity = 0.86;
+      } else if (biome === 'night_stealth') {
+          // Moonlit midnight stealth harbor water with silver-cyan reflections
+          deepColor.setHex(0x091930);
+          shallowColor.setHex(0x1e40af);
+          causticColor.setHex(0x7dd3fc);
+          foamColor.setHex(0xbae6fd);
+          opacity = 0.91;
       }
 
       return new THREE.ShaderMaterial({
@@ -2650,6 +2753,12 @@ export class GameEngine {
           size = 1.2;
           vy = -0.6;
           vx = 2.4;
+      } else if (biome === 'night_stealth') {
+          // Soft moonlit fireflies & nocturnal mist motes
+          color = 0x7dd3fc;
+          size = 1.25;
+          vy = 0.7;
+          vx = 0.9;
       }
 
       const mat = new THREE.PointsMaterial({
@@ -2838,6 +2947,280 @@ export class GameEngine {
       return this.aiDifficulty || 'normal';
   }
 
+  // --- Realistic Scenario-Adaptive Lighthouse Searchlight & Night Stealth System ---
+
+  createSearchlightBeamTexture() {
+      if (this.searchlightBeamTex) return this.searchlightBeamTex;
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      // Radial-longitudinal soft falloff: u = 0..1 across cone width (soft feathered edges), v = 0..1 from origin to tip
+      const imgData = ctx.createImageData(128, 128);
+      const data = imgData.data;
+      for (let y = 0; y < 128; y++) {
+          const v = y / 127; // 0 = at lighthouse origin, 1 = outer tip
+          // Smooth longitudinal attenuation that stays bright along the beam and feathers out near the tip
+          const distFade = Math.pow(Math.max(0, 1.0 - v * 0.82), 1.25);
+          for (let x = 0; x < 128; x++) {
+              const u = (x / 127) * 2.0 - 1.0; // -1..+1 across beam width
+              const edgeFade = Math.pow(Math.max(0, 1.0 - u * u), 1.65);
+              const alpha = Math.round(Math.min(1, distFade * edgeFade) * 255);
+              const idx = (y * 128 + x) * 4;
+              data[idx] = 255;
+              data[idx + 1] = 255;
+              data[idx + 2] = 255;
+              data[idx + 3] = alpha;
+          }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      this.searchlightBeamTex = tex;
+      return tex;
+  }
+
+  // Computes exact 2D ray distance from lighthouse (ox, oz) along direction (dx, dz) to the nearest wall, crate, pillar, or border
+  getSearchlightWallDistance(ox, oz, dx, dz, maxDist, ignoreGroup) {
+      let closest = maxDist;
+      const obstacles = this.walls;
+      for (let i = 0; i < obstacles.length; i++) {
+          const w = obstacles[i];
+          if (!w || w === ignoreGroup || !w.userData) continue;
+
+          // Circular obstacles (pillars, trees, barrels, other lighthouses)
+          if (w.userData.collisionRadius) {
+              const r = w.userData.collisionRadius;
+              const fx = ox - w.position.x;
+              const fz = oz - w.position.z;
+              // If ray starts inside this circle, skip
+              if (fx * fx + fz * fz <= r * r + 0.2) continue;
+              const b = 2 * (fx * dx + fz * dz);
+              const c = (fx * fx + fz * fz) - r * r;
+              const disc = b * b - 4 * c;
+              if (disc >= 0) {
+                  const t = (-b - Math.sqrt(disc)) * 0.5;
+                  if (t > 1.8 && t < closest) {
+                      closest = t;
+                  }
+              }
+              continue;
+          }
+
+          // Rectangular AABB walls ('W', 'S', 'C', borders)
+          const box = w.userData.bounds;
+          if (!box) continue;
+          const invDx = Math.abs(dx) > 1e-6 ? 1.0 / dx : 1e6;
+          const invDz = Math.abs(dz) > 1e-6 ? 1.0 / dz : 1e6;
+
+          const t1 = (box.min.x - ox) * invDx;
+          const t2 = (box.max.x - ox) * invDx;
+          const t3 = (box.min.z - oz) * invDz;
+          const t4 = (box.max.z - oz) * invDz;
+
+          const tmin = Math.max(Math.min(t1, t2), Math.min(t3, t4));
+          const tmax = Math.min(Math.max(t1, t2), Math.max(t3, t4));
+
+          if (tmax >= 0 && tmin <= tmax && tmin > 1.8 && tmin < closest) {
+              closest = tmin;
+          }
+      }
+      return closest;
+  }
+
+  updateLighthousesAndStealth(dt) {
+      if (this.muzzleRevealTimer > 0) {
+          this.muzzleRevealTimer = Math.max(0, this.muzzleRevealTimer - dt);
+      }
+      if (this.lighthouseAlertCooldown > 0) {
+          this.lighthouseAlertCooldown = Math.max(0, this.lighthouseAlertCooldown - dt);
+      }
+
+      let playerIlluminatedByAnyLighthouse = false;
+      const playerPos = (this.player && this.player.mesh && !this.isDying) ? this.player.mesh.position : null;
+
+      for (let i = 0; i < this.lighthouses.length; i++) {
+          const lh = this.lighthouses[i];
+          if (!lh || !lh.group) continue;
+
+          lh.angle = (lh.angle || 0) - lh.speed * dt;
+          if (lh.headGroup) {
+              lh.headGroup.rotation.y = lh.angle;
+          }
+
+          const ox = lh.group.position.x;
+          const oz = lh.group.position.z;
+          const N = lh.numRays || 24;
+          const halfCone = lh.halfCone || 0.43; // ~24.6 degrees half-angle (49 deg total sweep cone)
+          const maxRange = lh.maxRange || 34.0;
+          const minDeadzone = 2.6;
+
+          const floorPos = lh.floorFanGeo.attributes.position.array;
+          const airPos = lh.airBeamGeo.attributes.position.array;
+
+          // Pre-sample occluded wall distance for each of the N+1 rays across the cone
+          const rayDirsX = lh.rayDirsX;
+          const rayDirsZ = lh.rayDirsZ;
+          const rayDists = lh.rayDists;
+
+          let sumDist = 0;
+          for (let r = 0; r <= N; r++) {
+              const frac = (r / N) * 2.0 - 1.0; // -1 .. +1
+              const rayAngle = lh.angle + frac * halfCone;
+              const rdx = Math.sin(rayAngle);
+              const rdz = Math.cos(rayAngle);
+              rayDirsX[r] = rdx;
+              rayDirsZ[r] = rdz;
+              const hitDist = this.getSearchlightWallDistance(ox, oz, rdx, rdz, maxRange, lh.group);
+              rayDists[r] = hitDist;
+              sumDist += hitDist;
+          }
+
+          // Update Ground Projected Light Fan (y = 0.08) & Soft Volumetric Air Beam (from lantern y = 7.75 to ground y = 0.14)
+          for (let r = 0; r < N; r++) {
+              const vIdx = r * 9;
+              const dx0 = rayDirsX[r];
+              const dz0 = rayDirsZ[r];
+              const d0 = rayDists[r];
+
+              const dx1 = rayDirsX[r + 1];
+              const dz1 = rayDirsZ[r + 1];
+              const d1 = rayDists[r + 1];
+
+              // Floor Triangle r: starts just outside lighthouse base and stops exactly at the wall impact!
+              floorPos[vIdx]     = dx0 * minDeadzone;
+              floorPos[vIdx + 1] = 0.08;
+              floorPos[vIdx + 2] = dz0 * minDeadzone;
+
+              floorPos[vIdx + 3] = dx0 * d0;
+              floorPos[vIdx + 4] = 0.08;
+              floorPos[vIdx + 5] = dz0 * d0;
+
+              floorPos[vIdx + 6] = dx1 * d1;
+              floorPos[vIdx + 7] = 0.08;
+              floorPos[vIdx + 8] = dz1 * d1;
+
+              // Volumetric Air Beam Triangle r: slopes from lantern lens (y = 7.75) down to the occluded ground edge (y = 0.14)
+              airPos[vIdx]     = dx0 * 1.15;
+              airPos[vIdx + 1] = 7.75;
+              airPos[vIdx + 2] = dz0 * 1.15;
+
+              airPos[vIdx + 3] = dx0 * d0;
+              airPos[vIdx + 4] = 0.14;
+              airPos[vIdx + 5] = dz0 * d0;
+
+              airPos[vIdx + 6] = dx1 * d1;
+              airPos[vIdx + 7] = 0.14;
+              airPos[vIdx + 8] = dz1 * d1;
+          }
+
+          lh.floorFanGeo.attributes.position.needsUpdate = true;
+          lh.airBeamGeo.attributes.position.needsUpdate = true;
+
+          // Position the efficient no-shadow PointLight along the center of the occluded ground light pool so nearby walls & tanks receive real 3D illumination
+          const avgDist = sumDist / (N + 1);
+          const centerX = Math.sin(lh.angle) * Math.min(avgDist * 0.58, 16.0);
+          const centerZ = Math.cos(lh.angle) * Math.min(avgDist * 0.58, 16.0);
+          if (lh.groundPointLight) {
+              lh.groundPointLight.position.set(centerX, 3.2, centerZ);
+          }
+
+          // Check if the player tank is inside this lighthouse's unblocked beam
+          let spottingPlayer = false;
+          if (playerPos) {
+              const px = playerPos.x - ox;
+              const pz = playerPos.z - oz;
+              const pDist = Math.hypot(px, pz);
+              if (pDist > minDeadzone + 0.4 && pDist < maxRange + 1.0) {
+                  const pAngle = Math.atan2(px, pz);
+                  let angleDiff = pAngle - lh.angle;
+                  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+                  if (Math.abs(angleDiff) <= halfCone + 0.06) {
+                      // Check wall occlusion along the exact ray from lighthouse to player
+                      const dirX = px / pDist;
+                      const dirZ = pz / pDist;
+                      const wallDist = this.getSearchlightWallDistance(ox, oz, dirX, dirZ, maxRange, lh.group);
+                      if (pDist <= wallDist + 1.15) {
+                          spottingPlayer = true;
+                          playerIlluminatedByAnyLighthouse = true;
+                      }
+                  }
+              }
+          }
+
+          // Visual feedback on the lighthouse beam: Crimson Alert when spotting the player, Warm Searchlight Gold otherwise
+          const isNight = this.isNightStealthActive();
+          if (spottingPlayer) {
+              lh.floorFanMat.color.setHex(0xff1744);
+              lh.floorFanMat.opacity = isNight ? 0.62 : 0.46;
+              lh.airBeamMat.color.setHex(0xff1744);
+              lh.airBeamMat.opacity = isNight ? 0.34 : 0.24;
+              if (lh.bulbMat) lh.bulbMat.color.setHex(0xff1744);
+              if (lh.groundPointLight) {
+                  lh.groundPointLight.color.setHex(0xff1744);
+                  lh.groundPointLight.intensity = isNight ? 5.2 : 3.6;
+              }
+          } else {
+              lh.floorFanMat.color.setHex(isNight ? 0xffe57f : 0xffd54f);
+              lh.floorFanMat.opacity = isNight ? 0.48 : 0.32;
+              lh.airBeamMat.color.setHex(isNight ? 0xfff59d : 0xffe082);
+              lh.airBeamMat.opacity = isNight ? 0.24 : 0.15;
+              if (lh.bulbMat) lh.bulbMat.color.setHex(0xffffcc);
+              if (lh.groundPointLight) {
+                  lh.groundPointLight.color.setHex(0xffd54f);
+                  lh.groundPointLight.intensity = isNight ? 4.2 : 2.6;
+              }
+          }
+      }
+
+      const wasSpotted = this.isSpottedByLighthouse;
+      this.isSpottedByLighthouse = playerIlluminatedByAnyLighthouse;
+
+      // Trigger high-alert warning when player steps into a lighthouse searchlight beam
+      if (playerIlluminatedByAnyLighthouse && !wasSpotted && this.lighthouseAlertCooldown <= 0 && playerPos) {
+          this.lighthouseAlertCooldown = 2.6;
+          this.vfx.spawnShockwave(playerPos, 0xff1744, 7.5);
+          this.vfx.spawnFloatingText(playerPos, '🚨 ¡ILUMINADO POR EL FARO!', '#ff1744', 1.15);
+          this.onEvent({
+              type: 'LIGHT_PULSE',
+              data: { text: '🚨 ¡EL FARO TE HA ILUMINADO! LOS ENEMIGOS VEN TU POSICIÓN' }
+          });
+      }
+
+      // Compute overall stealth state for Night Stealth missions or maps with Lighthouses
+      const isNight = this.isNightStealthActive();
+      const hasStealthGameplay = isNight || this.lighthouses.length > 0;
+      if (!hasStealthGameplay || !playerPos) {
+          this.isPlayerStealthed = false;
+          if (this.stats.stealthStatus !== null) {
+              this.stats.stealthStatus = null;
+              this.updateUI();
+          }
+          return;
+      }
+
+      if (playerIlluminatedByAnyLighthouse) {
+          this.isPlayerStealthed = false;
+      } else if (isNight) {
+          // In Night Stealth mode, player is hidden in the shadows unless firing weapon or standing < 14 units in front of an enemy
+          this.isPlayerStealthed = (this.muzzleRevealTimer <= 0 && this.stageLightBoost <= 0);
+      } else {
+          this.isPlayerStealthed = false;
+      }
+
+      const nextStatus = playerIlluminatedByAnyLighthouse
+          ? 'SPOTTED'
+          : (this.isPlayerStealthed ? 'STEALTH' : (isNight ? 'COMBAT' : null));
+
+      if (this.stats.stealthStatus !== nextStatus || this.stats.isNightMode !== isNight) {
+          this.stats.stealthStatus = nextStatus;
+          this.stats.isNightMode = isNight;
+          this.updateUI();
+      }
+  }
+
   loadLevel(levelIndex) {
     this.cleanup();
     this.stageLightBoost = 0;
@@ -2941,6 +3324,14 @@ export class GameEngine {
         borderMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.5 });
         foliagePrimaryColor = 0x10b981;
         foliageSecondaryColor = 0x34d399;
+    } else if (biome === 'night_stealth') {
+        // Moonlit Tactical Stealth Operations: High-contrast steel-indigo walls with luminous cyan bevel caps so all 3D shapes are clearly visible at night!
+        woodMat = new THREE.MeshStandardMaterial({ color: 0x2b3d59, metalness: 0.45, roughness: 0.32, emissive: 0x0f1f38, emissiveIntensity: 0.35 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.48, roughness: 0.22 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x334155, map: this.createBrickTexture(), roughness: 0.48 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: 0x0369a1, emissiveIntensity: 0.32, roughness: 0.4 });
+        foliagePrimaryColor = 0x0284c7;
+        foliageSecondaryColor = 0x38bdf8;
     } else { // jungle
         woodMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.45 });
         capMat = new THREE.MeshStandardMaterial({ color: 0xffd600, metalness: 0.45, roughness: 0.3 });
@@ -2959,6 +3350,7 @@ export class GameEngine {
         : biome === 'matsuri' ? 0xd32f2f
         : biome === 'sunset_city' ? 0x475569
         : biome === 'tropical_island' ? 0x00acc1
+        : biome === 'night_stealth' ? 0x38bdf8
         : 0x5d4037,
       roughness: 0.45,
       metalness: 0.2
@@ -3150,7 +3542,7 @@ export class GameEngine {
             };
             this.scene.add(m);
             this.walls.push(m);
-        } else if (type === 'L') { // Lighthouse / Sentry Tower
+        } else if (type === 'L') { // Realistic Scenario-Adaptive Lighthouse / Searchlight Tower
             const grp = new THREE.Group();
             grp.position.set(x, 0, z);
             
@@ -3158,55 +3550,128 @@ export class GameEngine {
             base.position.y = 3;
             base.castShadow = true; base.receiveShadow = true;
             grp.add(base);
+
+            // Red warning stripe band around lighthouse tower
+            const stripe = new THREE.Mesh(new THREE.CylinderGeometry(2.68, 2.82, 1.5, 16), lhRedMat);
+            stripe.position.y = 3.2;
+            grp.add(stripe);
             
             const mid = new THREE.Mesh(lhTopGeo, lhRedMat);
-            mid.position.y = 7;
+            mid.position.y = 6.8;
             mid.castShadow = true;
             grp.add(mid);
 
+            // Observation gallery rim
+            const gallery = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.55, 0.35, 16), borderMat);
+            gallery.position.y = 6.0;
+            grp.add(gallery);
+
             const roof = new THREE.Mesh(lhRoofGeo, lhRedMat);
-            roof.position.y = 9;
+            roof.position.y = 9.1;
             roof.castShadow = true;
             grp.add(roof);
 
-            const lightPivot = new THREE.Group();
-            lightPivot.position.y = 8; 
-            grp.add(lightPivot);
+            // Rotating Searchlight Head housing & glowing lens
+            const headGroup = new THREE.Group();
+            headGroup.position.y = 7.75;
+            grp.add(headGroup);
 
-            const spotLight = new THREE.SpotLight(0xffeeb1, 600, 70, 0.7, 0.5, 1.2); 
-            spotLight.position.set(0, 0, 0);
-            spotLight.target.position.set(0, -20, 30);
-            spotLight.castShadow = true;
-            spotLight.shadow.bias = -0.0001;
-            lightPivot.add(spotLight);
-            lightPivot.add(spotLight.target);
+            const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+            const bulb = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 1.2, 12), bulbMat);
+            bulb.rotation.x = Math.PI / 2;
+            bulb.position.z = 0.65;
+            bulb.userData = { isEffect: true };
+            bulb.raycast = () => {};
+            headGroup.add(bulb);
 
-            const beamGeo = new THREE.CylinderGeometry(0.5, 8, 35, 32, 1, true);
-            beamGeo.rotateX(-Math.PI / 2);
-            beamGeo.translate(0, 0, 17.5);
-            const beamMat = new THREE.MeshBasicMaterial({
-                color: 0xffd700, 
+            // Dynamic Wall-Occluded Ground Light Sector + Volumetric Air Beam
+            const N_RAYS = 24;
+            const beamTex = this.createSearchlightBeamTexture();
+            const floorPositions = new Float32Array(N_RAYS * 9);
+            const airPositions = new Float32Array(N_RAYS * 9);
+            const beamUVs = new Float32Array(N_RAYS * 6);
+
+            for (let r = 0; r < N_RAYS; r++) {
+                const u0 = r / N_RAYS;
+                const u1 = (r + 1) / N_RAYS;
+                const uvIdx = r * 6;
+                // Vertex 0: near origin (v = 0)
+                beamUVs[uvIdx]     = 0.5;
+                beamUVs[uvIdx + 1] = 0.0;
+                // Vertex 1: outer ray r (v = 1)
+                beamUVs[uvIdx + 2] = u0;
+                beamUVs[uvIdx + 3] = 1.0;
+                // Vertex 2: outer ray r+1 (v = 1)
+                beamUVs[uvIdx + 4] = u1;
+                beamUVs[uvIdx + 5] = 1.0;
+            }
+
+            const floorFanGeo = new THREE.BufferGeometry();
+            floorFanGeo.setAttribute('position', new THREE.BufferAttribute(floorPositions, 3));
+            floorFanGeo.setAttribute('uv', new THREE.BufferAttribute(beamUVs, 2));
+
+            const floorFanMat = new THREE.MeshBasicMaterial({
+                color: 0xffd54f,
+                map: beamTex,
                 transparent: true,
-                opacity: 0.12,
+                opacity: 0.38,
                 side: THREE.DoubleSide,
                 depthWrite: false,
                 blending: THREE.AdditiveBlending
             });
-            const beam = new THREE.Mesh(beamGeo, beamMat);
-            beam.rotation.x = 0.3; 
-            beam.position.z = 1.0; 
-            beam.userData = { isEffect: true };
-            beam.raycast = () => {}; // Never block raycasts with the light cone!
-            lightPivot.add(beam);
+            const floorFanMesh = new THREE.Mesh(floorFanGeo, floorFanMat);
+            floorFanMesh.frustumCulled = false;
+            floorFanMesh.userData = { isEffect: true };
+            floorFanMesh.raycast = () => {};
+            grp.add(floorFanMesh);
 
-            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshBasicMaterial({ color: 0xffffaa }));
-            bulb.userData = { isEffect: true };
-            bulb.raycast = () => {};
-            lightPivot.add(bulb);
+            const airBeamGeo = new THREE.BufferGeometry();
+            airBeamGeo.setAttribute('position', new THREE.BufferAttribute(airPositions, 3));
+            airBeamGeo.setAttribute('uv', new THREE.BufferAttribute(beamUVs, 2));
+
+            const airBeamMat = new THREE.MeshBasicMaterial({
+                color: 0xffe082,
+                map: beamTex,
+                transparent: true,
+                opacity: 0.18,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            const airBeamMesh = new THREE.Mesh(airBeamGeo, airBeamMat);
+            airBeamMesh.frustumCulled = false;
+            airBeamMesh.userData = { isEffect: true };
+            airBeamMesh.raycast = () => {};
+            grp.add(airBeamMesh);
+
+            // Single efficient PointLight (castShadow = false) that glides along the illuminated floor zone
+            const groundPointLight = new THREE.PointLight(0xffd54f, 3.2, 28, 1.35);
+            groundPointLight.position.set(0, 3.2, 10);
+            groundPointLight.castShadow = false;
+            grp.add(groundPointLight);
 
             this.scene.add(grp);
             grp.updateMatrixWorld(true);
-            this.lighthouses.push({ group: grp, pivot: lightPivot, speed: 1.2 });
+
+            const initialAngle = (this.lighthouses.length * 1.57) % (Math.PI * 2);
+            this.lighthouses.push({
+                group: grp,
+                headGroup,
+                bulbMat,
+                floorFanGeo,
+                floorFanMat,
+                airBeamGeo,
+                airBeamMat,
+                groundPointLight,
+                angle: initialAngle,
+                speed: 0.95,
+                numRays: N_RAYS,
+                halfCone: 0.43,
+                maxRange: 34.0,
+                rayDirsX: new Float32Array(N_RAYS + 1),
+                rayDirsZ: new Float32Array(N_RAYS + 1),
+                rayDists: new Float32Array(N_RAYS + 1)
+            });
 
             grp.userData = { bounds: new THREE.Box3().setFromObject(base), collisionRadius: 2.95, type: 'lighthouse' };
             this.walls.push(grp);
@@ -3371,7 +3836,7 @@ export class GameEngine {
       }
     }
 
-    // --- PUNTO 1: BIOME BOSS FINALE ON MISSIONS 8, 16, 24, 32, 40, 48, 56, 64, 72 ---
+    // --- PUNTO 1: BIOME BOSS FINALE ON MISSIONS 8, 16, 24, 32, 40, 48, 56, 64, 72, 80 ---
     this.bossEntity = null;
     this.stats.bossInfo = null;
     if (levelIndex % 8 === 0) {
@@ -3384,7 +3849,8 @@ export class GameEngine {
         48: { name: '👑 GUARDIÁN DE EL DORADO', color: 0xffab00, maxHp: 20 },
         56: { name: '👑 GUARDIÁN METRÓPOLIS NOCTURNA', color: 0xff6e40, maxHp: 22 },
         64: { name: '👑 SHOGUN DEL FESTIVAL CARMESÍ', color: 0xff1744, maxHp: 24 },
-        72: { name: '👑 KRAKEN DE CORAL MK-IX', color: 0x00e5ff, maxHp: 26 }
+        72: { name: '👑 KRAKEN DE CORAL MK-IX', color: 0x00e5ff, maxHp: 26 },
+        80: { name: '👑 ESPECTRO NOCTURNO MK-X', color: 0x38bdf8, maxHp: 28 }
       };
       const bossCfg = BOSS_METADATA[levelIndex] || { name: '👑 MEGATANK JEFE', color: 0xb71c1c, maxHp: 12 };
       const enemies = this.entities.filter(e => e instanceof EnemyTank);
@@ -3411,6 +3877,10 @@ export class GameEngine {
 
     this.stats.enemiesLeft = this.entities.filter(e => e instanceof EnemyTank).length;
     this.stats.lives = this.playerPerk === 'heavy_armor' ? 4 : 3;
+    this.stats.isNightMode = this.isNightStealthActive();
+    this.muzzleRevealTimer = 0;
+    this.isSpottedByLighthouse = false;
+    this.updateLighthousesAndStealth(0.016);
     this.missionStartTime = performance.now();
     this.missionDamageTaken = 0;
     this.isRunning = true;
@@ -3523,9 +3993,10 @@ export class GameEngine {
     // Spawn smoke/flash at tip
     this.vfx.spawnMuzzleEffect(tipPos, totalRotation);
     
-    // Subtle screen shake on shoot for player
+    // Subtle screen shake on shoot for player + brief muzzle flash reveal in Night Stealth
     if (sourceTank instanceof PlayerTank) {
-        this.screenShake = 0.3; 
+        this.screenShake = 0.3;
+        this.muzzleRevealTimer = 0.65;
     }
   }
 
@@ -3893,9 +4364,8 @@ export class GameEngine {
         this.cursor.setVisible(false);
     }
 
-    this.lighthouses.forEach(lh => {
-        lh.pivot.rotation.y -= lh.speed * effectiveDt;
-    });
+    // Update Realistic Wall-Occluded Lighthouse Searchlights & Night Stealth Detection
+    this.updateLighthousesAndStealth(effectiveDt);
 
     // If player is in the middle of the catastrophic death sequence, freeze enemy shooting so camera focuses on the wreck
     if (this.isDying) {
@@ -4028,11 +4498,16 @@ export class GameEngine {
 
     const collisionObstacles = [...this.walls, ...this.destructibles, ...this.tankBlockers];
     const visionObstacles = [...this.walls, ...this.destructibles];
+    const stealthContext = {
+        isNightStealth: this.isNightStealthActive() || this.lighthouses.length > 0,
+        isPlayerStealthed: this.isPlayerStealthed,
+        isSpottedByLighthouse: this.isSpottedByLighthouse
+    };
 
     this.entities.forEach(entity => {
         if (!entity.mesh) return;
         
-        entity.update(dt, collisionObstacles, visionObstacles, this.entities); 
+        entity.update(dt, collisionObstacles, visionObstacles, this.entities, stealthContext); 
         
         if (entity.velocity && entity.velocity.lengthSq() > 0.04) {
             this.vfx.spawnTrack(entity.mesh.position, entity.mesh.rotation.y, entity);
@@ -4366,14 +4841,33 @@ export class GameEngine {
               else if (killMethod === 'BARREL' || killMethod === 'MINE') basePts = 150;
           }
 
+          // Stealth Ambush Bonus: Reward eliminating enemies from the shadows or before they spot the player!
+          const isStealthAmbush = (this.isNightStealthActive() || this.lighthouses.length > 0) &&
+              !this.isSpottedByLighthouse &&
+              (this.isPlayerStealthed || !entity.wasAlertedToPlayer);
+          const stealthBonusPts = isStealthAmbush ? 150 : 0;
+
           const multiplier = entity.isBoss ? 1 : Math.min(this.comboStreak, 5);
-          const totalPts = basePts * multiplier;
+          const totalPts = (basePts * multiplier) + stealthBonusPts;
           this.stats.score += totalPts;
+
+          // Instant Tactical Recharge Reward on Stealth Kill (+35% Mine & Bazooka Cooldown)
+          if (isStealthAmbush && this.player) {
+              if (this.player.mineCooldown > 0) {
+                  this.player.mineCooldown = Math.max(0, this.player.mineCooldown - this.player.maxMineCooldown * 0.35);
+              }
+              if (this.player.bazookaCooldown > 0) {
+                  this.player.bazookaCooldown = Math.max(0, this.player.bazookaCooldown - this.player.maxBazookaCooldown * 0.35);
+              }
+          }
 
           // Spawn Floating 3D Score & Style Banner
           let popLabel = entity.isBoss ? `👑 ¡JEFE ABATIDO! +${totalPts}` : `+${totalPts}`;
           let popColor = entity.isBoss ? '#ffd700' : '#ffeb3b';
-          if (!entity.isBoss && killMethod === 'RICOCHET') {
+          if (!entity.isBoss && isStealthAmbush) {
+              popLabel = `🥷 ¡GOLPE DE SIGILO! +${totalPts}`;
+              popColor = '#38bdf8';
+          } else if (!entity.isBoss && killMethod === 'RICOCHET') {
               popLabel = `🎯 ¡REBOTE! +${totalPts}`;
               popColor = '#00e5ff';
           } else if (!entity.isBoss && this.comboStreak >= 2) {
@@ -4382,10 +4876,10 @@ export class GameEngine {
               this.audio.play('combo', this.comboStreak);
           }
 
-          this.vfx.spawnFloatingText(pos, popLabel, popColor, entity.isBoss ? 1.4 : (this.comboStreak >= 2 ? 1.2 : 1.0));
+          this.vfx.spawnFloatingText(pos, popLabel, popColor, entity.isBoss ? 1.4 : ((isStealthAmbush || this.comboStreak >= 2) ? 1.22 : 1.0));
           this.onEvent({
               type: 'ENEMY_DESTROYED',
-              data: { combo: this.comboStreak, points: totalPts, method: killMethod }
+              data: { combo: this.comboStreak, points: totalPts, method: isStealthAmbush ? 'STEALTH' : killMethod }
           });
 
           this.updateUI();
