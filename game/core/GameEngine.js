@@ -310,6 +310,51 @@ export class GameEngine {
       }
       if (this.tableMesh) this.tableMesh.material.color.setHex(0x2d140e);
       if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x1f0d09);
+    } else if (biome === 'sunset_city') {
+      // Twilight sunset-to-night metropolis: warm golden-coral sunset rays vs deep dusk violet-indigo shadows
+      this.scene.background = new THREE.Color(0x241438);
+      if (this.scene.fog) this.scene.fog.color.setHex(0x241438);
+      this.ambientLight.color.setHex(0xffb74d);
+      this.ambientLight.groundColor.setHex(0x281845);
+      this.ambientLight.intensity = 0.9;
+      this.dirLight.color.setHex(0xff6e40);
+      this.dirLight.intensity = 1.65;
+      if (this.fillLight) {
+        this.fillLight.color.setHex(0x7c4dff);
+        this.fillLight.intensity = 0.56;
+      }
+      if (this.tableMesh) this.tableMesh.material.color.setHex(0x1f1630);
+      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x140e22);
+    } else if (biome === 'matsuri') {
+      // Festive Japanese Night Festival (Matsuri): warm golden-crimson paper lantern glow & sakura pink rim light
+      this.scene.background = new THREE.Color(0x160f29);
+      if (this.scene.fog) this.scene.fog.color.setHex(0x160f29);
+      this.ambientLight.color.setHex(0xffcc80);
+      this.ambientLight.groundColor.setHex(0x311b32);
+      this.ambientLight.intensity = 0.92;
+      this.dirLight.color.setHex(0xffab40);
+      this.dirLight.intensity = 1.62;
+      if (this.fillLight) {
+        this.fillLight.color.setHex(0xff80ab);
+        this.fillLight.intensity = 0.55;
+      }
+      if (this.tableMesh) this.tableMesh.material.color.setHex(0x28152b);
+      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x1a0d1c);
+    } else if (biome === 'tropical_island') {
+      // Sun-drenched Caribbean / Polynesian paradise island: bright tropical sunlight & turquoise lagoon bounce
+      this.scene.background = new THREE.Color(0x80deea);
+      if (this.scene.fog) this.scene.fog.color.setHex(0x80deea);
+      this.ambientLight.color.setHex(0xfffde7);
+      this.ambientLight.groundColor.setHex(0x00838f);
+      this.ambientLight.intensity = 0.94;
+      this.dirLight.color.setHex(0xfff59d);
+      this.dirLight.intensity = 1.65;
+      if (this.fillLight) {
+        this.fillLight.color.setHex(0x00e5ff);
+        this.fillLight.intensity = 0.52;
+      }
+      if (this.tableMesh) this.tableMesh.material.color.setHex(0xf5d799);
+      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0xe6c278);
     } else { // jungle
       // Lush emerald rainforest & golden El Dorado sunbeams
       this.scene.background = new THREE.Color(0x1b3b2b);
@@ -470,6 +515,41 @@ export class GameEngine {
         accentColor = 0xff6d00;
         finColor = 0x18ffff;
       }
+    } else if (biome === 'sunset_city') {
+      // Sunset golden-amber & neon magenta urban bay fish
+      bodyColor = index % 2 === 0 ? 0xff9100 : 0xff4081;
+      accentColor = 0xffe57f;
+      finColor = 0xff80ab;
+      emissiveColor = 0xff6d00;
+      emissiveInt = 0.35;
+    } else if (biome === 'matsuri') {
+      // Imperial Japanese Festival Nishikigoi Koi (vermilion red, pure white, and gold)
+      if (index % 3 === 0) {
+        bodyColor = 0xff1744;
+        accentColor = 0xffffff;
+        finColor = 0xff8a80;
+      } else if (index % 3 === 1) {
+        bodyColor = 0xffffff;
+        accentColor = 0xd50000;
+        finColor = 0xff5252;
+      } else {
+        bodyColor = 0xffca28;
+        accentColor = 0xff3d00;
+        finColor = 0xffe082;
+      }
+      emissiveColor = 0xff9100;
+      emissiveInt = 0.25;
+    } else if (biome === 'tropical_island') {
+      // Coral Reef Clownfish & Blue-Yellow Tang
+      if (index % 2 === 0) {
+        bodyColor = 0xff6d00; // Clownfish orange
+        accentColor = 0xffffff; // White band
+        finColor = 0xffab40;
+      } else {
+        bodyColor = 0x00b0ff; // Regal Blue Tang
+        accentColor = 0xffea00; // Bright yellow tail/accent
+        finColor = 0xffea00;
+      }
     } else {
       // Traditional Japanese Koi (orange, white, black/red markings)
       if (index % 3 === 0) {
@@ -617,6 +697,9 @@ export class GameEngine {
     else if (biome === 'arctic') mountainColor = 0x4fc3f7;
     else if (biome === 'volcano') mountainColor = 0x261410;
     else if (biome === 'jungle') mountainColor = 0x1b5e20;
+    else if (biome === 'sunset_city') mountainColor = 0x311b47;
+    else if (biome === 'matsuri') mountainColor = 0x28183b;
+    else if (biome === 'tropical_island') mountainColor = 0x26a69a;
 
     const mtnMat = new THREE.MeshStandardMaterial({ 
       color: mountainColor, 
@@ -668,6 +751,20 @@ export class GameEngine {
       stoneColor = 0x4e6e58;
       railColor = 0x2e4c38;
       lanternColor = 0xffd600;
+    } else if (biome === 'sunset_city') {
+      stoneColor = 0x334155;
+      railColor = 0xff6e40;
+      lanternColor = 0xffab40;
+    } else if (biome === 'matsuri') {
+      // Traditional Japanese Vermilion Red Lacquer Bridge (Taiko-bashi style)
+      stoneColor = 0x5d4037;
+      railColor = 0xd32f2f;
+      lanternColor = 0xff5252;
+    } else if (biome === 'tropical_island') {
+      // Warm Tropical Bamboo & Coral Sandstone Pier Bridge
+      stoneColor = 0xd7b377;
+      railColor = 0xa1662f;
+      lanternColor = 0xffea00;
     }
 
     const stoneMat = new THREE.MeshStandardMaterial({ 
@@ -818,6 +915,54 @@ export class GameEngine {
         ctx.arc((i * 47) % 256, (i * 89) % 256, 8 + (i % 7), 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (biome === 'sunset_city') {
+      // Twilight metropolitan asphalt grid with illuminated sunset-gold & magenta avenue markings
+      ctx.fillStyle = '#1e1b2e';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = 'rgba(255, 138, 101, 0.28)';
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= 256; i += 64) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(255, 193, 7, 0.25)';
+      for (let i = 0; i < 24; i++) {
+        ctx.fillRect((i * 43) % 240, (i * 71) % 240, 6, 4);
+      }
+    } else if (biome === 'matsuri') {
+      // Japanese night festival garden moss & stone courtyard with fallen pink sakura petals
+      ctx.fillStyle = '#231829';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = 'rgba(255, 171, 64, 0.22)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i <= 256; i += 64) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+      }
+      for (let i = 0; i < 50; i++) {
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(255, 128, 171, 0.55)' : 'rgba(255, 204, 128, 0.35)';
+        ctx.beginPath();
+        ctx.arc((i * 53) % 256, (i * 89) % 256, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (biome === 'tropical_island') {
+      // Sun-kissed golden coral beach sand with wave ripples & lush palm grass patches
+      ctx.fillStyle = '#f5d488';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = 'rgba(218, 168, 82, 0.35)';
+      ctx.lineWidth = 3;
+      for (let y = 16; y < 256; y += 32) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(85, y + 8, 170, y - 8, 256, y);
+        ctx.stroke();
+      }
+      for (let i = 0; i < 36; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(76, 175, 80, 0.25)';
+        ctx.beginPath();
+        ctx.arc((i * 61) % 256, (i * 97) % 256, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else {
       // Workshop lush alpine meadow grass with subtle clover & tile variation
       ctx.fillStyle = '#5a9234';
@@ -838,6 +983,93 @@ export class GameEngine {
     tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(110, 110);
     return tex;
+  }
+
+  // Helper: Creates two Japanese festival lamp posts ("farolas") connected by a catenary string cable with hanging glowing paper lanterns ("Chōchin")
+  createFestivalLanternFestoon(x1, z1, x2, z2, numLanterns = 5, poleHeight = 7.4, includePoles = true) {
+    const group = new THREE.Group();
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.7 });
+    const vermilionMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.45 });
+    const goldCapMat = new THREE.MeshStandardMaterial({ color: 0xffca28, metalness: 0.65, roughness: 0.25 });
+    const cableMat = new THREE.MeshBasicMaterial({ color: 0x1a1110 });
+
+    const buildFarolaPole = (px, pz) => {
+      const poleGrp = new THREE.Group();
+      poleGrp.position.set(px, 0, pz);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.0, 1.1), vermilionMat);
+      base.position.y = 0.5;
+      poleGrp.add(base);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, poleHeight, 8), poleMat);
+      shaft.position.y = poleHeight / 2;
+      shaft.castShadow = true;
+      poleGrp.add(shaft);
+      const topBar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.24, 0.35), vermilionMat);
+      topBar.position.y = poleHeight - 0.2;
+      poleGrp.add(topBar);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.65, 4), poleMat);
+      roof.position.y = poleHeight + 0.35;
+      roof.rotation.y = Math.PI / 4;
+      poleGrp.add(roof);
+      const topLamp = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffe082 }));
+      topLamp.position.y = poleHeight - 0.55;
+      poleGrp.add(topLamp);
+      return poleGrp;
+    };
+
+    if (includePoles) {
+      group.add(buildFarolaPole(x1, z1));
+      group.add(buildFarolaPole(x2, z2));
+    }
+
+    // Catenary sag curve between the two lamp posts
+    const sag = Math.min(2.1, Math.hypot(x2 - x1, z2 - z1) * 0.065);
+    const pStart = new THREE.Vector3(x1, poleHeight - 0.35, z1);
+    const pMid = new THREE.Vector3((x1 + x2) / 2, poleHeight - 0.35 - sag, (z1 + z2) / 2);
+    const pEnd = new THREE.Vector3(x2, poleHeight - 0.35, z2);
+    const curve = new THREE.CatmullRomCurve3([pStart, pMid, pEnd]);
+    const cableGeo = new THREE.TubeGeometry(curve, 14, 0.055, 5, false);
+    const cableMesh = new THREE.Mesh(cableGeo, cableMat);
+    group.add(cableMesh);
+
+    // Hang Chōchin paper lanterns along the catenary curve
+    const lanternGeo = new THREE.SphereGeometry(0.46, 10, 8);
+    lanternGeo.scale(0.88, 1.28, 0.88);
+    const rimGeo = new THREE.CylinderGeometry(0.26, 0.26, 0.12, 8);
+    const haloGeo = new THREE.SphereGeometry(0.95, 8, 8);
+    const lanternPalette = [0xff1744, 0xffab00, 0xff4081, 0xff6d00];
+
+    for (let i = 1; i <= numLanterns; i++) {
+      const t = i / (numLanterns + 1);
+      const pt = curve.getPoint(t);
+      const col = lanternPalette[(i - 1) % lanternPalette.length];
+
+      const lGrp = new THREE.Group();
+      lGrp.position.set(pt.x, pt.y - 0.52, pt.z);
+
+      const body = new THREE.Mesh(lanternGeo, new THREE.MeshBasicMaterial({ color: col }));
+      lGrp.add(body);
+
+      const topRim = new THREE.Mesh(rimGeo, poleMat);
+      topRim.position.y = 0.55;
+      lGrp.add(topRim);
+
+      const botRim = new THREE.Mesh(rimGeo, goldCapMat);
+      botRim.position.y = -0.55;
+      lGrp.add(botRim);
+
+      const halo = new THREE.Mesh(haloGeo, new THREE.MeshBasicMaterial({
+        color: col,
+        transparent: true,
+        opacity: 0.26,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      }));
+      lGrp.add(halo);
+
+      group.add(lGrp);
+    }
+
+    return group;
   }
 
   decorateTable(biome, mapW, mapH) {
@@ -884,7 +1116,15 @@ export class GameEngine {
     this.waterShaderMat = this.createWaterShaderMaterial(biome, halfW, halfH, moatWidth);
 
     // Textured Riverbed Floor underneath the water so Koi fish & lily pads cast depth
-    const bedColor = biome === 'desert' ? 0x8d6e63 : biome === 'cyber' ? 0x050b14 : biome === 'arctic' ? 0x01579b : biome === 'volcano' ? 0x1a0804 : biome === 'jungle' ? 0x004d40 : 0x014f86;
+    const bedColor = biome === 'desert' ? 0x8d6e63
+      : biome === 'cyber' ? 0x050b14
+      : biome === 'arctic' ? 0x01579b
+      : biome === 'volcano' ? 0x1a0804
+      : biome === 'jungle' ? 0x004d40
+      : biome === 'sunset_city' ? 0x1a1033
+      : biome === 'matsuri' ? 0x141229
+      : biome === 'tropical_island' ? 0x00acc1
+      : 0x014f86;
     const bedMat = new THREE.MeshStandardMaterial({ color: bedColor, roughness: 0.9 });
 
     const addWaterChannel = (w, d, x, z) => {
@@ -948,7 +1188,15 @@ export class GameEngine {
 
     // --- 4. STONE QUAY EMBANKMENTS ---
     const stoneBankMat = new THREE.MeshStandardMaterial({
-      color: biome === 'desert' ? 0xc89666 : biome === 'cyber' ? 0x1e293b : biome === 'arctic' ? 0x29b6f6 : biome === 'volcano' ? 0x4e342e : biome === 'jungle' ? 0x33691e : 0x795548,
+      color: biome === 'desert' ? 0xc89666
+        : biome === 'cyber' ? 0x1e293b
+        : biome === 'arctic' ? 0x29b6f6
+        : biome === 'volcano' ? 0x4e342e
+        : biome === 'jungle' ? 0x33691e
+        : biome === 'sunset_city' ? 0x334155
+        : biome === 'matsuri' ? 0xb71c1c
+        : biome === 'tropical_island' ? 0xf5d799
+        : 0x795548,
       roughness: 0.65
     });
 
@@ -1007,12 +1255,20 @@ export class GameEngine {
     // Paved roads extending outward from all 4 bridges so bridges connect naturally into the landscape
     const roadLen = 180;
     const roadW = 7.4;
-    const roadColor = biome === 'desert' ? 0xb88655 : biome === 'cyber' ? 0x111c2d : biome === 'arctic' ? 0x81d4fa : biome === 'volcano' ? 0x37474f : biome === 'jungle' ? 0x557153 : 0x9e9284;
+    const roadColor = biome === 'desert' ? 0xb88655
+      : biome === 'cyber' ? 0x111c2d
+      : biome === 'arctic' ? 0x81d4fa
+      : biome === 'volcano' ? 0x37474f
+      : biome === 'jungle' ? 0x557153
+      : biome === 'sunset_city' ? 0x1e293b
+      : biome === 'matsuri' ? 0x4e342e
+      : biome === 'tropical_island' ? 0xe6c278
+      : 0x9e9284;
     const roadMat = new THREE.MeshStandardMaterial({
       color: roadColor,
       roughness: 0.78,
-      emissive: biome === 'cyber' ? 0x00e5ff : (biome === 'volcano' ? 0xbf360c : 0x000000),
-      emissiveIntensity: biome === 'cyber' ? 0.15 : (biome === 'volcano' ? 0.12 : 0)
+      emissive: biome === 'cyber' ? 0x00e5ff : (biome === 'volcano' ? 0xbf360c : (biome === 'sunset_city' ? 0xff6e40 : 0x000000)),
+      emissiveIntensity: biome === 'cyber' ? 0.15 : (biome === 'volcano' ? 0.12 : (biome === 'sunset_city' ? 0.1 : 0))
     });
     const nsRoadGeo = new THREE.BoxGeometry(roadW, 0.22, roadLen);
     const ewRoadGeo = new THREE.BoxGeometry(roadLen, 0.22, roadW);
@@ -1370,6 +1626,294 @@ export class GameEngine {
       };
       addProp(buildZiggurat(1.05), outerWestX - 14, outerNorthZ - 12, -1.45);
       addProp(buildZiggurat(0.95), outerEastX + 14, outerSouthZ + 12, -1.45);
+
+    } else if (biome === 'sunset_city') {
+      // --- SUNSET NIGHT METROPOLIS: Illuminated 3D Skyscrapers, Neon Dusk Rooftops & Urban Boulevard Streetlights ---
+      const makeBuildingWindowTex = (hueShift = 0) => {
+        const c = document.createElement('canvas');
+        c.width = 128; c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#141829';
+        ctx.fillRect(0, 0, 128, 256);
+        const winColors = ['#ffd54f', '#ff8a65', '#ff4081', '#40c4ff', '#1e293b'];
+        for (let r = 10; r < 244; r += 16) {
+          for (let col = 10; col < 116; col += 20) {
+            const pick = (r * 7 + col * 3 + hueShift) % 7;
+            ctx.fillStyle = pick < 4 ? winColors[pick] : '#0f172a';
+            ctx.fillRect(col, r, 12, 9);
+          }
+        }
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      };
+
+      const winTexA = makeBuildingWindowTex(0);
+      const winTexB = makeBuildingWindowTex(3);
+      const bldgMatA = new THREE.MeshStandardMaterial({ map: winTexA, roughness: 0.35, metalness: 0.4, emissive: 0xff9100, emissiveMap: winTexA, emissiveIntensity: 0.65 });
+      const bldgMatB = new THREE.MeshStandardMaterial({ map: winTexB, roughness: 0.35, metalness: 0.4, emissive: 0xff4081, emissiveMap: winTexB, emissiveIntensity: 0.6 });
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.6 });
+      const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff1744 });
+
+      perimeterRing.forEach((p, idx) => {
+        const tower = new THREE.Group();
+        const w = 4.8 + (idx % 3) * 1.1;
+        const h = 11.0 + (idx % 4) * 3.8;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), idx % 2 === 0 ? bldgMatA : bldgMatB);
+        body.position.y = h / 2;
+        body.castShadow = true;
+        tower.add(body);
+
+        const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 1.4, w * 0.72), roofMat);
+        crown.position.y = h + 0.7;
+        tower.add(crown);
+
+        const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 3.2, 6), roofMat);
+        spire.position.y = h + 2.8;
+        tower.add(spire);
+
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), beaconMat);
+        beacon.position.y = h + 4.4;
+        tower.add(beacon);
+
+        addProp(tower, p.x * 1.08, p.z * 1.08, -1.45);
+      });
+
+      // Boulevard Streetlights with warm sunset-amber twin lamps along the canal avenues
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 });
+      const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffab40 });
+      const streetLampCoords = [
+        { x: -6.2, z: outerNorthZ - 6 }, { x: 6.2, z: outerNorthZ - 6 },
+        { x: -6.2, z: outerSouthZ + 6 }, { x: 6.2, z: outerSouthZ + 6 },
+        { x: outerWestX - 6, z: -6.2 }, { x: outerWestX - 6, z: 6.2 },
+        { x: outerEastX + 6, z: -6.2 }, { x: outerEastX + 6, z: 6.2 }
+      ];
+      streetLampCoords.forEach(sl => {
+        const lamp = new THREE.Group();
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 6.8, 8), poleMat);
+        pole.position.y = 3.4;
+        lamp.add(pole);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.18, 0.18), poleMat);
+        arm.position.y = 6.7;
+        lamp.add(arm);
+        const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), bulbMat);
+        b1.position.set(-0.95, 6.5, 0);
+        lamp.add(b1);
+        const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), bulbMat);
+        b2.position.set(0.95, 6.5, 0);
+        lamp.add(b2);
+        addProp(lamp, sl.x, sl.z, -1.45);
+      });
+
+    } else if (biome === 'matsuri') {
+      // --- JAPANESE NIGHT FESTIVAL (MATSURI): Connected Lamp Posts with Hanging Paper Lanterns ("Luces entre Farolas"), Torii Gates, Sakura Trees & 5-Tier Pagoda ---
+      // 1. Continuous Festival Lantern Festoons ("luces entre farolas") along all 4 outer canal banks
+      const festoonSpans = [
+        // North promenade (West & East of North bridge)
+        { x1: -halfW - 8, z1: outerNorthZ - 3.5, x2: -6.5, z2: outerNorthZ - 3.5, n: 6 },
+        { x1: 6.5, z1: outerNorthZ - 3.5, x2: halfW + 8, z2: outerNorthZ - 3.5, n: 6 },
+        // South promenade (West & East of South bridge)
+        { x1: -halfW - 8, z1: outerSouthZ + 3.5, x2: -6.5, z2: outerSouthZ + 3.5, n: 6 },
+        { x1: 6.5, z1: outerSouthZ + 3.5, x2: halfW + 8, z2: outerSouthZ + 3.5, n: 6 },
+        // West promenade (North & South of West bridge)
+        { x1: outerWestX - 3.5, z1: -halfH - 8, x2: outerWestX - 3.5, z2: -6.5, n: 5 },
+        { x1: outerWestX - 3.5, z1: 6.5, x2: outerWestX - 3.5, z2: halfH + 8, n: 5 },
+        // East promenade (North & South of East bridge)
+        { x1: outerEastX + 3.5, z1: -halfH - 8, x2: outerEastX + 3.5, z2: -6.5, n: 5 },
+        { x1: outerEastX + 3.5, z1: 6.5, x2: outerEastX + 3.5, z2: halfH + 8, n: 5 }
+      ];
+      festoonSpans.forEach(sp => {
+        const festoon = this.createFestivalLanternFestoon(sp.x1, sp.z1, sp.x2, sp.z2, sp.n, 7.8, true);
+        addProp(festoon, 0, 0, -1.45);
+      });
+
+      // 2. Traditional Vermilion Torii Gates (鳥居) straddling the 4 exterior roads
+      const vermilionMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.42 });
+      const blackWoodMat = new THREE.MeshStandardMaterial({ color: 0x1c1412, roughness: 0.65 });
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xffca28, metalness: 0.7, roughness: 0.25 });
+
+      const buildToriiGate = (rotY = 0) => {
+        const torii = new THREE.Group();
+        const colGeo = new THREE.CylinderGeometry(0.45, 0.55, 8.8, 12);
+        const leftCol = new THREE.Mesh(colGeo, vermilionMat);
+        leftCol.position.set(-4.3, 4.4, 0);
+        leftCol.castShadow = true;
+        torii.add(leftCol);
+        const rightCol = new THREE.Mesh(colGeo, vermilionMat);
+        rightCol.position.set(4.3, 4.4, 0);
+        rightCol.castShadow = true;
+        torii.add(rightCol);
+
+        // Top Kasagi lintel beam
+        const topBeam = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.65, 0.95), blackWoodMat);
+        topBeam.position.y = 8.9;
+        torii.add(topBeam);
+        const subBeam = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.48, 0.8), vermilionMat);
+        subBeam.position.y = 8.4;
+        torii.add(subBeam);
+        // Nuki tie-beam
+        const nukiBeam = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.45, 0.6), vermilionMat);
+        nukiBeam.position.y = 6.9;
+        torii.add(nukiBeam);
+        // Gold Gaku plaque in center
+        const plaque = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, 0.35), goldMat);
+        plaque.position.y = 7.65;
+        torii.add(plaque);
+
+        torii.rotation.y = rotY;
+        return torii;
+      };
+
+      addProp(buildToriiGate(0), 0, outerNorthZ - 8, -1.45);
+      addProp(buildToriiGate(0), 0, outerSouthZ + 8, -1.45);
+      addProp(buildToriiGate(Math.PI / 2), outerWestX - 8, 0, -1.45);
+      addProp(buildToriiGate(Math.PI / 2), outerEastX + 8, 0, -1.45);
+
+      // 3. Blooming Pink Sakura Cherry Blossom Trees around the perimeter
+      const sakuraTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2c2a, roughness: 0.85 });
+      const sakuraPinkMat = new THREE.MeshStandardMaterial({ color: 0xff80ab, roughness: 0.65, flatShading: true });
+      const sakuraLightMat = new THREE.MeshStandardMaterial({ color: 0xf8bbd0, roughness: 0.6, flatShading: true });
+      const blossomGeo = new THREE.DodecahedronGeometry(2.3, 0);
+
+      perimeterRing.forEach((p, idx) => {
+        const sakura = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.68, 3.2, 6), sakuraTrunkMat);
+        trunk.position.y = 1.6;
+        sakura.add(trunk);
+        const c1 = new THREE.Mesh(blossomGeo, sakuraPinkMat);
+        c1.position.set(0, 4.1, 0);
+        c1.scale.set(1.25, 0.85, 1.25);
+        sakura.add(c1);
+        const c2 = new THREE.Mesh(blossomGeo, sakuraLightMat);
+        c2.position.set(0.9, 5.1, 0.4);
+        c2.scale.set(0.85, 0.7, 0.85);
+        sakura.add(c2);
+        sakura.scale.setScalar(p.s);
+        addProp(sakura, p.x * 1.12, p.z * 1.12, -1.45);
+      });
+
+      // 4. Illuminated 5-Tier Japanese Pagoda Landmark on the Northwest & Southeast corners
+      const buildPagoda = (scale = 1) => {
+        const pag = new THREE.Group();
+        for (let tier = 0; tier < 5; tier++) {
+          const w = 6.8 - tier * 0.95;
+          const y = tier * 2.5;
+          const core = new THREE.Mesh(new THREE.BoxGeometry(w * 0.68, 2.0, w * 0.68), vermilionMat);
+          core.position.y = y + 1.0;
+          pag.add(core);
+          const roof = new THREE.Mesh(new THREE.ConeGeometry(w * 0.88, 1.15, 4), blackWoodMat);
+          roof.position.y = y + 2.3;
+          roof.rotation.y = Math.PI / 4;
+          pag.add(roof);
+        }
+        const sorin = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.24, 3.2, 8), goldMat);
+        sorin.position.y = 13.8;
+        pag.add(sorin);
+        pag.scale.setScalar(scale);
+        return pag;
+      };
+      addProp(buildPagoda(1.0), outerWestX - 15, outerNorthZ - 14, -1.45);
+      addProp(buildPagoda(0.92), outerEastX + 15, outerSouthZ + 14, -1.45);
+
+    } else if (biome === 'tropical_island') {
+      // --- TROPICAL PARADISE ISLAND: Curved Coconut Palm Trees, Striped Beach Umbrellas, Tiki Torches & Overwater Cabanas ---
+      const palmTrunkMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.85 });
+      const palmFrondMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.65, flatShading: true });
+      const coconutMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.8 });
+
+      const buildCoconutPalm = (scale = 1, leanAngle = 0.18) => {
+        const palm = new THREE.Group();
+        // Curved segmented trunk
+        for (let s = 0; s < 4; s++) {
+          const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.36 - s * 0.04, 0.44 - s * 0.04, 1.65, 7), palmTrunkMat);
+          seg.position.set(Math.sin(leanAngle) * s * 0.55, s * 1.45 + 0.8, 0);
+          seg.rotation.z = -leanAngle * (0.7 + s * 0.2);
+          seg.castShadow = true;
+          palm.add(seg);
+        }
+        const topX = Math.sin(leanAngle) * 1.85;
+        const topY = 6.2;
+        // Coconuts cluster
+        for (let c = 0; c < 3; c++) {
+          const nut = new THREE.Mesh(new THREE.SphereGeometry(0.28, 6, 6), coconutMat);
+          const a = (c / 3) * Math.PI * 2;
+          nut.position.set(topX + Math.cos(a) * 0.32, topY - 0.25, Math.sin(a) * 0.32);
+          palm.add(nut);
+        }
+        // Radiating tropical palm fronds
+        for (let f = 0; f < 6; f++) {
+          const fAngle = (f / 6) * Math.PI * 2;
+          const frond = new THREE.Mesh(new THREE.ConeGeometry(0.85, 3.2, 4), palmFrondMat);
+          frond.scale.set(1.0, 1.0, 0.28);
+          frond.position.set(topX + Math.cos(fAngle) * 1.25, topY + 0.1, Math.sin(fAngle) * 1.25);
+          frond.rotation.y = -fAngle;
+          frond.rotation.z = -Math.PI / 2.6;
+          palm.add(frond);
+        }
+        palm.scale.setScalar(scale);
+        return palm;
+      };
+
+      perimeterRing.forEach((p, idx) => {
+        const palm = buildCoconutPalm(p.s, (idx % 2 === 0 ? 1 : -1) * 0.2);
+        palm.rotation.y = idx * 1.1;
+        addProp(palm, p.x, p.z, -1.45);
+      });
+
+      // Colorful Beach Umbrellas & Tiki Torches along the sandy lagoon shores
+      const umbrellaColors = [0xff5252, 0xffca28, 0x00e5ff, 0xff4081];
+      const poleWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const flameMat = new THREE.MeshBasicMaterial({ color: 0xff9100 });
+      const beachSpots = [
+        { x: -16, z: outerNorthZ - 5 }, { x: 16, z: outerNorthZ - 5 },
+        { x: -16, z: outerSouthZ + 5 }, { x: 16, z: outerSouthZ + 5 },
+        { x: outerWestX - 5, z: -16 }, { x: outerEastX + 5, z: 16 }
+      ];
+      beachSpots.forEach((bs, idx) => {
+        const umb = new THREE.Group();
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.4, 6), poleWhiteMat);
+        stick.position.y = 1.7;
+        umb.add(stick);
+        const shade = new THREE.Mesh(
+          new THREE.ConeGeometry(2.4, 1.1, 8),
+          new THREE.MeshStandardMaterial({ color: umbrellaColors[idx % umbrellaColors.length], roughness: 0.5, flatShading: true })
+        );
+        shade.position.y = 3.3;
+        shade.rotation.z = 0.12;
+        umb.add(shade);
+        addProp(umb, bs.x, bs.z, -1.45);
+
+        // Adjacent Tiki Torch
+        const torch = new THREE.Group();
+        const bamboo = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 3.2, 6), palmTrunkMat);
+        bamboo.position.y = 1.6;
+        torch.add(bamboo);
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.75, 6), flameMat);
+        flame.position.y = 3.45;
+        torch.add(flame);
+        addProp(torch, bs.x + (idx % 2 === 0 ? 3.2 : -3.2), bs.z, -1.45);
+      });
+
+      // Overwater Polynesian Tiki Cabana Huts on the corners
+      const thatchMat = new THREE.MeshStandardMaterial({ color: 0xd4a359, roughness: 0.85, flatShading: true });
+      const buildTikiCabana = (scale = 1) => {
+        const hut = new THREE.Group();
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.5, 7.2), palmTrunkMat);
+        deck.position.y = 1.2;
+        hut.add(deck);
+        [[-2.8, -2.8], [2.8, -2.8], [-2.8, 2.8], [2.8, 2.8]].forEach(([px, pz]) => {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 4.4, 6), palmTrunkMat);
+          post.position.set(px, 2.2, pz);
+          hut.add(post);
+        });
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(5.8, 3.6, 6), thatchMat);
+        roof.position.y = 5.8;
+        hut.add(roof);
+        hut.scale.setScalar(scale);
+        return hut;
+      };
+      addProp(buildTikiCabana(1.0), outerWestX - 13, outerNorthZ - 12, -1.45);
+      addProp(buildTikiCabana(0.95), outerEastX + 13, outerSouthZ + 12, -1.45);
     }
   }
 
@@ -1495,6 +2039,64 @@ export class GameEngine {
       ctx.beginPath();
       ctx.moveTo(0, 60); ctx.lineTo(80, 120); ctx.lineTo(180, 110); ctx.lineTo(256, 200);
       ctx.stroke();
+    } else if (biome === 'sunset_city') {
+      // Twilight Sunset Metropolis Asphalt Tiles with warm golden-amber avenue lane lines & high contrast for tank tracks
+      ctx.fillStyle = '#3b4254'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#434c61';
+      ctx.fillRect(10, 10, 236, 236);
+      for (let i = 0; i < 320; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 171, 64, 0.14)' : 'rgba(30, 41, 59, 0.35)';
+        ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 3);
+      }
+      // Crisp sunset-amber & neon magenta avenue tile borders
+      ctx.strokeStyle = '#ff9100'; ctx.lineWidth = 4.5;
+      ctx.strokeRect(3, 3, 250, 250);
+      ctx.strokeStyle = 'rgba(255, 64, 129, 0.35)'; ctx.lineWidth = 2;
+      ctx.strokeRect(14, 14, 228, 228);
+      // Dashed golden road marking
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillRect(122, 24, 12, 36);
+      ctx.fillRect(122, 196, 12, 36);
+    } else if (biome === 'matsuri') {
+      // Warm Lantern-Lit Japanese Festival Flagstones with vermilion lacquer borders & scattered pink sakura petals
+      ctx.fillStyle = '#f2cfa0'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#e5be8a';
+      for (let i = 0; i < 360; i++) ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 3);
+      // Vermilion festival lacquer frame
+      ctx.strokeStyle = '#d32f2f'; ctx.lineWidth = 5;
+      ctx.strokeRect(3, 3, 250, 250);
+      // Imperial gold inner trim
+      ctx.strokeStyle = '#ffb300'; ctx.lineWidth = 2;
+      ctx.strokeRect(12, 12, 232, 232);
+      // Fallen pink sakura blossom petals on the stone
+      ctx.fillStyle = '#ff4081';
+      for (let p = 0; p < 7; p++) {
+        const px = 28 + ((p * 57) % 200);
+        const py = 32 + ((p * 83) % 190);
+        ctx.beginPath();
+        ctx.arc(px, py, 3.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (biome === 'tropical_island') {
+      // Sun-drenched Caribbean Coral Beach Sand Tiles with warm sand ripples, turquoise shells & bamboo joints
+      ctx.fillStyle = '#ffe596'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#f7d574';
+      for (let i = 0; i < 420; i++) ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 2);
+      // Subtle wind-swept beach sand ripple curves
+      ctx.strokeStyle = 'rgba(217, 155, 56, 0.35)'; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 85); ctx.bezierCurveTo(80, 75, 175, 95, 256, 85);
+      ctx.moveTo(0, 175); ctx.bezierCurveTo(80, 165, 175, 185, 256, 175);
+      ctx.stroke();
+      // Warm bamboo border
+      ctx.strokeStyle = '#c6842f'; ctx.lineWidth = 5;
+      ctx.strokeRect(3, 3, 250, 250);
+      // Turquoise lagoon shell corner accents
+      ctx.fillStyle = '#00bcd4';
+      ctx.fillRect(14, 14, 8, 8);
+      ctx.fillRect(234, 14, 8, 8);
+      ctx.fillRect(14, 234, 8, 8);
+      ctx.fillRect(234, 234, 8, 8);
     } else { // jungle
       // Vivid tropical lime-emerald turf tiles so dark tank tread marks pop with maximum contrast!
       ctx.fillStyle = '#9be548'; ctx.fillRect(0,0,256,256);
@@ -1844,6 +2446,27 @@ export class GameEngine {
           deepColor.setHex(0x004d40);
           shallowColor.setHex(0x00bfa5);
           causticColor.setHex(0xa7ffeb);
+      } else if (biome === 'sunset_city') {
+          // Twilight bay reflecting warm golden-coral sunset & neon violet
+          deepColor.setHex(0x1a103c);
+          shallowColor.setHex(0x5e35b1);
+          causticColor.setHex(0xff8a65);
+          foamColor.setHex(0xffcc80);
+          opacity = 0.91;
+      } else if (biome === 'matsuri') {
+          // Night festival mirror pond reflecting warm golden-crimson paper lanterns
+          deepColor.setHex(0x121830);
+          shallowColor.setHex(0x283593);
+          causticColor.setHex(0xffb74d);
+          foamColor.setHex(0xff80ab);
+          opacity = 0.9;
+      } else if (biome === 'tropical_island') {
+          // Crystal-clear Caribbean turquoise-aqua coral lagoon
+          deepColor.setHex(0x00838f);
+          shallowColor.setHex(0x00e5ff);
+          causticColor.setHex(0xe0f7fa);
+          foamColor.setHex(0xffffff);
+          opacity = 0.86;
       }
 
       return new THREE.ShaderMaterial({
@@ -2009,6 +2632,24 @@ export class GameEngine {
           size = 1.05;
           vy = -0.8;
           vx = 6.5;
+      } else if (biome === 'sunset_city') {
+          // Glowing golden-coral twilight embers & city dusk motes
+          color = 0xff9e80;
+          size = 1.25;
+          vy = 1.4;
+          vx = 1.2;
+      } else if (biome === 'matsuri') {
+          // Floating sakura cherry blossom petals & warm festival lantern sparks
+          color = 0xff80ab;
+          size = 1.45;
+          vy = -1.8;
+          vx = 2.2;
+      } else if (biome === 'tropical_island') {
+          // Warm golden tropical sun-sparkles & sea breeze mist
+          color = 0xfff59d;
+          size = 1.2;
+          vy = -0.6;
+          vx = 2.4;
       }
 
       const mat = new THREE.PointsMaterial({
@@ -2277,6 +2918,29 @@ export class GameEngine {
         borderMat = new THREE.MeshStandardMaterial({ color: 0xff3d00, emissive: 0xd50000, emissiveIntensity: 0.6 });
         foliagePrimaryColor = 0xd50000;
         foliageSecondaryColor = 0xff9100;
+    } else if (biome === 'sunset_city') {
+        woodMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.55, roughness: 0.28, emissive: 0x311b47, emissiveIntensity: 0.35 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xff6e40, emissive: 0xff3d00, emissiveIntensity: 0.55, roughness: 0.25 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, map: this.createBrickTexture(), roughness: 0.45 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x4a148c, emissive: 0x7c4dff, emissiveIntensity: 0.35, roughness: 0.4 });
+        foliagePrimaryColor = 0xff6e40;
+        foliageSecondaryColor = 0xffab40;
+    } else if (biome === 'matsuri') {
+        // Traditional Vermilion Red & Imperial Gold Japanese Festival Architecture
+        woodMat = new THREE.MeshStandardMaterial({ color: 0xd32f2f, roughness: 0.38 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xffca28, metalness: 0.65, roughness: 0.22 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, map: this.createBrickTexture(), roughness: 0.55 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0xb71c1c, roughness: 0.42 });
+        foliagePrimaryColor = 0xff80ab;
+        foliageSecondaryColor = 0xf8bbd0;
+    } else if (biome === 'tropical_island') {
+        // Warm Tropical Bamboo, Tiki Hardwood & Coral Limestone
+        woodMat = new THREE.MeshStandardMaterial({ color: 0xd99b26, roughness: 0.45 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, roughness: 0.28 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0xf5d799, map: this.createBrickTexture(), roughness: 0.55 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.5 });
+        foliagePrimaryColor = 0x10b981;
+        foliageSecondaryColor = 0x34d399;
     } else { // jungle
         woodMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.45 });
         capMat = new THREE.MeshStandardMaterial({ color: 0xffd600, metalness: 0.45, roughness: 0.3 });
@@ -2289,7 +2953,16 @@ export class GameEngine {
     const corkTex = this.createCorkTexture();
     const corkMat = new THREE.MeshStandardMaterial({ map: corkTex, roughness: 0.85, color: 0xffe0b2 });
     const crateFrameMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.6 });
-    const geomMat = new THREE.MeshStandardMaterial({ color: biome === 'arctic' ? 0x01579b : biome === 'jungle' ? 0xd4af37 : 0x5d4037, roughness: 0.45, metalness: 0.2 }); 
+    const geomMat = new THREE.MeshStandardMaterial({
+      color: biome === 'arctic' ? 0x01579b
+        : biome === 'jungle' ? 0xd4af37
+        : biome === 'matsuri' ? 0xd32f2f
+        : biome === 'sunset_city' ? 0x475569
+        : biome === 'tropical_island' ? 0x00acc1
+        : 0x5d4037,
+      roughness: 0.45,
+      metalness: 0.2
+    }); 
     
     const brickGeo = new THREE.BoxGeometry(cellSize, 4.2, cellSize);
     brickGeo.scale(0.95, 1, 0.95);
@@ -2349,6 +3022,31 @@ export class GameEngine {
     addBorder(mapW+2, 2, 0, mapH/2 + 1);
     addBorder(2, mapH, -mapW/2 - 1, 0);
     addBorder(2, mapH, mapW/2 + 1, 0);
+
+    // For Japanese Festival ('matsuri') & Sunset City ('sunset_city'), string festive overhead lantern festoons ("luces entre farolas") right along the arena border walls so they frame the battlefield!
+    if (biome === 'matsuri' || biome === 'sunset_city') {
+      const numLanternsPerSpan = biome === 'matsuri' ? 6 : 4;
+      const borderSpans = [
+        // North wall (left & right of center)
+        { x1: -mapW / 2, z1: -mapH / 2 - 1.2, x2: -6, z2: -mapH / 2 - 1.2 },
+        { x1: 6, z1: -mapH / 2 - 1.2, x2: mapW / 2, z2: -mapH / 2 - 1.2 },
+        // South wall (left & right of center)
+        { x1: -mapW / 2, z1: mapH / 2 + 1.2, x2: -6, z2: mapH / 2 + 1.2 },
+        { x1: 6, z1: mapH / 2 + 1.2, x2: mapW / 2, z2: mapH / 2 + 1.2 },
+        // West wall
+        { x1: -mapW / 2 - 1.2, z1: -mapH / 2, x2: -mapW / 2 - 1.2, z2: 0 },
+        { x1: -mapW / 2 - 1.2, z1: 0, x2: -mapW / 2 - 1.2, z2: mapH / 2 },
+        // East wall
+        { x1: mapW / 2 + 1.2, z1: -mapH / 2, x2: mapW / 2 + 1.2, z2: 0 },
+        { x1: mapW / 2 + 1.2, z1: 0, x2: mapW / 2 + 1.2, z2: mapH / 2 }
+      ];
+      borderSpans.forEach(sp => {
+        const fest = this.createFestivalLanternFestoon(sp.x1, sp.z1, sp.x2, sp.z2, numLanternsPerSpan, 9.2, true);
+        fest.userData = { isEnvironment: true };
+        this.scene.add(fest);
+        this.tableProps.push(fest);
+      });
+    }
 
     // Build Map Tile by Tile
     for (let r = 0; r < map.length; r++) {
@@ -2513,7 +3211,7 @@ export class GameEngine {
             grp.userData = { bounds: new THREE.Box3().setFromObject(base), collisionRadius: 2.95, type: 'lighthouse' };
             this.walls.push(grp);
 
-        } else if (type === 'R') { // 3-Tiered Lush 3D Tree
+        } else if (type === 'R') { // Biome-Themed 3D Tree (Coconut Palm in Tropical Island, Sakura Blossom in Matsuri, or 3-Tiered Tree)
             const grp = new THREE.Group();
             grp.position.set(x, 0, z);
 
@@ -2522,20 +3220,48 @@ export class GameEngine {
             trunk.castShadow = true; trunk.receiveShadow = true;
             grp.add(trunk);
 
-            const leavesLow = new THREE.Mesh(treeFoliageLowGeo, treeFoliageMat);
-            leavesLow.position.y = 3.5;
-            leavesLow.castShadow = true; leavesLow.receiveShadow = true;
-            grp.add(leavesLow);
+            if (biome === 'tropical_island') {
+              // Tropical Island Arena Coconut Palm Tree
+              const upperTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.9, 3.2, 8), treeTrunkMat);
+              upperTrunk.position.set(0.25, 4.1, 0);
+              upperTrunk.rotation.z = -0.12;
+              upperTrunk.castShadow = true;
+              grp.add(upperTrunk);
 
-            const leavesMid = new THREE.Mesh(treeFoliageMidGeo, treeFoliageTopMat);
-            leavesMid.position.y = 5.2;
-            leavesMid.castShadow = true; leavesMid.receiveShadow = true;
-            grp.add(leavesMid);
+              const nutMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.8 });
+              for (let n = 0; n < 3; n++) {
+                const nut = new THREE.Mesh(new THREE.SphereGeometry(0.38, 6, 6), nutMat);
+                const na = (n / 3) * Math.PI * 2;
+                nut.position.set(0.45 + Math.cos(na) * 0.45, 5.5, Math.sin(na) * 0.45);
+                grp.add(nut);
+              }
 
-            const leavesTop = new THREE.Mesh(treeFoliageTopGeo, treeFoliageMat);
-            leavesTop.position.y = 6.7;
-            leavesTop.castShadow = true; leavesTop.receiveShadow = true;
-            grp.add(leavesTop);
+              for (let f = 0; f < 6; f++) {
+                const fa = (f / 6) * Math.PI * 2;
+                const frond = new THREE.Mesh(new THREE.ConeGeometry(1.15, 3.8, 4), f % 2 === 0 ? treeFoliageMat : treeFoliageTopMat);
+                frond.scale.set(1.0, 1.0, 0.3);
+                frond.position.set(0.45 + Math.cos(fa) * 1.55, 5.9, Math.sin(fa) * 1.55);
+                frond.rotation.y = -fa;
+                frond.rotation.z = -Math.PI / 2.6;
+                frond.castShadow = true;
+                grp.add(frond);
+              }
+            } else {
+              const leavesLow = new THREE.Mesh(treeFoliageLowGeo, treeFoliageMat);
+              leavesLow.position.y = 3.5;
+              leavesLow.castShadow = true; leavesLow.receiveShadow = true;
+              grp.add(leavesLow);
+
+              const leavesMid = new THREE.Mesh(treeFoliageMidGeo, treeFoliageTopMat);
+              leavesMid.position.y = 5.2;
+              leavesMid.castShadow = true; leavesMid.receiveShadow = true;
+              grp.add(leavesMid);
+
+              const leavesTop = new THREE.Mesh(treeFoliageTopGeo, treeFoliageMat);
+              leavesTop.position.y = 6.7;
+              leavesTop.castShadow = true; leavesTop.receiveShadow = true;
+              grp.add(leavesTop);
+            }
 
             this.scene.add(grp);
             grp.updateMatrixWorld(true);
@@ -2645,7 +3371,7 @@ export class GameEngine {
       }
     }
 
-    // --- PUNTO 1: BIOME BOSS FINALE ON MISSIONS 8, 16, 24, 32, 40, 48 ---
+    // --- PUNTO 1: BIOME BOSS FINALE ON MISSIONS 8, 16, 24, 32, 40, 48, 56, 64, 72 ---
     this.bossEntity = null;
     this.stats.bossInfo = null;
     if (levelIndex % 8 === 0) {
@@ -2655,7 +3381,10 @@ export class GameEngine {
         24: { name: '👑 OVERLORD MATRIX Ω', color: 0xd500f9, maxHp: 14 },
         32: { name: '👑 TITÁN CRIOGÉNICO', color: 0x0091ea, maxHp: 16 },
         40: { name: '👑 VULCANO DESTRUCTOR', color: 0xff1744, maxHp: 18 },
-        48: { name: '👑 GUARDIÁN DE EL DORADO', color: 0xffab00, maxHp: 20 }
+        48: { name: '👑 GUARDIÁN DE EL DORADO', color: 0xffab00, maxHp: 20 },
+        56: { name: '👑 GUARDIÁN METRÓPOLIS NOCTURNA', color: 0xff6e40, maxHp: 22 },
+        64: { name: '👑 SHOGUN DEL FESTIVAL CARMESÍ', color: 0xff1744, maxHp: 24 },
+        72: { name: '👑 KRAKEN DE CORAL MK-IX', color: 0x00e5ff, maxHp: 26 }
       };
       const bossCfg = BOSS_METADATA[levelIndex] || { name: '👑 MEGATANK JEFE', color: 0xb71c1c, maxHp: 12 };
       const enemies = this.entities.filter(e => e instanceof EnemyTank);

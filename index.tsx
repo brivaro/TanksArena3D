@@ -516,13 +516,16 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
 // --- Professional Tactical UI Components ---
 
 const BIOMES_LIST = [
-  { id: 'all', label: 'TODAS (48)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
+  { id: 'all', label: 'TODAS (72)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
   { id: 'workshop', label: 'Taller (1-8)', icon: '🌲', range: [1, 8], color: '#fbbf24', accent: 'rgba(251, 191, 36, 0.16)' },
   { id: 'desert', label: 'Desierto (9-16)', icon: '🏜️', range: [9, 16], color: '#fb923c', accent: 'rgba(251, 146, 60, 0.16)' },
   { id: 'cyber', label: 'Cyber Matrix (17-24)', icon: '⚡', range: [17, 24], color: '#22d3ee', accent: 'rgba(34, 211, 238, 0.18)' },
   { id: 'arctic', label: 'Ártico (25-32)', icon: '❄️', range: [25, 32], color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
   { id: 'volcano', label: 'Volcán (33-40)', icon: '🌋', range: [33, 40], color: '#f87171', accent: 'rgba(248, 113, 113, 0.18)' },
-  { id: 'jungle', label: 'Selva (41-48)', icon: '🌴', range: [41, 48], color: '#4ade80', accent: 'rgba(74, 222, 128, 0.18)' }
+  { id: 'jungle', label: 'Selva (41-48)', icon: '🌴', range: [41, 48], color: '#4ade80', accent: 'rgba(74, 222, 128, 0.18)' },
+  { id: 'sunset_city', label: 'Ciudad Atardecer (49-56)', icon: '🌇', range: [49, 56], color: '#ff8a65', accent: 'rgba(255, 138, 101, 0.2)' },
+  { id: 'matsuri', label: 'Festival Japonés (57-64)', icon: '🏮', range: [57, 64], color: '#f472b6', accent: 'rgba(244, 114, 182, 0.2)' },
+  { id: 'tropical_island', label: 'Isla Tropical (65-72)', icon: '🏝️', range: [65, 72], color: '#2dd4bf', accent: 'rgba(45, 212, 191, 0.2)' }
 ];
 
 const TANK_SKINS_LIST = [
@@ -743,6 +746,7 @@ const ToyBlockIntroSplash: React.FC<ToyBlockIntroSplashProps> = ({ onFinish, onP
 
 interface MainMenuProps {
   onStart: () => void;
+  onQuickStartLevel: (lvl: number) => void;
   onLevelSelect: () => void;
   onOpenIntel: () => void;
   onOpenHangar: () => void;
@@ -760,6 +764,7 @@ interface MainMenuProps {
 
 const MainMenu: React.FC<MainMenuProps> = ({
   onStart,
+  onQuickStartLevel,
   onLevelSelect,
   onOpenIntel,
   onOpenHangar,
@@ -812,7 +817,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
               borderRadius: '6px',
               letterSpacing: '1px'
             }}>
-              6 BIOMAS • 48 MISIONES
+              9 BIOMAS • 72 MISIONES
             </span>
             <span style={{
               backgroundColor: 'rgba(251, 191, 36, 0.16)',
@@ -895,7 +900,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
                 <span style={styles.studioMenuIcon}>🗺️</span>
                 <div>
                   <div style={styles.studioMenuTitle}>SELECCIONAR MISIÓN</div>
-                  <div style={styles.studioMenuSub}>{totalLevels} operaciones tácticas en 6 biomas</div>
+                  <div style={styles.studioMenuSub}>{totalLevels} operaciones tácticas en 9 biomas</div>
                 </div>
               </div>
               <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24' }}>★ {totalStars}/{totalLevels * 3}</span>
@@ -1001,6 +1006,66 @@ const MainMenu: React.FC<MainMenuProps> = ({
                 <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
                   {Math.min(unlockedLevel - 1, totalLevels)}/{totalLevels}
                 </span>
+              </div>
+
+              {/* Quick Direct Launch for the 3 New Biomes */}
+              <div style={{ marginTop: '10px', paddingTop: '9px', borderTop: '1px solid rgba(148, 163, 184, 0.16)' }}>
+                <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#fde047', letterSpacing: '0.8px', marginBottom: '6px' }}>
+                  ✨ NUEVOS BIOMAS DISPONIBLES (ACCESO RÁPIDO):
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStartLevel(49)}
+                    style={{
+                      backgroundColor: 'rgba(255, 138, 101, 0.16)',
+                      border: '1px solid rgba(255, 138, 101, 0.5)',
+                      color: '#ffab91',
+                      borderRadius: '7px',
+                      padding: '6px 4px',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                    title="Jugar Misión #49: Ciudad Crepúsculo / Atardecer-Noche"
+                  >
+                    🌇 Ciudad (M49)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStartLevel(57)}
+                    style={{
+                      backgroundColor: 'rgba(244, 114, 182, 0.16)',
+                      border: '1px solid rgba(244, 114, 182, 0.5)',
+                      color: '#f9a8d4',
+                      borderRadius: '7px',
+                      padding: '6px 4px',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                    title="Jugar Misión #57: Festival Japonés con Luces entre Farolas"
+                  >
+                    🏮 Festival (M57)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStartLevel(65)}
+                    style={{
+                      backgroundColor: 'rgba(45, 212, 191, 0.16)',
+                      border: '1px solid rgba(45, 212, 191, 0.5)',
+                      color: '#5eead4',
+                      borderRadius: '7px',
+                      padding: '6px 4px',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                    title="Jugar Misión #65: Isla Tropical Paradisíaca"
+                  >
+                    🏝️ Isla (M65)
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1360,7 +1425,7 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                 gap: '6px'
               }}
             >
-              {unlockAll ? '🔓 ACCESO TOTAL (48/48)' : '🔒 MODO PROGRESIÓN'}
+              {unlockAll ? `🔓 ACCESO TOTAL (${totalLevels}/${totalLevels})` : '🔒 MODO PROGRESIÓN'}
             </button>
             <button
               className="tactical-btn-secondary"
@@ -2413,8 +2478,8 @@ const IntelModal: React.FC<IntelModalProps> = ({ onClose }) => (
           </div>
         </div>
 
-        <h3 style={{ color: '#4ade80', margin: '14px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>🌍 6 BIOMAS DE CAMPAÑA (48 MISIONES)</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+        <h3 style={{ color: '#4ade80', margin: '14px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>🌍 9 BIOMAS DE CAMPAÑA (72 MISIONES)</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '14px' }}>
           <div style={styles.intelCard}>
             <span style={{ fontWeight: 800, color: '#fbbf24', fontSize: '12px' }}>🌲 1. Taller de Juguetes (M1-M8)</span>
             <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Parqué de roble, puentes de piedra y estanque con peces Koi.</div>
@@ -2438,6 +2503,18 @@ const IntelModal: React.FC<IntelModalProps> = ({ onClose }) => (
           <div style={styles.intelCard}>
             <span style={{ fontWeight: 800, color: '#4ade80', fontSize: '12px' }}>🌴 6. Selva Esmeralda (M41-M48)</span>
             <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Templos de jade y oro de El Dorado en la jungla amazónica.</div>
+          </div>
+          <div style={styles.intelCard}>
+            <span style={{ fontWeight: 800, color: '#ff8a65', fontSize: '12px' }}>🌇 7. Ciudad Atardecer-Noche (M49-M56)</span>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Rascacielos iluminados en crepúsculo, avenidas urbanas y farolas.</div>
+          </div>
+          <div style={styles.intelCard}>
+            <span style={{ fontWeight: 800, color: '#f472b6', fontSize: '12px' }}>🏮 8. Festival Japonés Matsuri (M57-M64)</span>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Guirnaldas de farolillos entre farolas, puertas Torii, pagoda y cerezos Sakura.</div>
+          </div>
+          <div style={styles.intelCard}>
+            <span style={{ fontWeight: 800, color: '#2dd4bf', fontSize: '12px' }}>🏝️ 9. Isla Tropical (M65-M72)</span>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Playa de arena coralina, laguna turquesa, cocoteros, sombrillas y cabañas Tiki.</div>
           </div>
         </div>
       </div>
@@ -2853,6 +2930,7 @@ export const App = () => {
       {gameState === 'MENU' && !showIntroSplash && (
         <MainMenu
           onStart={startCampaign}
+          onQuickStartLevel={(lvl) => startGame(lvl)}
           onLevelSelect={() => setGameState('LEVEL_SELECT')}
           onOpenIntel={() => setShowIntel(true)}
           onOpenHangar={() => setShowHangar(true)}
