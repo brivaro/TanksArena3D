@@ -9,6 +9,7 @@ export class VFXManager {
     this.scene = scene;
     this.particles = [];
     this.tracks = [];
+    this.trackPool = [];
     this.shockwaves = [];
     this.markers = [];
     this.bulletTrails = [];
@@ -24,7 +25,9 @@ export class VFXManager {
     this.muzzleBoxGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
     this.muzzleFlashGeo = new THREE.SphereGeometry(0.48, 8, 8);
     this.trailGeo = new THREE.SphereGeometry(0.18, 6, 6);
-    this.trackGeo = new THREE.PlaneGeometry(0.5, 0.42);
+    // Pre-orient track plane flat on XZ ground so mesh.rotation.y = rotationY aligns 1:1 with tank heading
+    this.trackGeo = new THREE.PlaneGeometry(0.54, 0.58);
+    this.trackGeo.rotateX(-Math.PI / 2);
     this.scorchGeo = new THREE.CircleGeometry(2.2, 16);
     this.starGeo = new THREE.BoxGeometry(0.26, 0.26, 0.26);
     this.shockwaveGeo = new THREE.RingGeometry(0.5, 1.05, 28);
@@ -48,7 +51,7 @@ export class VFXManager {
       depthWrite: false
     });
 
-    // Soft, subtle tread decal texture (fades at edges)
+    // Crisp segmented caterpillar tread texture matching the reference photo
     this.trackTex = this.createSoftTrackTexture();
 
     // Permanent Pooled PointLight for explosions & cannon flashes
@@ -81,12 +84,24 @@ export class VFXManager {
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.clearRect(0, 0, 64, 64);
-      const grad = ctx.createRadialGradient(32, 32, 6, 32, 32, 28);
-      grad.addColorStop(0, 'rgba(70, 58, 48, 0.75)');
-      grad.addColorStop(0.65, 'rgba(85, 72, 60, 0.38)');
-      grad.addColorStop(1, 'rgba(85, 72, 60, 0.0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(4, 12, 56, 40);
+
+      // Base translucent tread belt imprint
+      ctx.fillStyle = 'rgba(28, 38, 18, 0.42)';
+      ctx.fillRect(6, 0, 52, 64);
+
+      // Left & right outer tread guide rails
+      ctx.fillStyle = 'rgba(18, 26, 10, 0.68)';
+      ctx.fillRect(6, 0, 5, 64);
+      ctx.fillRect(53, 0, 5, 64);
+
+      // Two crisp transverse caterpillar link cleats per segment
+      ctx.fillStyle = 'rgba(18, 26, 10, 0.72)';
+      ctx.fillRect(8, 10, 48, 8);
+      ctx.fillRect(8, 42, 48, 8);
+
+      // Subtle inner tread block shading
+      ctx.fillStyle = 'rgba(35, 48, 22, 0.35)';
+      ctx.fillRect(12, 20, 40, 18);
     }
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -196,19 +211,22 @@ export class VFXManager {
   }
 
   // Spawn glowing plasma tracer trail behind moving bullets (Uses object pool & shared materials — zero GC!)
-  spawnBulletTrail(pos, isPlayerBullet = true) {
-    const mat = isPlayerBullet ? this.playerTrailMat : this.enemyTrailMat;
+  spawnBulletTrail(pos, isPlayerBullet = true, isBazooka = false) {
+    const mat = isBazooka ? this.enemyTrailMat : (isPlayerBullet ? this.playerTrailMat : this.enemyTrailMat);
     let mesh = this.trailPool.pop();
     if (mesh) {
       mesh.material = mat;
       mesh.visible = true;
+      if (!mesh.parent) {
+        this.scene.add(mesh);
+      }
     } else {
       mesh = new THREE.Mesh(this.trailGeo, mat);
       this.scene.add(mesh);
     }
     mesh.position.copy(pos);
-    mesh.scale.setScalar(1.0);
-    this.bulletTrails.push({ mesh, age: 0, maxAge: 0.16 });
+    mesh.scale.setScalar(isBazooka ? 1.65 : 1.0);
+    this.bulletTrails.push({ mesh, age: 0, maxAge: isBazooka ? 0.24 : 0.16 });
   }
 
   // Spawn engine exhaust puff behind moving tank
@@ -348,46 +366,76 @@ export class VFXManager {
       this.shockwaves.push({ mesh, mat, speed: 18, maxRadius, age: 0 });
   }
 
-  // Soft, subtle tank tread marks that fade out smoothly and quickly (~2.1s)
+  // Crisp parallel caterpillar tread tracks matching the reference photo (Pooled & guaranteed in scene)
   spawnTrack(pos, rotationY, entity = null) {
       if (entity) {
-          if (entity._lastTrackPos && entity._lastTrackPos.distanceTo(pos) < 0.95) return;
+          let angleDiff = 0;
+          if (entity._lastTrackRot !== undefined) {
+              angleDiff = Math.abs(rotationY - entity._lastTrackRot);
+              if (angleDiff > Math.PI) angleDiff = Math.abs(angleDiff - Math.PI * 2);
+          }
+          if (entity._lastTrackPos && entity._lastTrackPos.distanceTo(pos) < 0.44 && angleDiff < 0.16) return;
           entity._lastTrackPos = pos.clone();
+          entity._lastTrackRot = rotationY;
       } else if (this.tracks.length > 0) {
           const recent = this.tracks[this.tracks.length - 1];
-          if (recent && recent.mesh.position.distanceTo(pos) < 0.95) return;
+          if (recent && recent.mesh.position.distanceTo(pos) < 0.44) return;
       }
 
-      if (this.tracks.length > 140) {
+      const recycleTrack = (t) => {
+          t.mesh.visible = false;
+          if (this.trackPool.length < 440) {
+              this.trackPool.push(t);
+          } else {
+              this.scene.remove(t.mesh);
+              if (t.mat) t.mat.dispose();
+          }
+      };
+
+      while (this.tracks.length > 380) {
           const old = this.tracks.shift();
-          this.scene.remove(old.mesh);
-          if (old.mat) old.mat.dispose();
+          recycleTrack(old);
       }
 
-      const offset = 1.45;
+      const offset = 1.32;
       _tempRight.set(1, 0, 0).applyAxisAngle(_upAxis, rotationY);
-      const maxAge = 2.1; // Short, clean lifetime
-      const baseOpacity = 0.22; // Very subtle & soft
+      const maxAge = 6.0;
+      const baseOpacity = 0.62;
 
       const createTread = (sideOffset) => {
-          const mat = new THREE.MeshBasicMaterial({
-              map: this.trackTex,
-              transparent: true,
-              opacity: baseOpacity,
-              side: THREE.DoubleSide,
-              depthWrite: false
-          });
-          const mesh = new THREE.Mesh(this.trackGeo, mat);
+          let item = this.trackPool.pop();
+          let mesh, mat;
+          if (item) {
+              mesh = item.mesh;
+              mat = item.mat;
+              mat.opacity = baseOpacity;
+              mesh.visible = true;
+              if (!mesh.parent) {
+                  this.scene.add(mesh);
+              }
+          } else {
+              mat = new THREE.MeshBasicMaterial({
+                  map: this.trackTex,
+                  transparent: true,
+                  opacity: baseOpacity,
+                  side: THREE.DoubleSide,
+                  depthWrite: false,
+                  polygonOffset: true,
+                  polygonOffsetFactor: -2,
+                  polygonOffsetUnits: -2
+              });
+              mesh = new THREE.Mesh(this.trackGeo, mat);
+              mesh.renderOrder = 2;
+              this.scene.add(mesh);
+          }
           mesh.position.set(
               pos.x + _tempRight.x * sideOffset,
-              0.03,
+              0.06,
               pos.z + _tempRight.z * sideOffset
           );
-          mesh.rotation.x = -Math.PI / 2;
-          mesh.rotation.z = rotationY;
+          mesh.rotation.set(0, rotationY, 0);
 
-          this.scene.add(mesh);
-          this.tracks.push({ mesh, mat, age: 0, maxAge, baseOpacity }); 
+          this.tracks.push({ mesh, mat, age: 0, maxAge, baseOpacity });
       };
 
       createTread(-offset);
@@ -647,18 +695,23 @@ export class VFXManager {
           }
       }
 
-      // 6. Tracks (Smooth linear/quadratic fade out!)
+      // 6. Tracks (Smooth fade out with object pooling!)
       for (let i = this.tracks.length - 1; i >= 0; i--) {
           const t = this.tracks[i];
           t.age += dt;
           if (t.age >= t.maxAge) {
-              this.scene.remove(t.mesh);
-              if (t.mat) t.mat.dispose();
+              t.mesh.visible = false;
+              if (this.trackPool.length < 400) {
+                  this.trackPool.push(t);
+              } else {
+                  this.scene.remove(t.mesh);
+                  if (t.mat) t.mat.dispose();
+              }
               this.tracks.splice(i, 1);
           } else {
               const lifeRatio = 1 - (t.age / t.maxAge);
               if (t.mat) {
-                  t.mat.opacity = t.baseOpacity * (lifeRatio * lifeRatio);
+                  t.mat.opacity = t.baseOpacity * (lifeRatio > 0.35 ? 1.0 : (lifeRatio / 0.35));
               }
           }
       }
@@ -681,8 +734,13 @@ export class VFXManager {
   clear() {
       this.particles.forEach(p => this.scene.remove(p.mesh));
       this.tracks.forEach(t => {
-          this.scene.remove(t.mesh);
-          if (t.mat) t.mat.dispose();
+          t.mesh.visible = false;
+          if (this.trackPool.length < 400) {
+              this.trackPool.push(t);
+          } else {
+              this.scene.remove(t.mesh);
+              if (t.mat) t.mat.dispose();
+          }
       });
       this.shockwaves.forEach(s => {
           this.scene.remove(s.mesh);

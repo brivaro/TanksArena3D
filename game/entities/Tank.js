@@ -250,25 +250,141 @@ export class Tank {
     }
   }
 
+  // Helper: 2D distance squared from point (px, pz) to segment (ax, az)-(bx, bz)
+  distToSegmentSq2D(px, pz, ax, az, bx, bz) {
+      const abx = bx - ax;
+      const abz = bz - az;
+      const apx = px - ax;
+      const apz = pz - az;
+      const lenSq = abx * abx + abz * abz;
+      let t = lenSq > 0.0001 ? (apx * abx + apz * abz) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const cx = ax + t * abx;
+      const cz = az + t * abz;
+      const dx = px - cx;
+      const dz = pz - cz;
+      return dx * dx + dz * dz;
+  }
+
+  // Helper: Check if point (px, pz) is inside 2D triangle (p0, p1, p2)
+  pointInTriangle2D(px, pz, p0, p1, p2) {
+      const d1 = (px - p1.x) * (p0.z - p1.z) - (p0.x - p1.x) * (pz - p1.z);
+      const d2 = (px - p2.x) * (p1.z - p2.z) - (p1.x - p2.x) * (pz - p2.z);
+      const d3 = (px - p0.x) * (p2.z - p0.z) - (p2.x - p0.x) * (pz - p0.z);
+      const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      return !(hasNeg && hasPos);
+  }
+
   checkCollision(newPos, walls, entities) {
+      const px = newPos.x;
+      const pz = newPos.z;
+
       for (const wall of walls) {
-          if (!wall.userData.bounds) continue;
-          
+          if (!wall || !wall.parent || !wall.userData || !wall.userData.bounds) continue;
+
+          // 1. Exact 2D Triangle Prism Collision ('T') — compact inset triangle so tanks pass smoothly between adjacent triangles & along diagonals
+          if (wall.userData.triPoints && wall.userData.triPoints.length === 3) {
+              const box = wall.userData.bounds;
+              if (
+                  px + this.radius < box.min.x ||
+                  px - this.radius > box.max.x ||
+                  pz + this.radius < box.min.z ||
+                  pz - this.radius > box.max.z
+              ) {
+                  continue;
+              }
+              const [p0, p1, p2] = wall.userData.triPoints;
+              if (this.pointInTriangle2D(px, pz, p0, p1, p2)) return true;
+
+              const d0 = this.distToSegmentSq2D(px, pz, p0.x, p0.z, p1.x, p1.z);
+              const d1 = this.distToSegmentSq2D(px, pz, p1.x, p1.z, p2.x, p2.z);
+              const d2 = this.distToSegmentSq2D(px, pz, p2.x, p2.z, p0.x, p0.z);
+              const minDistSq = Math.min(d0, d1, d2);
+              const effRadius = this.radius * 0.46;
+              if (minDistSq < effRadius * effRadius) return true;
+              continue;
+          }
+
+          // 2. Exact 2D Circular Collision for round obstacles (Trees, Cylinders, Barrels, Lighthouses, Prisms)
+          if (wall.userData.collisionRadius) {
+              const dx = px - wall.position.x;
+              const dz = pz - wall.position.z;
+              const minSum = this.radius * 0.85 + wall.userData.collisionRadius;
+              if (dx * dx + dz * dz < minSum * minSum) return true;
+              continue;
+          }
+
+          // 3. Standard Box AABB Collision (slightly beveled corners so tanks never snag when turning)
           const box = wall.userData.bounds;
-          const x = Math.max(box.min.x, Math.min(newPos.x, box.max.x));
-          const z = Math.max(box.min.z, Math.min(newPos.z, box.max.z));
-          const distance = Math.sqrt((x - newPos.x) * (x - newPos.x) + (z - newPos.z) * (z - newPos.z));
+          const inset = (wall.userData.type === 'wall' || wall.userData.type === 'stone' || wall.userData.type === 'cork') ? 0.22 : 0;
+          const minX = box.min.x + inset;
+          const maxX = box.max.x - inset;
+          const minZ = box.min.z + inset;
+          const maxZ = box.max.z - inset;
+          const x = Math.max(minX, Math.min(px, maxX));
+          const z = Math.max(minZ, Math.min(pz, maxZ));
+          const distance = Math.sqrt((x - px) * (x - px) + (z - pz) * (z - pz));
           
-          if (distance < this.radius) return true;
+          if (distance < this.radius * 0.90) return true;
       }
 
       for (const entity of entities) {
-          if (entity === this) continue;
-          if (!entity.mesh) continue; 
+          if (!entity || entity === this || entity.isDead) continue;
+          if (!entity.mesh || !entity.mesh.parent) continue;
+          if (entity.hp !== undefined && entity.hp <= 0) continue;
 
-          const dist = newPos.distanceTo(entity.mesh.position);
-          if (dist < this.radius + entity.radius) return true;
+          const dx = px - entity.mesh.position.x;
+          const dz = pz - entity.mesh.position.z;
+          const minDist = (this.radius + entity.radius) * 0.92;
+          if (dx * dx + dz * dz < minDist * minDist) return true;
       }
+      return false;
+  }
+
+  // Smooth multi-angle & diagonal wall-sliding so tanks glide past angled triangle prisms and narrow gaps without snagging
+  tryMoveWithSlide(newPos, collisionObstacles, entities) {
+      if (!this.checkCollision(newPos, collisionObstacles, entities)) {
+          this.mesh.position.copy(newPos);
+          return true;
+      }
+
+      const curX = this.mesh.position.x;
+      const curZ = this.mesh.position.z;
+      const dx = newPos.x - curX;
+      const dz = newPos.z - curZ;
+
+      // Try axis-aligned slides first if nearly axis-aligned, or multi-angle deflections (25°, 45°, 65°, 80°) for diagonal prisms
+      const candidateAngles = [0.42, -0.42, 0.78, -0.78, 1.12, -1.12, 1.42, -1.42];
+      const testPos = newPos.clone();
+
+      for (let i = 0; i < candidateAngles.length; i++) {
+          const ang = candidateAngles[i];
+          const c = Math.cos(ang);
+          const s = Math.sin(ang);
+          const scale = Math.max(0.45, Math.abs(c));
+          testPos.x = curX + (dx * c - dz * s) * scale;
+          testPos.z = curZ + (dx * s + dz * c) * scale;
+          if (!this.checkCollision(testPos, collisionObstacles, entities)) {
+              this.mesh.position.copy(testPos);
+              return true;
+          }
+      }
+
+      const slideX = this.mesh.position.clone();
+      slideX.x = newPos.x;
+      if (!this.checkCollision(slideX, collisionObstacles, entities)) {
+          this.mesh.position.copy(slideX);
+          return true;
+      }
+
+      const slideZ = this.mesh.position.clone();
+      slideZ.z = newPos.z;
+      if (!this.checkCollision(slideZ, collisionObstacles, entities)) {
+          this.mesh.position.copy(slideZ);
+          return true;
+      }
+
       return false;
   }
 

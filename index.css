@@ -158,3 +158,46 @@ canvas {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 193, 7, 0.65);
 }
+
+/* --- Toy Story 3D Wooden Alphabet Block Intro Animations --- */
+@keyframes toyBlockDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-220px) rotate(var(--block-rot-start, -18deg)) scale(0.5);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(14px) rotate(calc(var(--block-rot, 0deg) * -0.5)) scale(1.08, 0.91);
+  }
+  76% {
+    transform: translateY(-10px) rotate(calc(var(--block-rot, 0deg) * 1.15)) scale(0.97, 1.04);
+  }
+  90% {
+    transform: translateY(4px) rotate(var(--block-rot, 0deg)) scale(1.02, 0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(var(--block-rot, 0deg)) scale(1);
+  }
+}
+
+@keyframes toyBlockHeaderFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(var(--block-rot, 0deg));
+  }
+  50% {
+    transform: translateY(-3px) rotate(var(--block-rot, 0deg));
+  }
+}
+
+.studio-menu-item {
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+.studio-menu-item:hover {
+  transform: translateX(4px) translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+}
+.studio-menu-item:active {
+  transform: translateX(1px) scale(0.99);
+}
+

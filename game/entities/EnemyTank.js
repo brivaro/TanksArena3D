@@ -6,7 +6,7 @@ import { PlayerTank } from './PlayerTank.js';
 // Configuration for different enemy ranks
 const ENEMY_TYPES = {
     'static': { 
-        color: 0x66BB6A, // Green (Sentry Turret)
+        color: 0x00E676, // Vivid Emerald Green (Sentry Turret)
         speed: 0, 
         rotSpeed: 1.0,
         shootCooldown: 2.4,
@@ -15,7 +15,7 @@ const ENEMY_TYPES = {
         behavior: 'STATIC' 
     },
     'basic': { 
-        color: 0xD32F2F, // Crimson Red (Patrol)
+        color: 0xFF1744, // Vivid Crimson Red (Patrol)
         speed: 5.5, 
         rotSpeed: 3.0,
         shootCooldown: 1.5,
@@ -24,7 +24,7 @@ const ENEMY_TYPES = {
         behavior: 'WANDER' 
     },
     'fast': { 
-        color: 0x00ACC1, // Electric Cyan (Scout Interceptor)
+        color: 0x00E5FF, // Electric Cyan (Scout Interceptor)
         speed: 9.5, 
         rotSpeed: 4.5,
         shootCooldown: 1.0,
@@ -33,7 +33,7 @@ const ENEMY_TYPES = {
         behavior: 'AGGRESSIVE' 
     },
     'heavy': { 
-        color: 0x3E2723, // Obsidian/Bronze (Sniper Juggernaut)
+        color: 0xFF6D00, // Vivid Blazing Amber-Bronze (Sniper Juggernaut)
         speed: 3.5, 
         rotSpeed: 2.2,
         shootCooldown: 2.0,
@@ -42,7 +42,7 @@ const ENEMY_TYPES = {
         behavior: 'TACTICAL' 
     },
     'boss': {
-        color: 0x880E4F, // Imperial Dreadnought Crimson-Purple
+        color: 0xD500F9, // Imperial Dreadnought Neon Magenta-Crimson
         speed: 4.8,
         rotSpeed: 2.8,
         shootCooldown: 1.35,
@@ -52,10 +52,54 @@ const ENEMY_TYPES = {
     }
 };
 
+// AI Difficulty Multipliers
+export const AI_DIFFICULTY_PROFILES = {
+    'easy': {
+        speedMult: 0.72,
+        rotMult: 0.70,
+        cooldownMult: 1.50,
+        reactionMult: 1.55,
+        bulletSpeedMult: 0.80,
+        turretAimSpeed: 3.2,
+        aimTolerance: 0.26,
+        bossHpMult: 0.75
+    },
+    'normal': {
+        speedMult: 1.0,
+        rotMult: 1.0,
+        cooldownMult: 1.0,
+        reactionMult: 1.0,
+        bulletSpeedMult: 1.0,
+        turretAimSpeed: 5.0,
+        aimTolerance: 0.38,
+        bossHpMult: 1.0
+    },
+    'hard': {
+        speedMult: 1.22,
+        rotMult: 1.28,
+        cooldownMult: 0.75,
+        reactionMult: 0.68,
+        bulletSpeedMult: 1.18,
+        turretAimSpeed: 6.8,
+        aimTolerance: 0.44,
+        bossHpMult: 1.25
+    },
+    'extreme': {
+        speedMult: 1.42,
+        rotMult: 1.58,
+        cooldownMult: 0.56,
+        reactionMult: 0.42,
+        bulletSpeedMult: 1.34,
+        turretAimSpeed: 9.0,
+        aimTolerance: 0.52,
+        bossHpMult: 1.5
+    }
+};
+
 export class EnemyTank extends Tank {
-  constructor(scene, x, z, typeKey = 'basic', bossConfig = null) {
-    const config = ENEMY_TYPES[typeKey] || ENEMY_TYPES['basic'];
-    const bossColor = (bossConfig && bossConfig.color) ? bossConfig.color : config.color;
+  constructor(scene, x, z, typeKey = 'basic', bossConfig = null, difficulty = 'normal') {
+    const baseConfig = ENEMY_TYPES[typeKey] || ENEMY_TYPES['basic'];
+    const bossColor = (bossConfig && bossConfig.color) ? bossConfig.color : baseConfig.color;
     super(scene, x, z, bossColor, typeKey === 'boss' ? {
       bodyColor: bossColor,
       trimColor: 0xffca28,
@@ -65,17 +109,15 @@ export class EnemyTank extends Tank {
     } : null);
     
     this.typeKey = typeKey;
-    this.config = config;
+    this.baseConfig = baseConfig;
+    this.config = { ...baseConfig };
     this.isBoss = (typeKey === 'boss');
     this.bossName = (bossConfig && bossConfig.name) ? bossConfig.name : 'COLOSO BLINDADO';
-    this.maxHp = this.isBoss ? ((bossConfig && bossConfig.maxHp) || 10) : 1;
+    this.baseBossMaxHp = this.isBoss ? ((bossConfig && bossConfig.maxHp) || 10) : 1;
+    this.maxHp = this.baseBossMaxHp;
     this.hp = this.maxHp;
     this.enraged = false;
     this.hitFlashTimer = 0;
-    
-    this.speed = config.speed;
-    this.rotationSpeed = config.rotSpeed;
-    this.maxCooldown = config.shootCooldown;
 
     if (this.isBoss) {
       this.mesh.scale.setScalar(1.52);
@@ -89,9 +131,37 @@ export class EnemyTank extends Tank {
     this.moveDir = new THREE.Vector3(0,0,1);
     this.changeDirTimer = 0;
     this.targetAngle = 0;
-    this.spawnTimer = config.reactionTime; 
 
+    this.applyDifficulty(difficulty, true);
     this.addRankInsignia(typeKey);
+  }
+
+  applyDifficulty(difficulty = 'normal', isInitial = false) {
+    const diffProfile = AI_DIFFICULTY_PROFILES[difficulty] || AI_DIFFICULTY_PROFILES['normal'];
+    this.difficulty = difficulty;
+    this.diffProfile = diffProfile;
+
+    this.config = {
+      ...this.baseConfig,
+      speed: this.baseConfig.speed * diffProfile.speedMult,
+      rotSpeed: this.baseConfig.rotSpeed * diffProfile.rotMult,
+      shootCooldown: this.baseConfig.shootCooldown * diffProfile.cooldownMult,
+      reactionTime: this.baseConfig.reactionTime * diffProfile.reactionMult,
+      bulletSpeed: this.baseConfig.bulletSpeed * diffProfile.bulletSpeedMult
+    };
+
+    this.speed = this.enraged ? this.config.speed * 1.28 : this.config.speed;
+    this.rotationSpeed = this.config.rotSpeed;
+    this.maxCooldown = this.enraged ? Math.min(1.05, this.config.shootCooldown * 0.78) : this.config.shootCooldown;
+
+    if (this.isBoss && isInitial) {
+      this.maxHp = Math.max(4, Math.round(this.baseBossMaxHp * diffProfile.bossHpMult));
+      this.hp = this.maxHp;
+    }
+
+    if (isInitial) {
+      this.spawnTimer = this.config.reactionTime;
+    }
   }
 
   addRankInsignia(typeKey) {
@@ -227,7 +297,8 @@ export class EnemyTank extends Tank {
     while (turretDiff > Math.PI) turretDiff -= Math.PI * 2;
     while (turretDiff < -Math.PI) turretDiff += Math.PI * 2;
     
-    this.turret.rotation.y += Math.sign(turretDiff) * Math.min(Math.abs(turretDiff), 5.0 * dt);
+    const aimSpeed = (this.diffProfile && this.diffProfile.turretAimSpeed) ? this.diffProfile.turretAimSpeed : 5.0;
+    this.turret.rotation.y += Math.sign(turretDiff) * Math.min(Math.abs(turretDiff), aimSpeed * dt);
 
     // Throttled Line of Sight check with Box3 broadphase (10x faster than per-frame full-scene raycast!)
     this.losTimer -= dt;
@@ -246,7 +317,26 @@ export class EnemyTank extends Tank {
 
             for (let i = 0; i < visionObstacles.length; i++) {
                 const obs = visionObstacles[i];
-                const b = obs.userData && obs.userData.bounds;
+                if (!obs || !obs.userData) continue;
+
+                // Analytical 2D Line-of-Sight check for circular obstacles (Lighthouses 'L', Trees 'R', Columns 'Y')
+                // Prevents the Lighthouse's transparent spotlight cone from blinding enemies while its solid tower base properly blocks sight!
+                if (obs.userData.collisionRadius) {
+                    const ox = obs.position.x - start.x;
+                    const oz = obs.position.z - start.z;
+                    const proj = ox * vecToPlayer.x + oz * vecToPlayer.z;
+                    if (proj > 0 && proj < distToPlayer) {
+                        const perpSq = (ox * ox + oz * oz) - proj * proj;
+                        const blockRad = obs.userData.collisionRadius * 0.92;
+                        if (perpSq < blockRad * blockRad) {
+                            blockedByBox = true;
+                            break;
+                        }
+                    }
+                    continue;
+                }
+
+                const b = obs.userData.bounds;
                 if (b) {
                     if (ray.intersectBox(b, hitBoxPt)) {
                         if (start.distanceToSquared(hitBoxPt) < distToPlayer * distToPlayer) {
@@ -268,7 +358,14 @@ export class EnemyTank extends Tank {
                     this.cachedCanSeePlayer = true;
                 } else {
                     const hits = this.raycaster.intersectObjects(losCandidates, true);
-                    if (hits.length === 0 || hits[0].distance > distToPlayer) {
+                    let validHit = null;
+                    for (let h = 0; h < hits.length; h++) {
+                        if (!hits[h].object.userData || !hits[h].object.userData.isEffect) {
+                            validHit = hits[h];
+                            break;
+                        }
+                    }
+                    if (!validHit || validHit.distance > distToPlayer) {
                         this.cachedCanSeePlayer = true;
                     }
                 }
@@ -289,7 +386,8 @@ export class EnemyTank extends Tank {
     }
 
     // Shoot if we see player and aim is roughly correct
-    if (canSeePlayer && this.cooldown <= 0 && Math.abs(turretDiff) < 0.38) {
+    const aimTol = (this.diffProfile && this.diffProfile.aimTolerance) ? this.diffProfile.aimTolerance : 0.38;
+    if (canSeePlayer && this.cooldown <= 0 && Math.abs(turretDiff) < aimTol) {
         this.tryShoot();
     }
 
@@ -316,14 +414,13 @@ export class EnemyTank extends Tank {
     if (Math.abs(angleDiff) > 0.1) {
         turnRate = Math.sign(angleDiff) * this.rotationSpeed;
         this.mesh.rotation.y += turnRate * dt;
-    } else {
-        forwardSpeed = this.speed;
+    }
+    if (Math.abs(angleDiff) < 0.65) {
+        forwardSpeed = this.speed * (Math.abs(angleDiff) > 0.15 ? 0.72 : 1.0);
         const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
-        const newPos = this.mesh.position.clone().add(forward.multiplyScalar(this.speed * dt));
+        const newPos = this.mesh.position.clone().add(forward.multiplyScalar(forwardSpeed * dt));
         
-        if (!this.checkCollision(newPos, collisionObstacles, entities)) {
-            this.mesh.position.copy(newPos);
-        } else {
+        if (!this.tryMoveWithSlide(newPos, collisionObstacles, entities)) {
             this.targetAngle = this.mesh.rotation.y + Math.PI * (0.8 + Math.random() * 0.4);
             this.changeDirTimer = 1.0;
             forwardSpeed = 0;

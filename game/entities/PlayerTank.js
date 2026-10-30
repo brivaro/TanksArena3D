@@ -4,44 +4,44 @@ import { Tank } from './Tank.js';
 
 export const PLAYER_SKINS = {
   classic: {
-    bodyColor: 0x0074D9,
-    trimColor: 0x004b8d,
+    bodyColor: 0x0088ff,
+    trimColor: 0x0055cc,
     stripeColor: 0xffffff,
-    roughness: 0.22,
+    roughness: 0.2,
     metalness: 0.18
   },
   gold: {
-    bodyColor: 0xffca28,
+    bodyColor: 0xffd600,
     trimColor: 0x1e293b,
-    stripeColor: 0xfff8e1,
-    roughness: 0.16,
+    stripeColor: 0xfffde7,
+    roughness: 0.15,
     metalness: 0.85,
     trimMetalness: 0.7
   },
   camo: {
-    bodyColor: 0x4b6043,
-    trimColor: 0x2e3b28,
-    stripeColor: 0xdca868,
-    roughness: 0.55,
+    bodyColor: 0x4caf50,
+    trimColor: 0x1b5e20,
+    stripeColor: 0xffca28,
+    roughness: 0.45,
     metalness: 0.12
   },
   cyber: {
     bodyColor: 0x0f172a,
-    trimColor: 0x00e5ff,
-    stripeColor: 0x00e5ff,
-    roughness: 0.18,
+    trimColor: 0x00f0ff,
+    stripeColor: 0x00f0ff,
+    roughness: 0.16,
     metalness: 0.75,
-    trimEmissive: 0x00e5ff,
-    trimEmissiveIntensity: 0.65
+    trimEmissive: 0x00f0ff,
+    trimEmissiveIntensity: 0.75
   },
   crimson: {
-    bodyColor: 0xb71c1c,
+    bodyColor: 0xff1744,
     trimColor: 0x212121,
-    stripeColor: 0xff9100,
-    roughness: 0.24,
+    stripeColor: 0xffea00,
+    roughness: 0.22,
     metalness: 0.4,
-    emissive: 0x4a0000,
-    emissiveIntensity: 0.35
+    emissive: 0x6a0000,
+    emissiveIntensity: 0.4
   }
 };
 
@@ -59,11 +59,15 @@ export class PlayerTank extends Tank {
     this.needsMine = false;
     this.mineCooldown = 0;
     this.maxMineCooldown = perkId === 'ordnance' ? 1.05 : 1.8;
+    this.needsBazooka = false;
+    this.bazookaCooldown = 0;
+    this.maxBazookaCooldown = perkId === 'ordnance' ? 2.6 : 4.0;
     this.bonusBounces = perkId === 'ricochet' ? 1 : 0;
     this.bulletSpeedMultiplier = perkId === 'ricochet' ? 1.18 : 1.0;
 
     this.invulnerableTimer = 0;
     this.bufferedMineTime = 0;
+    this.bufferedBazookaTime = 0;
 
     // Power-Up States
     this.shieldActive = false;
@@ -150,14 +154,17 @@ export class PlayerTank extends Tank {
   update(dt, collisionObstacles, visionObstacles, entities) {
     this.updateCooldown(dt);
     if (this.mineCooldown > 0) this.mineCooldown -= dt;
+    if (this.bazookaCooldown > 0) this.bazookaCooldown -= dt;
     if (this.warpCooldown > 0) this.warpCooldown -= dt;
 
     // Handle Power-Up Timers
     if (this.rapidFireTimer > 0) {
       this.rapidFireTimer -= dt;
+      if (this.rapidFireTimer < 0) this.rapidFireTimer = 0;
     }
     if (this.speedBoostTimer > 0) {
       this.speedBoostTimer -= dt;
+      if (this.speedBoostTimer < 0) this.speedBoostTimer = 0;
     }
 
     // Shield Animation
@@ -200,20 +207,7 @@ export class PlayerTank extends Tank {
       const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
       const newPos = this.mesh.position.clone().add(forward.multiplyScalar(activeForwardSpeed * dt));
 
-      if (!this.checkCollision(newPos, collisionObstacles, entities)) {
-        this.mesh.position.copy(newPos);
-      } else {
-        // Smooth wall-sliding along X or Z axis so tank never gets stuck on corners
-        const slideX = this.mesh.position.clone();
-        slideX.x = newPos.x;
-        const slideZ = this.mesh.position.clone();
-        slideZ.z = newPos.z;
-        if (!this.checkCollision(slideX, collisionObstacles, entities)) {
-          this.mesh.position.copy(slideX);
-        } else if (!this.checkCollision(slideZ, collisionObstacles, entities)) {
-          this.mesh.position.copy(slideZ);
-        }
-      }
+      this.tryMoveWithSlide(newPos, collisionObstacles, entities);
     } else {
       // Classic tank controls (WASD / Arrow Keys)
       const moveSpeed = move.forward * currentBaseSpeed;
@@ -227,20 +221,7 @@ export class PlayerTank extends Tank {
         const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
         const newPos = this.mesh.position.clone().add(forward.multiplyScalar(moveSpeed * dt));
 
-        if (!this.checkCollision(newPos, collisionObstacles, entities)) {
-          this.mesh.position.copy(newPos);
-        } else {
-          // Smooth wall-sliding along X or Z axis
-          const slideX = this.mesh.position.clone();
-          slideX.x = newPos.x;
-          const slideZ = this.mesh.position.clone();
-          slideZ.z = newPos.z;
-          if (!this.checkCollision(slideX, collisionObstacles, entities)) {
-            this.mesh.position.copy(slideX);
-          } else if (!this.checkCollision(slideZ, collisionObstacles, entities)) {
-            this.mesh.position.copy(slideZ);
-          }
-        }
+        this.tryMoveWithSlide(newPos, collisionObstacles, entities);
       }
     }
 
@@ -271,12 +252,28 @@ export class PlayerTank extends Tank {
         this.turret.rotation.y = angle - this.mesh.rotation.y; 
     }
 
-    // 3. Shooting (Super-fast if rapid fire powerup active!)
-    if (this.input.checkShoot()) {
-        this.tryShoot();
+    // 3. Heavy Bazooka Demolition Rocket (Q / F / Shift or Shift+Click or HUD button)
+    if (this.input.checkBazooka()) {
+        this.bufferedBazookaTime = 0.5;
     }
 
-    // 4. Mines (with input buffering so taps are never ignored)
+    if (this.bufferedBazookaTime > 0) {
+        this.bufferedBazookaTime -= dt;
+        if (this.bazookaCooldown <= 0) {
+            this.fireBazooka();
+        }
+    }
+
+    // 4. Standard Shooting (or Bazooka if holding modifier key and Bazooka is ready)
+    if (this.input.checkShoot()) {
+        if (this.input.isHoldingBazookaModifier && this.input.isHoldingBazookaModifier() && this.bazookaCooldown <= 0) {
+            this.fireBazooka();
+        } else {
+            this.tryShoot();
+        }
+    }
+
+    // 5. Mines (with input buffering so taps are never ignored)
     if (this.input.checkMine()) {
         this.bufferedMineTime = 0.5;
     }
@@ -302,6 +299,22 @@ export class PlayerTank extends Tank {
       return true;
     }
     return false;
+  }
+
+  fireBazooka() {
+    if (this.bazookaCooldown <= 0) {
+      this.needsBazooka = true;
+      this.bazookaCooldown = this.maxBazookaCooldown;
+      this.bufferedBazookaTime = 0;
+      this.recoilImpulse = 1.65;
+      if (this.barrel) {
+        this.barrel.position.z = 0.65;
+      }
+      return true;
+    } else {
+      this.bufferedBazookaTime = 0.55;
+      return false;
+    }
   }
 
   dropMine() {

@@ -22,6 +22,7 @@ export class InputManager {
     this.isMouseDown = false;
     this.shouldShoot = false;
     this.shouldMine = false;
+    this.shouldBazooka = false;
     this.autoShootHold = false; // Hold fire button to shoot continuously when cooldown allows
 
     this.boundListeners = [];
@@ -40,7 +41,7 @@ export class InputManager {
     // Keyboard
     const onKeyDown = (e) => {
       this.keys[e.code] = true;
-      if (e.code === 'Space' || e.code === 'KeyE' || e.code === 'KeyQ' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      if (e.code === 'Space' || e.code === 'KeyE') {
         if (e.code === 'Space') {
           e.preventDefault();
           if (document.activeElement && document.activeElement instanceof HTMLElement && document.activeElement !== this.canvas) {
@@ -48,6 +49,8 @@ export class InputManager {
           }
         }
         this.shouldMine = true;
+      } else if (e.code === 'KeyQ' || e.code === 'KeyF' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        this.shouldBazooka = true;
       }
     };
     const onKeyUp = (e) => {
@@ -71,7 +74,7 @@ export class InputManager {
     };
     this.addListener(window, 'pointermove', onPointerMove);
 
-    // Pointer Down (Left click = Fire, Right click = Mine on PC)
+    // Pointer Down (Left click = Fire or Bazooka if holding Shift/Q/F, Right click = Mine on PC)
     const onPointerDown = (e) => {
       if (e.pointerType === 'mouse') {
         const target = e.target;
@@ -85,9 +88,16 @@ export class InputManager {
           return;
         }
 
+        this.updateMouseCoords(e.clientX, e.clientY);
+
+        // If holding Shift, Q, or F while clicking Left Mouse Button, fire Bazooka!
+        if (e.shiftKey || this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['KeyQ'] || this.keys['KeyF']) {
+          this.shouldBazooka = true;
+          return;
+        }
+
         this.isMouseDown = true;
         this.shouldShoot = true;
-        this.updateMouseCoords(e.clientX, e.clientY);
       }
       // On mobile/touch devices, all firing is exclusively governed by the aim stick!
     };
@@ -131,6 +141,7 @@ export class InputManager {
     this.isMouseDown = false;
     this.shouldShoot = false;
     this.shouldMine = false;
+    this.shouldBazooka = false;
     this.autoShootHold = false;
   }
 
@@ -217,6 +228,10 @@ export class InputManager {
     this.shouldMine = true;
   }
 
+  triggerBazooka() {
+    this.shouldBazooka = true;
+  }
+
   getMovementVector() {
     const move = { forward: 0, turn: 0, directX: 0, directZ: 0, hasDirectInput: false };
 
@@ -259,6 +274,7 @@ export class InputManager {
   }
 
   checkShoot() {
+    // If holding Shift/Q/F while mouse is down, prefer Bazooka if ready
     if (this.shouldShoot || this.autoShootHold || this.isMouseDown) {
       this.shouldShoot = false;
       return true;
@@ -266,9 +282,21 @@ export class InputManager {
     return false;
   }
 
+  isHoldingBazookaModifier() {
+    return Boolean(this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['KeyQ'] || this.keys['KeyF']);
+  }
+
   checkMine() {
     if (this.shouldMine) {
       this.shouldMine = false;
+      return true;
+    }
+    return false;
+  }
+
+  checkBazooka() {
+    if (this.shouldBazooka) {
+      this.shouldBazooka = false;
       return true;
     }
     return false;

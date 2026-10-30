@@ -327,27 +327,30 @@ interface MobileControlsClusterProps {
   onAim: (x: number, y: number, active: boolean) => void;
   onQuickShoot?: () => void;
   onMine: () => void;
+  onBazooka: () => void;
   onToggleCamera: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   cameraMode?: 'overview' | 'follow';
   mineReady: boolean;
+  bazookaReady: boolean;
 }
 
 const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
   onAim,
-  onQuickShoot,
   onMine,
+  onBazooka,
   onToggleCamera,
-  onZoomIn,
-  onZoomOut,
   cameraMode,
-  mineReady
+  mineReady,
+  bazookaReady
 }) => {
   const [minePressed, setMinePressed] = useState(false);
+  const [bazookaPressed, setBazookaPressed] = useState(false);
   const [camPressed, setCamPressed] = useState(false);
   const lastCameraTapRef = useRef(0);
   const lastMineTapRef = useRef(0);
+  const lastBazookaTapRef = useRef(0);
 
   // Bulletproof anti-duplicate camera toggle
   const handleCameraTrigger = (e: React.TouchEvent | React.MouseEvent) => {
@@ -381,18 +384,33 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
     onMine();
   };
 
+  const handleBazookaTrigger = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastBazookaTapRef.current < 300) return;
+    lastBazookaTapRef.current = now;
+
+    setBazookaPressed(true);
+    setTimeout(() => setBazookaPressed(false), 200);
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(40); } catch (_) {}
+    }
+    onBazooka();
+  };
+
   return (
     <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-end', pointerEvents: 'auto' }}>
-      {/* Side Utility Controls (Camera Mode & Mine Button) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-        {/* Dynamic Camera Quick Toggle with Anti-Double-Fire and Active Visual Glow */}
+      {/* Side Utility Controls (Camera Mode, Bazooka & Mine Buttons) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+        {/* Dynamic Camera Quick Toggle */}
         <button
           type="button"
           onTouchStart={handleCameraTrigger}
           onClick={handleCameraTrigger}
           style={{
-            width: '54px',
-            height: '54px',
+            width: '50px',
+            height: '50px',
             borderRadius: '50%',
             backgroundColor: cameraMode === 'follow' ? '#e1f5fe' : 'rgba(255, 255, 255, 0.95)',
             border: cameraMode === 'follow' ? '3px solid #0288d1' : '3px solid #8d6e63',
@@ -400,7 +418,7 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
               ? '0 0 16px rgba(2, 136, 209, 0.8), inset 0 2px 4px rgba(255,255,255,0.9)'
               : '0 4px 12px rgba(0,0,0,0.3)',
             color: cameraMode === 'follow' ? '#01579b' : '#3e2723',
-            fontSize: '19px',
+            fontSize: '17px',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
@@ -415,19 +433,53 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
           title={cameraMode === 'overview' ? 'Vista de cerca: Seguir al tanque' : 'Vista general: Ver todo el mapa'}
         >
           {cameraMode === 'overview' ? '🎯' : '🗺️'}
-          <span style={{ fontSize: '8px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: '7.5px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.5px' }}>
             {cameraMode === 'overview' ? 'TANQUE' : 'MAPA'}
           </span>
         </button>
 
-        {/* Instant Responsive Mine Button (NO disabled attribute so taps are never ignored) */}
+        {/* Heavy Demolition Bazooka Button */}
+        <div
+          data-ui-element="true"
+          onTouchStart={handleBazookaTrigger}
+          onMouseDown={handleBazookaTrigger}
+          style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            backgroundColor: bazookaReady ? '#ea580c' : '#616161',
+            border: '3px solid rgba(255, 255, 255, 0.92)',
+            boxShadow: bazookaReady
+              ? '0 6px 18px rgba(234,88,12,0.75), inset 0 2px 4px rgba(255,255,255,0.45)'
+              : '0 2px 6px rgba(0,0,0,0.4)',
+            color: '#fff',
+            fontSize: '21px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'none',
+            userSelect: 'none',
+            transform: bazookaPressed ? 'scale(0.88)' : 'scale(1)',
+            transition: 'transform 0.1s ease-out, background-color 0.2s',
+            opacity: bazookaReady ? 1.0 : 0.7
+          }}
+        >
+          🚀
+          <span style={{ fontSize: '8.5px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.4px' }}>
+            {bazookaReady ? 'BAZOCA' : 'CARGA'}
+          </span>
+        </div>
+
+        {/* Instant Responsive Mine Button */}
         <div
           data-ui-element="true"
           onTouchStart={handleMineTrigger}
           onMouseDown={handleMineTrigger}
           style={{
-            width: '64px',
-            height: '64px',
+            width: '60px',
+            height: '60px',
             borderRadius: '50%',
             backgroundColor: mineReady ? '#d32f2f' : '#616161',
             border: '3px solid rgba(255, 255, 255, 0.9)',
@@ -435,7 +487,7 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
               ? '0 6px 18px rgba(211,47,47,0.7), inset 0 2px 4px rgba(255,255,255,0.4)'
               : '0 2px 6px rgba(0,0,0,0.4)',
             color: '#fff',
-            fontSize: '24px',
+            fontSize: '21px',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
@@ -449,13 +501,13 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
           }}
         >
           💣
-          <span style={{ fontSize: '9px', fontWeight: '900', marginTop: '2px', letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: '8.5px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.4px' }}>
             {mineReady ? 'MINA' : 'RECARGA'}
           </span>
         </div>
       </div>
 
-      {/* Aim & Shoot Virtual Crosshair Joystick (Only shoots when actively moving mira) */}
+      {/* Aim & Shoot Virtual Crosshair Joystick */}
       <VirtualAimJoystick onAim={onAim} />
     </div>
   );
@@ -488,14 +540,222 @@ const TACTICAL_PERKS_LIST = [
   { id: 'heavy_armor', icon: '🛡️', name: 'Blindaje Reactivo', desc: 'Inicia todas las misiones con 4 corazones de blindaje (❤️x4)', color: '#fbbf24' }
 ];
 
+const AI_DIFFICULTIES_LIST = [
+  { id: 'easy', label: 'FÁCIL', rank: 'Cadete', icon: '🟢', color: '#4ade80', desc: 'IA más pausada, proyectiles lentos y menor cadencia' },
+  { id: 'normal', label: 'NORMAL', rank: 'Comandante', icon: '🔵', color: '#38bdf8', desc: 'Equilibrio táctico estándar de velocidad y puntería' },
+  { id: 'hard', label: 'DIFÍCIL', rank: 'Élite', icon: '🟠', color: '#fbbf24', desc: 'Tanques más rápidos, reflejos agudos y mayor cadencia' },
+  { id: 'extreme', label: 'EXTREMO', rank: 'Pesadilla', icon: '🔴', color: '#f87171', desc: 'IA implacable, recarga ultrarrápida y jefes reforzados' }
+];
+
+// --- Toy Story Style 3D Wooden Alphabet Block Components ---
+
+const WOOD_BLOCK_PALETTE = [
+  { border: '#e53935', shadow: '#8e0000', letter: '#d32f2f' }, // Classic Toy Red
+  { border: '#1e88e5', shadow: '#0d47a1', letter: '#1565c0' }, // Bright Cobalt Blue
+  { border: '#43a047', shadow: '#1b5e20', letter: '#2e7d32' }, // Playroom Emerald Green
+  { border: '#fdd835', shadow: '#c68400', letter: '#e65100' }, // Sunny Amber Yellow
+  { border: '#fb8c00', shadow: '#bf360c', letter: '#d84315' }, // Vibrant Toy Orange
+  { border: '#8e24aa', shadow: '#4a148c', letter: '#6a1b9a' }  // Royal Toy Purple
+];
+
+interface WoodenBlockRowProps {
+  word: string;
+  startIndex: number;
+  size?: 'large' | 'compact';
+  animateDrop?: boolean;
+}
+
+const WoodenBlockRow: React.FC<WoodenBlockRowProps> = ({
+  word,
+  startIndex,
+  size = 'large',
+  animateDrop = false
+}) => {
+  const isLarge = size === 'large';
+  const blockSize = isLarge ? 66 : 42;
+  const fontSize = isLarge ? 35 : 22;
+  const borderWidth = isLarge ? 6 : 4;
+  const depthBottom = isLarge ? 8 : 5;
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: isLarge ? '10px' : '6px', flexWrap: 'wrap' }}>
+      {word.split('').map((ch, idx) => {
+        if (ch === ' ') {
+          return <div key={idx} style={{ width: isLarge ? '18px' : '10px' }} />;
+        }
+        const globalIdx = startIndex + idx;
+        const pal = WOOD_BLOCK_PALETTE[globalIdx % WOOD_BLOCK_PALETTE.length];
+        const rotDeg = ((globalIdx % 2 === 0 ? 1 : -1) * (1.8 + (globalIdx % 3) * 0.9)).toFixed(1);
+        const startRotDeg = ((globalIdx % 2 === 0 ? -1 : 1) * 22).toFixed(1);
+        const delaySec = (globalIdx * 0.085).toFixed(3);
+
+        return (
+          <div
+            key={idx}
+            style={{
+              width: `${blockSize}px`,
+              height: `${blockSize}px`,
+              borderRadius: isLarge ? '13px' : '9px',
+              background: 'linear-gradient(145deg, #fff3d6 0%, #f5d399 55%, #e2b46d 100%)',
+              border: `${borderWidth}px solid ${pal.border}`,
+              boxShadow: `0 ${depthBottom}px 0 ${pal.shadow}, 0 ${depthBottom + 10}px 22px rgba(0,0,0,0.55), inset 0 2px 3px rgba(255,255,255,0.85), inset 0 -3px 6px rgba(139, 90, 43, 0.35)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              userSelect: 'none',
+              ['--block-rot' as any]: `${rotDeg}deg`,
+              ['--block-rot-start' as any]: `${startRotDeg}deg`,
+              transform: `rotate(${rotDeg}deg)`,
+              animation: animateDrop
+                ? `toyBlockDrop 0.68s cubic-bezier(0.22, 1, 0.36, 1) ${delaySec}s both`
+                : `toyBlockHeaderFloat 3.6s ease-in-out ${delaySec}s infinite`
+            }}
+          >
+            {/* Subtle carved wood-grain inner groove */}
+            <div style={{
+              position: 'absolute',
+              inset: isLarge ? '4px' : '2px',
+              borderRadius: isLarge ? '6px' : '4px',
+              border: '1px solid rgba(160, 105, 50, 0.28)',
+              pointerEvents: 'none'
+            }} />
+            <span style={{
+              fontFamily: '"Chakra Petch", "Arial Black", Impact, sans-serif',
+              fontSize: `${fontSize}px`,
+              fontWeight: 900,
+              color: pal.letter,
+              textShadow: '0 2px 0 rgba(255,255,255,0.75), 0 -1px 1px rgba(0,0,0,0.28)',
+              lineHeight: 1
+            }}>
+              {ch}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+interface ToyBlockIntroSplashProps {
+  onFinish: () => void;
+  onPlayBlockSound?: (index: number) => void;
+}
+
+const ToyBlockIntroSplash: React.FC<ToyBlockIntroSplashProps> = ({ onFinish, onPlayBlockSound }) => {
+  const [fadingOut, setFadingOut] = useState(false);
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    // Trigger subtle wooden block pop cues as blocks land
+    for (let i = 0; i < 12; i++) {
+      const t = setTimeout(() => {
+        if (onPlayBlockSound) onPlayBlockSound(i);
+      }, i * 85 + 320);
+      timers.push(t);
+    }
+
+    const fadeTimer = setTimeout(() => {
+      setFadingOut(true);
+    }, 2400);
+    const doneTimer = setTimeout(() => {
+      onFinish();
+    }, 2850);
+
+    timers.push(fadeTimer, doneTimer);
+    return () => timers.forEach(t => clearTimeout(t));
+  }, [onFinish, onPlayBlockSound]);
+
+  const handleSkip = () => {
+    setFadingOut(true);
+    setTimeout(onFinish, 220);
+  };
+
+  return (
+    <div
+      onClick={handleSkip}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 200,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'radial-gradient(circle at center, rgba(30, 41, 59, 0.72) 0%, rgba(9, 13, 24, 0.94) 100%)',
+        backdropFilter: 'blur(14px)',
+        cursor: 'pointer',
+        opacity: fadingOut ? 0 : 1,
+        transition: 'opacity 0.42s ease-out',
+        padding: '24px'
+      }}
+    >
+      {/* Studio Emblem Pill */}
+      <div style={{
+        backgroundColor: 'rgba(251, 191, 36, 0.16)',
+        border: '1.5px solid rgba(251, 191, 36, 0.55)',
+        color: '#fde047',
+        fontSize: '11px',
+        fontWeight: 900,
+        padding: '6px 16px',
+        borderRadius: '20px',
+        letterSpacing: '2.2px',
+        marginBottom: '24px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+      }}>
+        ★ TOYBOX TACTICAL STUDIOS PRESENTA ★
+      </div>
+
+      {/* 3D Wooden Alphabet Toy Blocks Spelling TANKS ARENA 3D */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+        <WoodenBlockRow word="TANKS" startIndex={0} size="large" animateDrop={true} />
+        <WoodenBlockRow word="ARENA 3D" startIndex={5} size="large" animateDrop={true} />
+      </div>
+
+      {/* Toy Story Inspired Wooden Train / Tank Track Divider */}
+      <div style={{
+        marginTop: '28px',
+        padding: '10px 24px',
+        borderRadius: '12px',
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        border: '1px solid rgba(148, 163, 184, 0.28)',
+        color: '#e2e8f0',
+        fontSize: '13px',
+        fontWeight: 800,
+        letterSpacing: '1px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+      }}>
+        🪵 EDICIÓN COLECCIONISTA DE BATALLA DE JUGUETES 3D
+      </div>
+
+      <div style={{
+        marginTop: '18px',
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#94a3b8',
+        letterSpacing: '1.2px'
+      }}>
+        Haz clic en cualquier lugar para entrar al Centro de Mando
+      </div>
+    </div>
+  );
+};
+
 interface MainMenuProps {
   onStart: () => void;
   onLevelSelect: () => void;
   onOpenIntel: () => void;
   onOpenHangar: () => void;
+  onOpenSettings: () => void;
   unlockedLevel: number;
   totalLevels: number;
   totalStars: number;
+  aiDifficulty: string;
+  onSelectDifficulty: (diffId: string) => void;
+  isMusicMuted: boolean;
+  onToggleMusic: () => void;
+  selectedSkin: string;
+  selectedPerk: string;
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({
@@ -503,139 +763,501 @@ const MainMenu: React.FC<MainMenuProps> = ({
   onLevelSelect,
   onOpenIntel,
   onOpenHangar,
+  onOpenSettings,
   unlockedLevel,
   totalLevels,
-  totalStars
+  totalStars,
+  aiDifficulty,
+  onSelectDifficulty,
+  isMusicMuted,
+  onToggleMusic,
+  selectedSkin,
+  selectedPerk
 }) => {
   const currentMission = Math.min(unlockedLevel, totalLevels);
   const currentBiomeId = LevelLoader.getBiome(currentMission);
   const currentBiome = BIOMES_LIST.find(b => b.id === currentBiomeId) || BIOMES_LIST[1];
   const progressPct = Math.min(100, Math.round(((unlockedLevel - 1) / totalLevels) * 100));
+  const activeDiff = AI_DIFFICULTIES_LIST.find(d => d.id === aiDifficulty) || AI_DIFFICULTIES_LIST[1];
+  const activeSkinObj = TANK_SKINS_LIST.find(s => s.id === selectedSkin) || TANK_SKINS_LIST[0];
+  const activePerkObj = TACTICAL_PERKS_LIST.find(p => p.id === selectedPerk) || TACTICAL_PERKS_LIST[0];
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.menuBox}>
-        {/* Top Tactical Header Badge */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
-          <span style={styles.toyBadge}>EDICIÓN COMANDO TÁCTICO 3D</span>
-          <span style={{
-            backgroundColor: 'rgba(56, 189, 248, 0.15)',
-            border: '1px solid rgba(56, 189, 248, 0.45)',
-            color: '#38bdf8',
-            fontSize: '10px',
-            fontWeight: 800,
-            padding: '4px 10px',
-            borderRadius: '6px',
-            letterSpacing: '1px'
-          }}>
-            6 BIOMAS • 48 MISIONES
-          </span>
-          <span style={{
-            backgroundColor: 'rgba(251, 191, 36, 0.16)',
-            border: '1px solid rgba(251, 191, 36, 0.45)',
-            color: '#fbbf24',
-            fontSize: '10px',
-            fontWeight: 900,
-            padding: '4px 10px',
-            borderRadius: '6px',
-            letterSpacing: '0.8px'
-          }}>
-            ★ {totalStars} / {totalLevels * 3}
-          </span>
+      <div style={{
+        ...styles.menuBox,
+        maxWidth: '940px',
+        padding: '28px 34px',
+        textAlign: 'left'
+      }}>
+        {/* Top Studio Bar & Wooden Toy Block Logo Header */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          paddingBottom: '20px',
+          marginBottom: '22px',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.2)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <span style={styles.toyBadge}>TOYBOX TACTICAL STUDIOS • EDICIÓN 3D</span>
+            <span style={{
+              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.45)',
+              color: '#38bdf8',
+              fontSize: '10px',
+              fontWeight: 800,
+              padding: '4px 10px',
+              borderRadius: '6px',
+              letterSpacing: '1px'
+            }}>
+              6 BIOMAS • 48 MISIONES
+            </span>
+            <span style={{
+              backgroundColor: 'rgba(251, 191, 36, 0.16)',
+              border: '1px solid rgba(251, 191, 36, 0.45)',
+              color: '#fbbf24',
+              fontSize: '10px',
+              fontWeight: 900,
+              padding: '4px 10px',
+              borderRadius: '6px',
+              letterSpacing: '0.8px'
+            }}>
+              ★ {totalStars} / {totalLevels * 3} ESTRELLAS
+            </span>
+          </div>
+
+          {/* Toy Story Wooden Blocks Header Logo */}
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', margin: '4px 0 10px 0' }}>
+            <WoodenBlockRow word="TANKS" startIndex={0} size="compact" animateDrop={false} />
+            <WoodenBlockRow word="ARENA 3D" startIndex={5} size="compact" animateDrop={false} />
+          </div>
+
+          <p style={{ ...styles.subtitle, margin: '2px 0 0 0', fontSize: '13px' }}>
+            Combate táctico de blindados con balística de rebote, cohete bazoca de demolición y física reactiva
+          </p>
         </div>
 
-        <h1 style={styles.title}>TANKS ARENA 3D</h1>
-        <p style={styles.subtitle}>
-          Combate táctico de blindados con balística de rebote, demolición y física reactiva
-        </p>
-
-        {/* Active Operation Telemetry Card */}
+        {/* Wide 2-Column Studio Layout: Left Navigation Menu + Right Command Telemetry */}
         <div style={{
-          backgroundColor: 'rgba(15, 23, 42, 0.78)',
-          border: '1px solid rgba(148, 163, 184, 0.22)',
-          borderRadius: '12px',
-          padding: '14px 18px',
-          marginBottom: '18px',
-          textAlign: 'left'
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+          gap: '22px',
+          alignItems: 'stretch'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <div>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', letterSpacing: '1.2px' }}>
-                OPERACIÓN ACTIVA EN CURSO
+          {/* LEFT COLUMN: Classic AAA Studio Menu Navigation */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'space-between' }}>
+            {/* 1. CONTINUAR / DESPLEGAR */}
+            <button
+              className="tactical-btn-primary"
+              onClick={onStart}
+              style={{
+                ...styles.primaryButton,
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                textAlign: 'left',
+                borderRadius: '12px'
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 900, color: '#451a03', letterSpacing: '1.2px' }}>
+                  OPERACIÓN EN CURSO • {currentBiome.icon} {currentBiome.label.split(' ')[0].toUpperCase()}
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                  ▶ CONTINUAR CAMPAÑA (M-{currentMission})
+                </div>
               </div>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#f8fafc', marginTop: '2px', fontFamily: '"Chakra Petch", sans-serif' }}>
+              <span style={{
+                backgroundColor: 'rgba(15, 23, 42, 0.16)',
+                padding: '6px 10px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 900,
+                color: '#0f172a'
+              }}>
+                JUGAR →
+              </span>
+            </button>
+
+            {/* 2. SELECCIONAR MISIÓN */}
+            <button
+              className="studio-menu-item"
+              onClick={onLevelSelect}
+              style={{
+                ...styles.studioMenuBtn,
+                borderLeft: '4px solid #fbbf24'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={styles.studioMenuIcon}>🗺️</span>
+                <div>
+                  <div style={styles.studioMenuTitle}>SELECCIONAR MISIÓN</div>
+                  <div style={styles.studioMenuSub}>{totalLevels} operaciones tácticas en 6 biomas</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24' }}>★ {totalStars}/{totalLevels * 3}</span>
+            </button>
+
+            {/* 3. HANGAR 3D */}
+            <button
+              className="studio-menu-item"
+              onClick={onOpenHangar}
+              style={{
+                ...styles.studioMenuBtn,
+                borderLeft: '4px solid #38bdf8'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={styles.studioMenuIcon}>🔧</span>
+                <div>
+                  <div style={styles.studioMenuTitle}>HANGAR 3D Y ARMAMENTO</div>
+                  <div style={styles.studioMenuSub}>{activeSkinObj.name} • {activePerkObj.name}</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#38bdf8' }}>EQUIPAR</span>
+            </button>
+
+            {/* 4. AJUSTES */}
+            <button
+              className="studio-menu-item"
+              onClick={onOpenSettings}
+              style={{
+                ...styles.studioMenuBtn,
+                borderLeft: '4px solid #a855f7'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={styles.studioMenuIcon}>⚙️</span>
+                <div>
+                  <div style={styles.studioMenuTitle}>AJUSTES Y AUDIO</div>
+                  <div style={styles.studioMenuSub}>IA: {activeDiff.label} • Música: {isMusicMuted ? 'OFF' : 'ON'} • Controles</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#c084fc' }}>CONFIGURAR</span>
+            </button>
+
+            {/* 5. MANUAL / ENCICLOPEDIA */}
+            <button
+              className="studio-menu-item"
+              onClick={onOpenIntel}
+              style={{
+                ...styles.studioMenuBtn,
+                borderLeft: '4px solid #4ade80'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={styles.studioMenuIcon}>📖</span>
+                <div>
+                  <div style={styles.studioMenuTitle}>MANUAL DE COMBATE</div>
+                  <div style={styles.studioMenuSub}>Guía de Bazoca, Minas, Biomas y Controles</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#4ade80' }}>VER GUÍA</span>
+            </button>
+          </div>
+
+          {/* RIGHT COLUMN: Command Center Status, Quick AI Difficulty & Arsenal Summary */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'space-between' }}>
+            {/* Active Campaign Operation Card */}
+            <div style={{
+              backgroundColor: 'rgba(9, 14, 26, 0.78)',
+              border: '1px solid rgba(148, 163, 184, 0.22)',
+              borderRadius: '12px',
+              padding: '14px 16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', letterSpacing: '1.2px' }}>
+                  EXPEDIENTE DE CAMPAÑA
+                </span>
+                <span style={{
+                  backgroundColor: currentBiome.accent,
+                  border: `1px solid ${currentBiome.color}66`,
+                  color: currentBiome.color,
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10.5px',
+                  fontWeight: 800
+                }}>
+                  {currentBiome.icon} {currentBiome.label.split(' ')[0].toUpperCase()}
+                </span>
+              </div>
+
+              <div style={{ fontSize: '16px', fontWeight: 900, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif' }}>
                 MISIÓN #{currentMission}: {LevelLoader.getLevelName(currentMission).toUpperCase()}
               </div>
-            </div>
-            <div style={{
-              backgroundColor: currentBiome.accent,
-              border: `1px solid ${currentBiome.color}66`,
-              color: currentBiome.color,
-              padding: '4px 10px',
-              borderRadius: '8px',
-              fontSize: '11px',
-              fontWeight: 800
-            }}>
-              {currentBiome.icon} {currentBiome.label.split(' ')[0].toUpperCase()}
-            </div>
-          </div>
 
-          {/* Campaign Progress Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-            <div style={{ flex: 1, height: '6px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{
-                width: `${Math.max(4, progressPct)}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
-                borderRadius: '3px'
-              }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                <div style={{ flex: 1, height: '7px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.max(4, progressPct)}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
+                    borderRadius: '4px'
+                  }} />
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.min(unlockedLevel - 1, totalLevels)}/{totalLevels}
+                </span>
+              </div>
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
-              {Math.min(unlockedLevel - 1, totalLevels)}/{totalLevels} COMPLETADAS
-            </span>
+
+            {/* Quick AI Difficulty & Music Selector Card */}
+            <div style={{
+              backgroundColor: 'rgba(9, 14, 26, 0.78)',
+              border: '1px solid rgba(148, 163, 184, 0.22)',
+              borderRadius: '12px',
+              padding: '12px 16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#cbd5e1', letterSpacing: '0.8px' }}>
+                  🤖 DIFICULTAD IA: <span style={{ color: activeDiff.color }}>{activeDiff.label} ({activeDiff.rank})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={onToggleMusic}
+                  style={{
+                    backgroundColor: isMusicMuted ? 'rgba(30, 41, 59, 0.9)' : 'rgba(16, 185, 129, 0.2)',
+                    border: isMusicMuted ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(74, 222, 128, 0.55)',
+                    color: isMusicMuted ? '#94a3b8' : '#4ade80',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isMusicMuted ? '🎵 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                {AI_DIFFICULTIES_LIST.map(d => {
+                  const active = aiDifficulty === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => onSelectDifficulty(d.id)}
+                      title={d.desc}
+                      style={{
+                        backgroundColor: active ? `${d.color}24` : 'rgba(30, 41, 59, 0.7)',
+                        border: active ? `1.5px solid ${d.color}` : '1px solid rgba(148, 163, 184, 0.22)',
+                        color: active ? d.color : '#94a3b8',
+                        borderRadius: '8px',
+                        padding: '7px 4px',
+                        fontSize: '10.5px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {d.icon} {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '6px' }}>
+                {activeDiff.desc}
+              </div>
+            </div>
+
+            {/* Compact Arsenal & Keybinds Summary */}
+            <div style={{
+              backgroundColor: 'rgba(9, 14, 26, 0.78)',
+              border: '1px solid rgba(148, 163, 184, 0.2)',
+              borderRadius: '12px',
+              padding: '12px 16px'
+            }}>
+              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
+                ⚡ CONTROLES DE COMBATE Y DEMOLICIÓN
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', color: '#cbd5e1' }}>
+                <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.55)', padding: '6px 9px', borderRadius: '7px' }}>
+                  <strong style={{ color: '#f8fafc' }}>🕹️ Mover / Cañón</strong>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                    <kbd style={styles.kbd}>WASD</kbd> + <kbd style={styles.kbd}>Clic Izq</kbd>
+                  </div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(234, 88, 12, 0.16)', border: '1px solid rgba(251, 146, 60, 0.35)', padding: '6px 9px', borderRadius: '7px' }}>
+                  <strong style={{ color: '#fdba74' }}>🚀 Cohete Bazoca</strong>
+                  <div style={{ fontSize: '10px', color: '#fed7aa', marginTop: '2px' }}>
+                    <kbd style={styles.kbd}>Q</kbd> / <kbd style={styles.kbd}>F</kbd> / <kbd style={styles.kbd}>Shift</kbd> (Rompe muros)
+                  </div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.55)', padding: '6px 9px', borderRadius: '7px' }}>
+                  <strong style={{ color: '#4ade80' }}>💣 Poner Mina</strong>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                    <kbd style={styles.kbd}>Espacio</kbd> / <kbd style={styles.kbd}>E</kbd> / <kbd style={styles.kbd}>Clic Der</kbd>
+                  </div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.55)', padding: '6px 9px', borderRadius: '7px' }}>
+                  <strong style={{ color: '#38bdf8' }}>🔍 Cámara 3D</strong>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                    <kbd style={styles.kbd}>C</kbd> Vista • <kbd style={styles.kbd}>Z</kbd>/<kbd style={styles.kbd}>X</kbd> Zoom
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
 
-        {/* Main CTA Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-          <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onStart}>
-            ▶ DESPLEGAR EN CAMPAÑA • MISIÓN #{currentMission}
-          </button>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-            <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onLevelSelect}>
-              🗺️ MISIONES ({totalLevels})
-            </button>
+interface SettingsModalProps {
+  aiDifficulty: string;
+  onSelectDifficulty: (diffId: string) => void;
+  isMuted: boolean;
+  onToggleMute: () => void;
+  isMusicMuted: boolean;
+  onToggleMusic: () => void;
+  touchControlsEnabled: boolean;
+  onToggleTouchControls: () => void;
+  cameraMode: 'overview' | 'follow';
+  onToggleCamera: () => void;
+  onReplayIntro: () => void;
+  onClose: () => void;
+}
+
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  aiDifficulty,
+  onSelectDifficulty,
+  isMuted,
+  onToggleMute,
+  isMusicMuted,
+  onToggleMusic,
+  touchControlsEnabled,
+  onToggleTouchControls,
+  cameraMode,
+  onToggleCamera,
+  onReplayIntro,
+  onClose
+}) => {
+  const activeDiff = AI_DIFFICULTIES_LIST.find(d => d.id === aiDifficulty) || AI_DIFFICULTIES_LIST[1];
+
+  return (
+    <div style={styles.overlay}>
+      <div style={{ ...styles.menuBox, maxWidth: '640px', textAlign: 'left', padding: '26px 30px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.22)', paddingBottom: '12px', marginBottom: '16px' }}>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 800, color: '#c084fc', letterSpacing: '1.5px' }}>CONFIGURACIÓN DEL SISTEMA</div>
+            <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>⚙️ AJUSTES DEL JUEGO</h2>
+          </div>
+          <button className="tactical-btn-secondary" onClick={onClose} style={{ ...styles.secondaryButton, width: 'auto', padding: '6px 14px' }}>✕</button>
+        </div>
+
+        {/* 1. Audio & Soundtrack Settings */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
+            🔊 AUDIO Y BANDA SONORA
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
-              className="tactical-btn-secondary"
+              type="button"
+              onClick={onToggleMusic}
               style={{
                 ...styles.secondaryButton,
-                borderColor: 'rgba(56, 189, 248, 0.45)',
-                color: '#38bdf8'
+                backgroundColor: isMusicMuted ? 'rgba(30, 41, 59, 0.85)' : 'rgba(20, 83, 45, 0.45)',
+                borderColor: isMusicMuted ? 'rgba(148, 163, 184, 0.3)' : 'rgba(74, 222, 128, 0.6)',
+                color: isMusicMuted ? '#94a3b8' : '#4ade80'
               }}
-              onClick={onOpenHangar}
             >
-              🔧 HANGAR 3D
+              {isMusicMuted ? '🎵 MÚSICA DE FONDO: OFF' : '🎵 MÚSICA DE FONDO: ON'}
             </button>
-            <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onOpenIntel}>
-              📖 MANUAL
+            <button
+              type="button"
+              onClick={onToggleMute}
+              style={{
+                ...styles.secondaryButton,
+                backgroundColor: isMuted ? 'rgba(30, 41, 59, 0.85)' : 'rgba(14, 116, 144, 0.35)',
+                borderColor: isMuted ? 'rgba(148, 163, 184, 0.3)' : 'rgba(56, 189, 248, 0.6)',
+                color: isMuted ? '#94a3b8' : '#38bdf8'
+              }}
+            >
+              {isMuted ? '🔇 EFECTOS SFX: OFF' : '🔊 EFECTOS SFX: ON'}
             </button>
           </div>
         </div>
 
-        {/* Sleek Control Briefing Footer */}
-        <div style={styles.controlsInfoBox}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <span style={{ fontWeight: 800, color: '#fbbf24', fontSize: '11px', letterSpacing: '1px' }}>
-              ⚡ ESQUEMA DE CONTROL RÁPIDO
-            </span>
-            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700 }}>PC & TÁCTIL</span>
+        {/* 2. AI Difficulty Selector */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px', marginBottom: '8px' }}>
+            🤖 NIVEL DE DIFICULTAD DE LA IA ENEMIGA
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px', fontSize: '11.5px', color: '#cbd5e1' }}>
-            <div>💻 <strong style={{ color: '#f8fafc' }}>PC</strong>: <kbd style={styles.kbd}>WASD</kbd> Mover • <kbd style={styles.kbd}>Clic Izq</kbd> Fuego • <kbd style={styles.kbd}>Espacio</kbd> / <kbd style={styles.kbd}>E</kbd> / <kbd style={styles.kbd}>Clic Der</kbd> o botón HUD 💣 Mina</div>
-            <div>🔍 <strong style={{ color: '#f8fafc' }}>Cámara 3D</strong>: Rueda del ratón o <kbd style={styles.kbd}>Z</kbd> / <kbd style={styles.kbd}>X</kbd> Zoom • <kbd style={styles.kbd}>C</kbd> Vista Cenital / Tanque</div>
-            <div>📱 <strong style={{ color: '#f8fafc' }}>Móvil</strong>: Doble Joystick Táctico (Mover + Cruceta de Tiro Deliberado) • Botón Mina 💣</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            {AI_DIFFICULTIES_LIST.map(d => {
+              const active = aiDifficulty === d.id;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => onSelectDifficulty(d.id)}
+                  style={{
+                    backgroundColor: active ? `${d.color}24` : 'rgba(15, 23, 42, 0.8)',
+                    border: active ? `2px solid ${d.color}` : '1px solid rgba(148, 163, 184, 0.25)',
+                    color: active ? d.color : '#cbd5e1',
+                    borderRadius: '10px',
+                    padding: '10px 6px',
+                    fontSize: '11.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div>{d.icon} {d.label}</div>
+                  <div style={{ fontSize: '9.5px', opacity: 0.8, marginTop: '2px' }}>{d.rank}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
+            {activeDiff.desc}
           </div>
         </div>
+
+        {/* 3. Interface, Camera & Intro Replay */}
+        <div style={{ marginBottom: '18px' }}>
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#4ade80', letterSpacing: '0.8px', marginBottom: '8px' }}>
+            🎮 INTERFAZ, CÁMARA Y ANIMACIÓN
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={onToggleTouchControls}
+              style={styles.secondaryButton}
+            >
+              📱 CONTROLES TÁCTILES: {touchControlsEnabled ? 'ON' : 'OFF'}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleCamera}
+              style={styles.secondaryButton}
+            >
+              🔍 CÁMARA: {cameraMode === 'overview' ? 'MAPA COMPLETO' : 'SEGUIR TANQUE'}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onReplayIntro}
+            style={{
+              ...styles.tertiaryButton,
+              marginTop: '10px',
+              borderColor: 'rgba(251, 191, 36, 0.4)',
+              color: '#fde047',
+              fontWeight: 800
+            }}
+          >
+            🧱 REPRODUCIR ANIMACIÓN DE BLOQUES DE MADERA (INTRO)
+          </button>
+        </div>
+
+        <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onClose}>
+          ✓ GUARDAR Y VOLVER AL MENÚ PRINCIPAL
+        </button>
       </div>
     </div>
   );
@@ -928,20 +1550,26 @@ interface HUDProps {
   bossInfo?: { name: string; hp: number; maxHp: number; enraged: boolean } | null;
   mineReady?: boolean;
   mineCooldownProgress?: number;
+  bazookaReady?: boolean;
+  bazookaCooldownProgress?: number;
   combo?: number;
   isMuted?: boolean;
+  isMusicMuted?: boolean;
+  aiDifficulty?: string;
   cameraMode?: 'overview' | 'follow';
   zoomLevel?: number;
   touchControlsEnabled?: boolean;
   isDying?: boolean;
   onMenu: () => void;
   onToggleMute: () => void;
+  onToggleMusic: () => void;
   onPause: () => void;
   onToggleCamera: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onToggleTouchControls: () => void;
   onMine: () => void;
+  onBazooka: () => void;
 }
 
 const HUD: React.FC<HUDProps> = ({
@@ -955,19 +1583,25 @@ const HUD: React.FC<HUDProps> = ({
   bossInfo = null,
   mineReady = true,
   mineCooldownProgress = 1.0,
+  bazookaReady = true,
+  bazookaCooldownProgress = 1.0,
   combo = 0,
   isMuted = false,
+  isMusicMuted = false,
+  aiDifficulty = 'normal',
   cameraMode = 'overview',
   touchControlsEnabled = true,
   isDying = false,
   onMenu,
   onToggleMute,
+  onToggleMusic,
   onPause,
   onToggleCamera,
   onZoomIn,
   onZoomOut,
   onToggleTouchControls,
-  onMine
+  onMine,
+  onBazooka
 }) => {
   const hearts = Array.from({ length: 4 }, (_, i) => {
     if (i === 3 && lives < 4) return null;
@@ -989,6 +1623,7 @@ const HUD: React.FC<HUDProps> = ({
   });
 
   const biomeMeta = BIOMES_LIST.find(b => b.id === biome) || BIOMES_LIST[1];
+  const diffMeta = AI_DIFFICULTIES_LIST.find(d => d.id === aiDifficulty) || AI_DIFFICULTIES_LIST[1];
 
   return (
     <div style={{
@@ -996,68 +1631,99 @@ const HUD: React.FC<HUDProps> = ({
       opacity: isDying ? 0 : 1,
       transition: 'opacity 0.45s ease-out'
     }}>
-      <div style={styles.hudTop}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={styles.hudPanel}>
-            <button onClick={onPause} style={styles.hudButton} title="Pausar juego [Esc / P]">
-              ⏸️
-            </button>
-          </div>
-          <div style={styles.hudPanel}>
-            <button onClick={onToggleMute} style={styles.hudButton} title="Silenciar / Activar sonido [M]">
-              {isMuted ? '🔇' : '🔊'}
-            </button>
-          </div>
-
-          {/* Dynamic Camera Mode & Zoom Controls */}
-          <div style={{
-            ...styles.hudPanel,
-            borderColor: cameraMode === 'follow' ? 'rgba(56, 189, 248, 0.65)' : 'rgba(148, 163, 184, 0.3)'
-          }}>
-            <button
-              onClick={onToggleCamera}
-              style={{
-                ...styles.hudButton,
-                color: cameraMode === 'overview' ? '#fbbf24' : '#38bdf8',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-              title="Alternar entre ver todo el mapa o seguir al tanque [C]"
-            >
-              {cameraMode === 'overview' ? '🗺️ MAPA' : '🎯 TANQUE'}
-            </button>
-            <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '6px' }}>
-              <button onClick={onZoomIn} style={styles.miniBtn} title="Acercar cámara [Z / +]">🔍+</button>
-              <button onClick={onZoomOut} style={styles.miniBtn} title="Alejar cámara [X / -]">🔍-</button>
+      <div style={{ ...styles.hudTop, position: 'relative' }}>
+        {/* Left Controls Stacked into 2 Compact Rows so Center Mission/Boss Header Never Shifts Off-Center */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', zIndex: 3 }}>
+          {/* Row 1: Pause, SFX Mute, Music Toggle, Mission Select */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={styles.hudPanel}>
+              <button onClick={onPause} style={styles.hudButton} title="Pausar juego [Esc / P]">
+                ⏸️
+              </button>
+            </div>
+            <div style={styles.hudPanel}>
+              <button onClick={onToggleMute} style={styles.hudButton} title="Silenciar / Activar efectos de sonido [M]">
+                {isMuted ? '🔇' : '🔊'}
+              </button>
+            </div>
+            <div style={{
+              ...styles.hudPanel,
+              borderColor: !isMusicMuted ? 'rgba(74, 222, 128, 0.45)' : 'rgba(148, 163, 184, 0.25)'
+            }}>
+              <button
+                onClick={onToggleMusic}
+                style={{
+                  ...styles.hudButton,
+                  color: !isMusicMuted ? '#4ade80' : '#94a3b8',
+                  fontSize: '11px'
+                }}
+                title="Activar / Desactivar banda sonora de fondo"
+              >
+                🎵 {!isMusicMuted ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <div style={styles.hudPanel}>
+              <button onClick={onMenu} style={styles.hudButton} title="Selector de Misiones">
+                🗺️ MISIONES
+              </button>
             </div>
           </div>
 
-          {/* Touch Controls Toggle */}
-          <div style={styles.hudPanel}>
-            <button
-              onClick={onToggleTouchControls}
-              style={{
-                ...styles.hudButton,
-                color: touchControlsEnabled ? '#4ade80' : '#94a3b8',
-                fontSize: '11px'
-              }}
-              title="Mostrar u ocultar joystick táctil"
-            >
-              📱 {touchControlsEnabled ? 'TÁCTIL: ON' : 'TÁCTIL: OFF'}
-            </button>
-          </div>
+          {/* Row 2: Camera Mode + Zoom & Touch Mode Toggle */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{
+              ...styles.hudPanel,
+              borderColor: cameraMode === 'follow' ? 'rgba(56, 189, 248, 0.65)' : 'rgba(148, 163, 184, 0.3)'
+            }}>
+              <button
+                onClick={onToggleCamera}
+                style={{
+                  ...styles.hudButton,
+                  color: cameraMode === 'overview' ? '#fbbf24' : '#38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="Alternar entre ver todo el mapa o seguir al tanque [C]"
+              >
+                {cameraMode === 'overview' ? '🗺️ MAPA' : '🎯 TANQUE'}
+              </button>
+              <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '6px' }}>
+                <button onClick={onZoomIn} style={styles.miniBtn} title="Acercar cámara [Z / +]">🔍+</button>
+                <button onClick={onZoomOut} style={styles.miniBtn} title="Alejar cámara [X / -]">🔍-</button>
+              </div>
+            </div>
 
-          <div style={styles.hudPanel}>
-            <button onClick={onMenu} style={styles.hudButton} title="Selector de Misiones">
-              🗺️ MISIONES
-            </button>
+            <div style={styles.hudPanel}>
+              <button
+                onClick={onToggleTouchControls}
+                style={{
+                  ...styles.hudButton,
+                  color: touchControlsEnabled ? '#4ade80' : '#94a3b8',
+                  fontSize: '11px'
+                }}
+                title="Mostrar u ocultar joystick táctil"
+              >
+                📱 {touchControlsEnabled ? 'TÁCTIL: ON' : 'TÁCTIL: OFF'}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Central Level and Biome Badge (+ Boss Health Bar when active) */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-          <div style={{ ...styles.hudPanel, flexDirection: 'column', alignItems: 'center', padding: '5px 18px' }}>
+        {/* Truly Centered Level, Biome & Boss Health Bar Header */}
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: 0,
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          zIndex: 2,
+          pointerEvents: 'none'
+        }}>
+          <div style={{ ...styles.hudPanel, flexDirection: 'column', alignItems: 'center', padding: '5px 18px', pointerEvents: 'auto' }}>
             <div style={{
               fontSize: '9.5px',
               color: biomeMeta?.color || '#fbbf24',
@@ -1065,11 +1731,13 @@ const HUD: React.FC<HUDProps> = ({
               fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '6px'
             }}>
-              {biomeMeta?.icon} {biomeMeta?.label.split(' ')[0].toUpperCase()}
+              <span>{biomeMeta?.icon} {biomeMeta?.label.split(' ')[0].toUpperCase()}</span>
+              <span style={{ color: '#475569' }}>•</span>
+              <span style={{ color: diffMeta.color }}>IA: {diffMeta.label}</span>
             </div>
-            <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif' }}>
+            <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif', whiteSpace: 'nowrap' }}>
               MISIÓN <span style={styles.highlight}>#{mission}</span>
               {missionName ? ` • ${missionName.toUpperCase()}` : ''}
             </div>
@@ -1084,10 +1752,11 @@ const HUD: React.FC<HUDProps> = ({
               minWidth: '280px',
               padding: '7px 14px',
               borderColor: bossInfo.enraged ? '#ef4444' : '#f59e0b',
-              backgroundColor: 'rgba(15, 23, 42, 0.92)',
-              boxShadow: bossInfo.enraged ? '0 0 22px rgba(239, 68, 68, 0.5)' : '0 6px 18px rgba(0,0,0,0.45)'
+              backgroundColor: 'rgba(15, 23, 42, 0.94)',
+              boxShadow: bossInfo.enraged ? '0 0 22px rgba(239, 68, 68, 0.5)' : '0 6px 18px rgba(0,0,0,0.45)',
+              pointerEvents: 'auto'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '10px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 900, color: bossInfo.enraged ? '#fca5a5' : '#fde047', letterSpacing: '0.6px' }}>
                   {bossInfo.name} {bossInfo.enraged ? '🔥 ENFURECIDO' : ''}
                 </span>
@@ -1109,7 +1778,8 @@ const HUD: React.FC<HUDProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        {/* Right Hostiles & Combo Counter */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', zIndex: 3 }}>
           {combo >= 2 && (
             <div style={{
               ...styles.hudPanel,
@@ -1131,77 +1801,148 @@ const HUD: React.FC<HUDProps> = ({
         </div>
       </div>
 
-      <div style={styles.hudBottom}>
-        <div style={styles.hudPanel}>
+      <div style={{ ...styles.hudBottom, position: 'relative' }}>
+        {/* Left: Armor Hearts */}
+        <div style={{ ...styles.hudPanel, zIndex: 3 }}>
           <span style={{ marginRight: '8px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>BLINDAJE:</span>
           {hearts}
         </div>
 
-        {/* Active Power-up Status Pill */}
-        {activePowerup && (
-          <div style={{
-            ...styles.hudPanel,
-            backgroundColor: 'rgba(245, 158, 11, 0.2)',
-            borderColor: '#fbbf24',
-            color: '#fde68a',
-            fontSize: '12px',
-            fontWeight: 800
-          }}>
-            {activePowerup}
-          </div>
-        )}
-
-        {/* Clickable Mine Button for PC & Touch (Also triggered via Space / E / Right-Click) */}
-        <button
-          type="button"
-          data-ui-element="true"
-          onClick={(e) => {
-            e.stopPropagation();
-            onMine();
-            e.currentTarget.blur();
-          }}
-          title="Desplegar Mina Terrestre [Espacio / Tecla E / Clic Derecho]"
-          style={{
-            ...styles.hudPanel,
-            borderColor: mineReady ? 'rgba(74, 222, 128, 0.65)' : 'rgba(248, 113, 113, 0.45)',
-            backgroundColor: mineReady ? 'rgba(20, 83, 45, 0.72)' : 'rgba(15, 23, 42, 0.86)',
-            flexDirection: 'column',
-            gap: '4px',
-            minWidth: '175px',
-            cursor: 'pointer',
-            outline: 'none'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', marginRight: '6px' }}>💣</span>
-              <span style={{ fontSize: '11px', fontWeight: 900, color: mineReady ? '#4ade80' : '#f87171' }}>
-                {mineReady ? 'PONER MINA' : 'RECARGANDO'}
-              </span>
-            </div>
-            <span style={{
-              fontSize: '9px',
-              fontWeight: 800,
-              padding: '1px 5px',
-              borderRadius: '4px',
-              backgroundColor: 'rgba(15, 23, 42, 0.8)',
-              color: '#cbd5e1',
-              border: '1px solid rgba(148, 163, 184, 0.3)'
-            }}>
-              ESPACIO / E
-            </span>
-          </div>
-          <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: '2px', overflow: 'hidden' }}>
+        {/* Truly Centered Bottom Action Cluster: Active Power-Up Pill + Mine & Bazooka Buttons */}
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          bottom: 0,
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          zIndex: 2,
+          pointerEvents: 'none'
+        }}>
+          {/* Active Power-up Status Pill (Synced live with player tank timers/shield) */}
+          {activePowerup && (
             <div style={{
-              width: `${Math.round((mineReady ? 1 : mineCooldownProgress) * 100)}%`,
-              height: '100%',
-              backgroundColor: mineReady ? '#4ade80' : '#f87171',
-              transition: 'width 0.1s linear'
-            }} />
-          </div>
-        </button>
+              ...styles.hudPanel,
+              backgroundColor: 'rgba(15, 23, 42, 0.92)',
+              borderColor: '#fbbf24',
+              color: '#fde047',
+              fontSize: '11.5px',
+              fontWeight: 900,
+              padding: '5px 14px',
+              pointerEvents: 'none'
+            }}>
+              {activePowerup}
+            </div>
+          )}
 
-        <div style={{ ...styles.hudPanel, fontVariantNumeric: 'tabular-nums' }}>
+          {/* Clickable PC Mine + Bazooka Buttons — Perfectly Centered */}
+          {!touchControlsEnabled && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', pointerEvents: 'auto' }}>
+              <button
+                type="button"
+                data-ui-element="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMine();
+                  e.currentTarget.blur();
+                }}
+                title="Desplegar Mina Terrestre [Espacio / Tecla E / Clic Derecho]"
+                style={{
+                  ...styles.hudPanel,
+                  borderColor: mineReady ? 'rgba(74, 222, 128, 0.65)' : 'rgba(248, 113, 113, 0.45)',
+                  backgroundColor: mineReady ? 'rgba(20, 83, 45, 0.85)' : 'rgba(15, 23, 42, 0.92)',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  minWidth: '175px',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', marginRight: '6px' }}>💣</span>
+                    <span style={{ fontSize: '11px', fontWeight: 900, color: mineReady ? '#4ade80' : '#f87171' }}>
+                      {mineReady ? 'PONER MINA' : 'RECARGANDO'}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    color: '#cbd5e1',
+                    border: '1px solid rgba(148, 163, 184, 0.3)'
+                  }}>
+                    ESPACIO / E
+                  </span>
+                </div>
+                <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.round((mineReady ? 1 : mineCooldownProgress) * 100)}%`,
+                    height: '100%',
+                    backgroundColor: mineReady ? '#4ade80' : '#f87171',
+                    transition: 'width 0.1s linear'
+                  }} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                data-ui-element="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBazooka();
+                  e.currentTarget.blur();
+                }}
+                title="Disparar Cohete Bazoca Demoledor de Muros [Tecla Q / F / Shift]"
+                style={{
+                  ...styles.hudPanel,
+                  borderColor: bazookaReady ? 'rgba(251, 146, 60, 0.75)' : 'rgba(148, 163, 184, 0.35)',
+                  backgroundColor: bazookaReady ? 'rgba(154, 52, 18, 0.88)' : 'rgba(15, 23, 42, 0.92)',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  minWidth: '180px',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', marginRight: '6px' }}>🚀</span>
+                    <span style={{ fontSize: '11px', fontWeight: 900, color: bazookaReady ? '#fdba74' : '#94a3b8' }}>
+                      {bazookaReady ? 'COHETE BAZOCA' : 'RECARGANDO'}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    color: '#fed7aa',
+                    border: '1px solid rgba(251, 146, 60, 0.35)'
+                  }}>
+                    Q / F / SHIFT
+                  </span>
+                </div>
+                <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.round((bazookaReady ? 1 : bazookaCooldownProgress) * 100)}%`,
+                    height: '100%',
+                    backgroundColor: bazookaReady ? '#fb923c' : '#f87171',
+                    transition: 'width 0.1s linear'
+                  }} />
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Tactical Score */}
+        <div style={{ ...styles.hudPanel, fontVariantNumeric: 'tabular-nums', zIndex: 3 }}>
           <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>PUNTOS</span>
           <span style={styles.highlight}>{score}</span>
         </div>
@@ -1217,6 +1958,10 @@ interface PauseMenuProps {
   onMenu: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  isMusicMuted: boolean;
+  onToggleMusic: () => void;
+  aiDifficulty: string;
+  onSelectDifficulty: (diffId: string) => void;
   onToggleCamera: () => void;
   cameraMode?: 'overview' | 'follow';
   touchControlsEnabled: boolean;
@@ -1232,6 +1977,10 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
   onMenu,
   isMuted,
   onToggleMute,
+  isMusicMuted,
+  onToggleMusic,
+  aiDifficulty,
+  onSelectDifficulty,
   onToggleCamera,
   cameraMode,
   touchControlsEnabled,
@@ -1240,12 +1989,12 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
   missionName
 }) => (
   <div style={styles.overlay}>
-    <div style={{ ...styles.menuBox, maxWidth: '460px' }}>
+    <div style={{ ...styles.menuBox, maxWidth: '475px' }}>
       <div style={styles.toyBadge}>SISTEMA EN PAUSA TÁCTICA</div>
       <h2 style={{ ...styles.title, fontSize: '26px' }}>OPERACIÓN DETENIDA</h2>
       <p style={styles.subtitle}>Misión #{mission} • {missionName || 'En curso'}</p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', width: '100%', marginTop: '14px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', width: '100%', marginTop: '12px' }}>
         <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onResume}>
           ▶ REANUDAR COMBATE
         </button>
@@ -1255,12 +2004,53 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
         <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onToggleCamera}>
           🔍 CÁMARA: {cameraMode === 'overview' ? 'CAMBIAR A SEGUIR TANQUE' : 'CAMBIAR A VISTA GLOBAL'}
         </button>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '9px' }}>
-          <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onToggleTouchControls}>
+
+        {/* AI Difficulty Selector in Pause Menu */}
+        <div style={{
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          border: '1px solid rgba(148, 163, 184, 0.25)',
+          borderRadius: '10px',
+          padding: '9px 12px',
+          textAlign: 'left'
+        }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#cbd5e1', letterSpacing: '1px', marginBottom: '6px' }}>
+            🤖 DIFICULTAD DE LA IA ENEMIGA
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
+            {AI_DIFFICULTIES_LIST.map(d => {
+              const active = aiDifficulty === d.id;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => onSelectDifficulty(d.id)}
+                  style={{
+                    backgroundColor: active ? `${d.color}22` : 'rgba(30, 41, 59, 0.7)',
+                    border: active ? `1.5px solid ${d.color}` : '1px solid rgba(148, 163, 184, 0.2)',
+                    color: active ? d.color : '#94a3b8',
+                    borderRadius: '7px',
+                    padding: '6px 4px',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {d.icon} {d.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '10px 8px', fontSize: '11px' }} onClick={onToggleTouchControls}>
             📱 TÁCTIL: {touchControlsEnabled ? 'ON' : 'OFF'}
           </button>
-          <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onToggleMute}>
-            {isMuted ? '🔇 SONIDO: OFF' : '🔊 SONIDO: ON'}
+          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '10px 8px', fontSize: '11px' }} onClick={onToggleMute}>
+            {isMuted ? '🔇 EFECTOS: OFF' : '🔊 EFECTOS: ON'}
+          </button>
+          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '10px 8px', fontSize: '11px' }} onClick={onToggleMusic}>
+            {isMusicMuted ? '🎵 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '9px', marginTop: '4px' }}>
@@ -1665,19 +2455,29 @@ export const App = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const [gameState, setGameState] = useState<'MENU' | 'LEVEL_SELECT' | 'PLAYING' | 'GAMEOVER' | 'PAUSED'>('MENU');
+  const [showIntroSplash, setShowIntroSplash] = useState(true);
   const [showIntel, setShowIntel] = useState(false);
   const [showHangar, setShowHangar] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [unlockAll, setUnlockAll] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    try { return localStorage.getItem('tanks_sfx_muted') === 'true'; } catch { return false; }
+  });
+  const [isMusicMuted, setIsMusicMuted] = useState<boolean>(() => {
+    try { return localStorage.getItem('tanks_music_muted') === 'true'; } catch { return false; }
+  });
   const [cameraMode, setCameraMode] = useState<'overview' | 'follow'>('overview');
   const [isPlayerDying, setIsPlayerDying] = useState(false);
 
-  // Player Hangar Loadout State
+  // Player Hangar Loadout & AI Difficulty State
   const [playerSkin, setPlayerSkin] = useState<string>(() => {
     try { return localStorage.getItem('tanks_player_skin') || 'classic'; } catch { return 'classic'; }
   });
   const [playerPerk, setPlayerPerk] = useState<string>(() => {
     try { return localStorage.getItem('tanks_player_perk') || 'ricochet'; } catch { return 'ricochet'; }
+  });
+  const [aiDifficulty, setAiDifficulty] = useState<string>(() => {
+    try { return localStorage.getItem('tanks_ai_difficulty') || 'normal'; } catch { return 'normal'; }
   });
 
   // 3-Star Rating per mission persisted in localStorage
@@ -1713,6 +2513,8 @@ export const App = () => {
     won: false,
     mineReady: true,
     mineCooldownProgress: 1.0,
+    bazookaReady: true,
+    bazookaCooldownProgress: 1.0,
     combo: 0,
     isPaused: false,
     cameraMode: 'overview' as 'overview' | 'follow',
@@ -1841,6 +2643,12 @@ export const App = () => {
     engineRef.current?.setPlayerLoadout(playerSkin, perkId);
   };
 
+  const handleSelectDifficulty = (diffId: string) => {
+    setAiDifficulty(diffId);
+    try { localStorage.setItem('tanks_ai_difficulty', diffId); } catch (_) {}
+    engineRef.current?.setDifficulty(diffId);
+  };
+
   const totalStarsEarned = (Object.values(missionStars) as number[]).reduce((acc: number, s: number) => acc + (s || 0), 0);
 
   // Camera toggle timestamp guard
@@ -1925,6 +2733,13 @@ export const App = () => {
     if (engineRef.current) {
       const muted = engineRef.current.toggleMute();
       setIsMuted(muted);
+    }
+  };
+
+  const toggleMusic = () => {
+    if (engineRef.current) {
+      const musicMuted = engineRef.current.toggleMusic();
+      setIsMusicMuted(musicMuted);
     }
   };
 
@@ -2028,15 +2843,29 @@ export const App = () => {
         }}
       />
 
-      {gameState === 'MENU' && (
+      {showIntroSplash && gameState === 'MENU' && (
+        <ToyBlockIntroSplash
+          onFinish={() => setShowIntroSplash(false)}
+          onPlayBlockSound={(idx) => engineRef.current?.audio?.play('wood_pop', idx)}
+        />
+      )}
+
+      {gameState === 'MENU' && !showIntroSplash && (
         <MainMenu
           onStart={startCampaign}
           onLevelSelect={() => setGameState('LEVEL_SELECT')}
           onOpenIntel={() => setShowIntel(true)}
           onOpenHangar={() => setShowHangar(true)}
+          onOpenSettings={() => setShowSettings(true)}
           unlockedLevel={unlockedLevel}
           totalLevels={totalLevels}
           totalStars={totalStarsEarned}
+          aiDifficulty={aiDifficulty}
+          onSelectDifficulty={handleSelectDifficulty}
+          isMusicMuted={isMusicMuted}
+          onToggleMusic={toggleMusic}
+          selectedSkin={playerSkin}
+          selectedPerk={playerPerk}
         />
       )}
 
@@ -2173,16 +3002,20 @@ export const App = () => {
             {...gameStats}
             cameraMode={cameraMode}
             isMuted={isMuted}
+            isMusicMuted={isMusicMuted}
+            aiDifficulty={aiDifficulty}
             touchControlsEnabled={touchControlsEnabled}
             isDying={isPlayerDying}
             onMenu={() => setGameState('LEVEL_SELECT')}
             onToggleMute={toggleMute}
+            onToggleMusic={toggleMusic}
             onPause={pauseGame}
             onToggleCamera={toggleCamera}
             onZoomIn={zoomIn}
             onZoomOut={zoomOut}
             onToggleTouchControls={() => setTouchControlsEnabled(prev => !prev)}
             onMine={() => engineRef.current?.triggerMine()}
+            onBazooka={() => engineRef.current?.triggerBazooka()}
           />
 
           {/* Floating Power-up Toast Notification */}
@@ -2232,11 +3065,15 @@ export const App = () => {
                   onMine={() => {
                     engineRef.current?.triggerMine();
                   }}
+                  onBazooka={() => {
+                    engineRef.current?.triggerBazooka();
+                  }}
                   onToggleCamera={toggleCamera}
                   onZoomIn={zoomIn}
                   onZoomOut={zoomOut}
                   cameraMode={cameraMode}
                   mineReady={gameStats.mineReady}
+                  bazookaReady={gameStats.bazookaReady}
                 />
               </div>
             </div>
@@ -2252,6 +3089,10 @@ export const App = () => {
           onMenu={returnToMenu}
           isMuted={isMuted}
           onToggleMute={toggleMute}
+          isMusicMuted={isMusicMuted}
+          onToggleMusic={toggleMusic}
+          aiDifficulty={aiDifficulty}
+          onSelectDifficulty={handleSelectDifficulty}
           onToggleCamera={toggleCamera}
           cameraMode={cameraMode}
           touchControlsEnabled={touchControlsEnabled}
@@ -2287,6 +3128,25 @@ export const App = () => {
           onSelectSkin={handleSelectSkin}
           onSelectPerk={handleSelectPerk}
           onClose={() => setShowHangar(false)}
+        />
+      )}
+      {showSettings && (
+        <SettingsModal
+          aiDifficulty={aiDifficulty}
+          onSelectDifficulty={handleSelectDifficulty}
+          isMuted={isMuted}
+          onToggleMute={toggleMute}
+          isMusicMuted={isMusicMuted}
+          onToggleMusic={toggleMusic}
+          touchControlsEnabled={touchControlsEnabled}
+          onToggleTouchControls={() => setTouchControlsEnabled(prev => !prev)}
+          cameraMode={cameraMode}
+          onToggleCamera={toggleCamera}
+          onReplayIntro={() => {
+            setShowSettings(false);
+            setShowIntroSplash(true);
+          }}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </>
@@ -2399,6 +3259,44 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     outline: 'none',
     width: '100%'
+  },
+  studioMenuBtn: {
+    backgroundColor: 'rgba(9, 14, 26, 0.82)',
+    border: '1px solid rgba(148, 163, 184, 0.22)',
+    borderRadius: '11px',
+    padding: '12px 16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    cursor: 'pointer',
+    outline: 'none',
+    width: '100%',
+    textAlign: 'left',
+    color: '#f8fafc'
+  },
+  studioMenuIcon: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '9px',
+    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    flexShrink: 0
+  },
+  studioMenuTitle: {
+    fontSize: '13.5px',
+    fontWeight: 900,
+    color: '#f8fafc',
+    fontFamily: '"Chakra Petch", sans-serif',
+    letterSpacing: '0.5px'
+  },
+  studioMenuSub: {
+    fontSize: '11px',
+    color: '#94a3b8',
+    marginTop: '2px'
   },
   controlsInfoBox: {
     marginTop: '18px',

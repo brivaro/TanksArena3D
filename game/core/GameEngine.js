@@ -33,12 +33,14 @@ export class GameEngine {
     this.tableProps = [];    // Environmental props on the desk outside arena
     this.currentBiome = 'workshop';
 
-    // Load Player Hangar Customization (Skin & Tactical Perk)
+    // Load Player Hangar Customization (Skin, Tactical Perk & AI Difficulty)
     this.playerSkin = 'classic';
     this.playerPerk = 'ricochet';
+    this.aiDifficulty = 'normal';
     try {
       this.playerSkin = localStorage.getItem('tanks_player_skin') || 'classic';
       this.playerPerk = localStorage.getItem('tanks_player_perk') || 'ricochet';
+      this.aiDifficulty = localStorage.getItem('tanks_ai_difficulty') || 'normal';
     } catch (_) {}
     
     this.stats = { 
@@ -49,6 +51,8 @@ export class GameEngine {
         missionName: 'The Basics', 
         mineReady: true,
         mineCooldownProgress: 1.0,
+        bazookaReady: true,
+        bazookaCooldownProgress: 1.0,
         combo: 0,
         cameraMode: 'overview',
         zoomLevel: 0.9,
@@ -125,7 +129,7 @@ export class GameEngine {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.22;
 
     // Procedural Studio RoomEnvironment for crisp clearcoat & metallic reflections
     try {
@@ -1431,84 +1435,83 @@ export class GameEngine {
     const ctx = canvas.getContext('2d');
 
     if (biome === 'workshop') {
-      // Rich warm honey-oak parquet tiles with crisp bevel borders
-      ctx.fillStyle = '#e5c494'; ctx.fillRect(0,0,256,256);
-      ctx.fillStyle = '#d6b07c';
-      for(let i=0; i<500; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 5, 2);
-      ctx.strokeStyle = '#b88e58'; ctx.lineWidth = 5;
+      // Vivid warm golden-honey parquet tiles with crisp bevel borders
+      ctx.fillStyle = '#f5c77e'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#e5b162';
+      for(let i=0; i<480; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 5, 2);
+      ctx.strokeStyle = '#c48636'; ctx.lineWidth = 5;
       ctx.strokeRect(2,2,252,252);
-      ctx.strokeStyle = 'rgba(255,245,220,0.4)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,248,225,0.55)'; ctx.lineWidth = 2;
       ctx.strokeRect(6,6,244,244);
     } else if (biome === 'desert') {
-      // Warm golden-terracotta sandstone tiles with desert ripple relief
-      ctx.fillStyle = '#e6be8a'; ctx.fillRect(0,0,256,256);
-      ctx.fillStyle = '#d4a36a';
-      for(let i=0; i<600; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 3, 2);
-      ctx.strokeStyle = '#b37d43'; ctx.lineWidth = 5;
+      // Vivid sun-drenched golden-amber sandstone tiles
+      ctx.fillStyle = '#f7be6d'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#e8a248';
+      for(let i=0; i<550; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 3, 2);
+      ctx.strokeStyle = '#c27125'; ctx.lineWidth = 5;
       ctx.strokeRect(2,2,252,252);
-      ctx.strokeStyle = 'rgba(140, 85, 35, 0.32)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(165, 82, 20, 0.35)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(0, 128); ctx.lineTo(256, 128); ctx.stroke();
     } else if (biome === 'cyber') {
-      // Dark polished obsidian with luminous cyan & magenta neon grid
-      ctx.fillStyle = '#090d16'; ctx.fillRect(0,0,256,256);
-      ctx.fillStyle = '#0f172a';
+      // Deep electric indigo-obsidian with vivid cyan & neon magenta grid
+      ctx.fillStyle = '#070b18'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#0f1b38';
       ctx.fillRect(8, 8, 240, 240);
-      ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#00f0ff'; ctx.lineWidth = 4;
       ctx.strokeRect(4, 4, 248, 248);
-      ctx.fillStyle = '#e040fb';
+      ctx.fillStyle = '#ff00e5';
       ctx.fillRect(16, 16, 8, 8);
       ctx.fillRect(232, 16, 8, 8);
       ctx.fillRect(16, 232, 8, 8);
       ctx.fillRect(232, 232, 8, 8);
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.28)'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.36)'; ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(128, 0); ctx.lineTo(128, 256);
       ctx.moveTo(0, 128); ctx.lineTo(256, 128);
       ctx.stroke();
     } else if (biome === 'arctic') {
-      // Crisp glacial ice-blue tiles with deep azure joint lines (never bleached white!)
-      ctx.fillStyle = '#cceeff'; ctx.fillRect(0,0,256,256);
-      ctx.fillStyle = '#99ddff';
-      for(let i=0; i<450; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 4, 2);
-      ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 5;
+      // Vivid crystal sky-blue glacial tiles with bright azure joints
+      ctx.fillStyle = '#b3ecff'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#80dfff';
+      for(let i=0; i<420; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 4, 2);
+      ctx.strokeStyle = '#00b0ff'; ctx.lineWidth = 5;
       ctx.strokeRect(2,2,252,252);
-      // Frost facet lines
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)'; ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(36, 36); ctx.lineTo(105, 120); ctx.lineTo(165, 88); ctx.lineTo(215, 215);
       ctx.stroke();
     } else if (biome === 'volcano') {
-      // Charcoal volcanic basalt with glowing red-orange magma fissures
-      ctx.fillStyle = '#1a110e'; ctx.fillRect(0,0,256,256);
-      ctx.fillStyle = '#281914';
+      // Rich volcanic obsidian with vibrant glowing lava seams
+      ctx.fillStyle = '#1f100c'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#321912';
       for(let i=0; i<400; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 4, 3);
-      ctx.strokeStyle = '#ff3d00'; ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#ff3d00'; ctx.lineWidth = 4;
       ctx.strokeRect(2, 2, 252, 252);
-      ctx.strokeStyle = '#ff9100'; ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffab00'; ctx.lineWidth = 3.2;
       ctx.beginPath();
       ctx.moveTo(0, 60); ctx.lineTo(80, 120); ctx.lineTo(180, 110); ctx.lineTo(256, 200);
       ctx.stroke();
-      ctx.strokeStyle = '#ffff00'; ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#ffff00'; ctx.lineWidth = 1.4;
       ctx.beginPath();
       ctx.moveTo(0, 60); ctx.lineTo(80, 120); ctx.lineTo(180, 110); ctx.lineTo(256, 200);
       ctx.stroke();
     } else { // jungle
-      // Ancient temple limestone & jade flagstones with lush emerald moss seams
-      ctx.fillStyle = '#9ead92'; ctx.fillRect(0,0,256,256);
-      ctx.fillStyle = '#899b7c';
-      for(let i=0; i<500; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 4, 3);
-      // Lush emerald moss border joints
-      ctx.strokeStyle = '#2e7d32'; ctx.lineWidth = 6;
+      // Vivid tropical lime-emerald turf tiles so dark tank tread marks pop with maximum contrast!
+      ctx.fillStyle = '#9be548'; ctx.fillRect(0,0,256,256);
+      ctx.fillStyle = '#86d136';
+      for(let i=0; i<380; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 4, 3);
+      // Lush emerald border joints
+      ctx.strokeStyle = '#4d9e1a'; ctx.lineWidth = 5;
       ctx.strokeRect(3, 3, 250, 250);
-      // Carved inner temple relief frame
-      ctx.strokeStyle = '#687a5b'; ctx.lineWidth = 2.5;
-      ctx.strokeRect(22, 22, 212, 212);
+      // Subtle inner relief frame
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)'; ctx.lineWidth = 2;
+      ctx.strokeRect(18, 18, 220, 220);
       // Golden El Dorado corner glyphs
-      ctx.fillStyle = '#d4af37';
-      ctx.fillRect(18, 18, 10, 10);
-      ctx.fillRect(228, 18, 10, 10);
-      ctx.fillRect(18, 228, 10, 10);
-      ctx.fillRect(228, 228, 10, 10);
+      ctx.fillStyle = '#ffd600';
+      ctx.fillRect(14, 14, 9, 9);
+      ctx.fillRect(233, 14, 9, 9);
+      ctx.fillRect(14, 233, 9, 9);
+      ctx.fillRect(233, 233, 9, 9);
     }
 
     const t = new THREE.CanvasTexture(canvas);
@@ -1608,6 +1611,7 @@ export class GameEngine {
 
       group.userData = { 
           bounds: new THREE.Box3().setFromObject(group), 
+          collisionRadius: 1.65,
           type: 'barrel', 
           exploded: false 
       };
@@ -1741,6 +1745,7 @@ export class GameEngine {
 
       group.userData = { 
           bounds: new THREE.Box3().setFromObject(group), 
+          collisionRadius: 2.05,
           type: 'prism',
           crystal: crystal,
           light: beaconLight,
@@ -2131,7 +2136,7 @@ export class GameEngine {
       orb.position.y = 3.1;
       group.add(orb);
 
-      group.userData = { bounds: new THREE.Box3().setFromObject(group), type: 'laser_switch' };
+      group.userData = { bounds: new THREE.Box3().setFromObject(group), collisionRadius: 1.45, type: 'laser_switch' };
       return { mesh: group, orb, orbMat, cooldown: 0 };
   }
 
@@ -2175,6 +2180,23 @@ export class GameEngine {
       } catch (_) {}
   }
 
+  setDifficulty(diffId) {
+      this.aiDifficulty = diffId || 'normal';
+      try {
+          localStorage.setItem('tanks_ai_difficulty', this.aiDifficulty);
+      } catch (_) {}
+      this.entities.forEach(entity => {
+          if (entity instanceof EnemyTank && !entity.isDead) {
+              entity.applyDifficulty(this.aiDifficulty, false);
+          }
+      });
+      return this.aiDifficulty;
+  }
+
+  getDifficulty() {
+      return this.aiDifficulty || 'normal';
+  }
+
   loadLevel(levelIndex) {
     this.cleanup();
     this.stageLightBoost = 0;
@@ -2182,6 +2204,9 @@ export class GameEngine {
     this.comboStreak = 0;
     this.comboTimer = 0;
     this.stats.combo = 0;
+    this.stats.activePowerup = null;
+    this.stats.bazookaReady = true;
+    this.stats.bazookaCooldownProgress = 1.0;
     if (this.input) this.input.resetInputs();
 
     this.stats.mission = levelIndex;
@@ -2218,50 +2243,47 @@ export class GameEngine {
     
     let woodMat, brickMat, borderMat, capMat, foliagePrimaryColor, foliageSecondaryColor;
     if (biome === 'workshop') {
-        woodMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.45 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0xa66c38, roughness: 0.38 });
-        brickMat = new THREE.MeshStandardMaterial({ map: this.createBrickTexture(), roughness: 0.65 });
-        borderMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.55 });
-        foliagePrimaryColor = 0x2e7d32;
-        foliageSecondaryColor = 0x43a047;
+        woodMat = new THREE.MeshStandardMaterial({ color: 0xb86522, roughness: 0.4 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xe68a2e, roughness: 0.32 });
+        brickMat = new THREE.MeshStandardMaterial({ map: this.createBrickTexture(), roughness: 0.58 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x5d3a1a, roughness: 0.5 });
+        foliagePrimaryColor = 0x22c55e;
+        foliageSecondaryColor = 0x4ade80;
     } else if (biome === 'desert') {
-        woodMat = new THREE.MeshStandardMaterial({ color: 0xc67131, roughness: 0.55 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0xe08e45, roughness: 0.45 });
-        brickMat = new THREE.MeshStandardMaterial({ color: 0x9c4dcc, map: this.createBrickTexture(), roughness: 0.7 });
-        brickMat.color.setHex(0xa85c32);
-        borderMat = new THREE.MeshStandardMaterial({ color: 0x6d3b1e, roughness: 0.65 });
-        foliagePrimaryColor = 0x558b2f;
-        foliageSecondaryColor = 0x7cb342;
+        woodMat = new THREE.MeshStandardMaterial({ color: 0xe07a28, roughness: 0.48 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xffa73b, roughness: 0.38 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0xc86428, map: this.createBrickTexture(), roughness: 0.62 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x7c3f16, roughness: 0.58 });
+        foliagePrimaryColor = 0x65a30d;
+        foliageSecondaryColor = 0x84cc16;
     } else if (biome === 'cyber') {
-        woodMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.22, emissive: 0x004d66, emissiveIntensity: 0.35 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00acc1, emissiveIntensity: 0.6, roughness: 0.2 });
-        brickMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.15, emissive: 0x4a148c, emissiveIntensity: 0.35 });
-        borderMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x007799, emissiveIntensity: 0.45 });
-        foliagePrimaryColor = 0x00bfa5;
-        foliageSecondaryColor = 0x00e5ff;
+        woodMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.2, emissive: 0x006688, emissiveIntensity: 0.45 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00b8d4, emissiveIntensity: 0.72, roughness: 0.18 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.15, emissive: 0x6a1b9a, emissiveIntensity: 0.45 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x0088aa, emissiveIntensity: 0.55 });
+        foliagePrimaryColor = 0x00e5ff;
+        foliageSecondaryColor = 0x18ffff;
     } else if (biome === 'arctic') {
-        // Rich cobalt-sapphire glacial blocks so they stand out sharply against the snow floor!
-        woodMat = new THREE.MeshStandardMaterial({ color: 0x0288d1, roughness: 0.25, metalness: 0.15 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0x4fc3f7, roughness: 0.18, metalness: 0.1 });
-        brickMat = new THREE.MeshStandardMaterial({ color: 0x1565c0, map: this.createBrickTexture(), roughness: 0.4 });
-        borderMat = new THREE.MeshStandardMaterial({ color: 0x01579b, roughness: 0.35 });
-        foliagePrimaryColor = 0x00695c;
-        foliageSecondaryColor = 0x80deea;
+        woodMat = new THREE.MeshStandardMaterial({ color: 0x0091ea, roughness: 0.22, metalness: 0.15 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0x40c4ff, roughness: 0.15, metalness: 0.1 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x0277bd, map: this.createBrickTexture(), roughness: 0.35 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x01579b, roughness: 0.32 });
+        foliagePrimaryColor = 0x00bfa5;
+        foliageSecondaryColor = 0x64ffda;
     } else if (biome === 'volcano') {
-        woodMat = new THREE.MeshStandardMaterial({ color: 0x2d1812, roughness: 0.7, emissive: 0x4e1405, emissiveIntensity: 0.35 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0xff5722, emissive: 0xd84315, emissiveIntensity: 0.55, roughness: 0.4 });
-        brickMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, map: this.createBrickTexture(), roughness: 0.8 });
-        borderMat = new THREE.MeshStandardMaterial({ color: 0xd84315, emissive: 0xbf360c, emissiveIntensity: 0.55 });
-        foliagePrimaryColor = 0xb71c1c;
-        foliageSecondaryColor = 0xff6d00;
+        woodMat = new THREE.MeshStandardMaterial({ color: 0x3e1e14, roughness: 0.65, emissive: 0x6d1b07, emissiveIntensity: 0.42 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xff6d00, emissive: 0xff3d00, emissiveIntensity: 0.65, roughness: 0.35 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x4e2c22, map: this.createBrickTexture(), roughness: 0.72 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0xff3d00, emissive: 0xd50000, emissiveIntensity: 0.6 });
+        foliagePrimaryColor = 0xd50000;
+        foliageSecondaryColor = 0xff9100;
     } else { // jungle
-        // Ancient carved jade-stone & golden temple relief blocks
-        woodMat = new THREE.MeshStandardMaterial({ color: 0x2e5c3e, roughness: 0.55 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.45, roughness: 0.35 });
-        brickMat = new THREE.MeshStandardMaterial({ color: 0x4e6e58, map: this.createBrickTexture(), roughness: 0.65 });
-        borderMat = new THREE.MeshStandardMaterial({ color: 0x1b4328, roughness: 0.6 });
-        foliagePrimaryColor = 0x1b5e20;
-        foliageSecondaryColor = 0x00c853;
+        woodMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.45 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xffd600, metalness: 0.45, roughness: 0.3 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0x15803d, map: this.createBrickTexture(), roughness: 0.55 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.5 });
+        foliagePrimaryColor = 0x16a34a;
+        foliageSecondaryColor = 0x4ade80;
     }
     
     const corkTex = this.createCorkTexture();
@@ -2283,13 +2305,15 @@ export class GameEngine {
     const cylGeo = new THREE.CylinderGeometry(cellSize/2.6, cellSize/2.6, 3.8, 24);
     const cylRingGeo = new THREE.CylinderGeometry(cellSize/2.25, cellSize/2.25, 0.55, 24);
     
-    // Triangle (Prism) Geometry
+    // Triangle (Prism) Geometry — Compact centered triangular wedge so tanks can pass along the diagonal and between adjacent prisms
+    const triHalf = cellSize * 0.24; // 1.92 units half-extent (leaves a wide 4.16-unit visual corridor between adjacent triangles!)
+    const triColHalf = cellSize * 0.15; // 1.20 units inset physical collision triangle (prevents snagging on sharp 45° tips)
     const triShape = new THREE.Shape();
-    triShape.moveTo(-cellSize/2 + 0.5, -cellSize/2 + 0.5);
-    triShape.lineTo(cellSize/2 - 0.5, -cellSize/2 + 0.5);
-    triShape.lineTo(-cellSize/2 + 0.5, cellSize/2 - 0.5);
-    triShape.lineTo(-cellSize/2 + 0.5, -cellSize/2 + 0.5);
-    const triGeo = new THREE.ExtrudeGeometry(triShape, { depth: 4.2, bevelEnabled: true, bevelThickness: 0.2, bevelSize: 0.15, bevelSegments: 2 });
+    triShape.moveTo(-triHalf, -triHalf);
+    triShape.lineTo(triHalf, -triHalf);
+    triShape.lineTo(-triHalf, triHalf);
+    triShape.lineTo(-triHalf, -triHalf);
+    const triGeo = new THREE.ExtrudeGeometry(triShape, { depth: 3.9, bevelEnabled: true, bevelThickness: 0.18, bevelSize: 0.12, bevelSegments: 2 });
     
     // Lighthouse Geometry (Composite)
     const lhBaseGeo = new THREE.CylinderGeometry(2.5, 3, 6, 16);
@@ -2307,7 +2331,7 @@ export class GameEngine {
     const treeFoliageMat = new THREE.MeshStandardMaterial({ color: foliagePrimaryColor, roughness: 0.65 });
     const treeFoliageTopMat = new THREE.MeshStandardMaterial({ color: foliageSecondaryColor, roughness: 0.6 });
 
-    // Borders (The Arena Outer Wall with 3D Top Coping)
+    // Borders (The Arena Outer Wall with 3D Top Coping — strictly indestructible)
     const addBorder = (w, d, x, z) => {
         const m = new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), borderMat);
         m.position.set(x, 2, z);
@@ -2316,7 +2340,8 @@ export class GameEngine {
         coping.position.y = 3.1;
         coping.castShadow = true;
         m.add(coping);
-        m.userData = { bounds: new THREE.Box3().setFromObject(m) };
+        m.updateMatrixWorld(true);
+        m.userData = { bounds: new THREE.Box3().setFromObject(m), isBorder: true, type: 'border' };
         this.scene.add(m);
         this.walls.push(m); 
     };
@@ -2363,6 +2388,7 @@ export class GameEngine {
             cap.position.y = 2.15;
             cap.castShadow = true; cap.receiveShadow = true;
             m.add(cap);
+            m.updateMatrixWorld(true);
             m.userData = { bounds: new THREE.Box3().setFromObject(m), type: 'wall' };
             this.scene.add(m);
             this.walls.push(m);
@@ -2377,6 +2403,7 @@ export class GameEngine {
             const bandBot = new THREE.Mesh(crateBandHGeo, crateFrameMat);
             bandBot.position.y = -1.35;
             m.add(bandBot);
+            m.updateMatrixWorld(true);
             m.userData = { bounds: new THREE.Box3().setFromObject(m), type: 'cork' };
             this.scene.add(m);
             this.destructibles.push(m);
@@ -2391,7 +2418,8 @@ export class GameEngine {
             const topRing = new THREE.Mesh(cylRingGeo, capMat);
             topRing.position.y = 1.65;
             m.add(topRing);
-            m.userData = { bounds: new THREE.Box3().setFromObject(m), type: 'cyl' };
+            m.updateMatrixWorld(true);
+            m.userData = { bounds: new THREE.Box3().setFromObject(m), collisionRadius: 2.55, type: 'cyl' };
             this.scene.add(m);
             this.walls.push(m);
         } else if (type === 'S') { // Stone Fortress Block
@@ -2402,16 +2430,26 @@ export class GameEngine {
             stoneCap.position.y = 2.25;
             stoneCap.castShadow = true;
             m.add(stoneCap);
+            m.updateMatrixWorld(true);
             m.userData = { bounds: new THREE.Box3().setFromObject(m), type: 'stone' };
             this.scene.add(m);
             this.walls.push(m);
-        } else if (type === 'T') { // Triangle Prism
+        } else if (type === 'T') { // Triangle Prism (Properly centered in cell (x, z) with inset 2D triangle vertices)
             const m = new THREE.Mesh(triGeo, woodMat);
-            m.rotation.x = -Math.PI / 2; 
-            m.rotation.z = -Math.PI / 2;
-            m.position.set(x + cellSize/2 - 0.5, 0, z - cellSize/2 + 0.5);
+            m.rotation.x = -Math.PI / 2;
+            m.position.set(x, 0, z);
             m.castShadow = true; m.receiveShadow = true;
-            m.userData = { bounds: new THREE.Box3().setFromObject(m), type: 'tri' };
+            m.updateMatrixWorld(true);
+            const triPoints = [
+                { x: x - triColHalf, z: z + triColHalf },
+                { x: x + triColHalf, z: z + triColHalf },
+                { x: x - triColHalf, z: z - triColHalf }
+            ];
+            m.userData = {
+                bounds: new THREE.Box3().setFromObject(m),
+                triPoints,
+                type: 'tri'
+            };
             this.scene.add(m);
             this.walls.push(m);
         } else if (type === 'L') { // Lighthouse / Sentry Tower
@@ -2460,16 +2498,19 @@ export class GameEngine {
             beam.rotation.x = 0.3; 
             beam.position.z = 1.0; 
             beam.userData = { isEffect: true };
+            beam.raycast = () => {}; // Never block raycasts with the light cone!
             lightPivot.add(beam);
 
             const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshBasicMaterial({ color: 0xffffaa }));
             bulb.userData = { isEffect: true };
+            bulb.raycast = () => {};
             lightPivot.add(bulb);
 
             this.scene.add(grp);
-            this.lighthouses.push({ pivot: lightPivot, speed: 1.2 });
+            grp.updateMatrixWorld(true);
+            this.lighthouses.push({ group: grp, pivot: lightPivot, speed: 1.2 });
 
-            grp.userData = { bounds: new THREE.Box3().setFromObject(base), type: 'lighthouse' };
+            grp.userData = { bounds: new THREE.Box3().setFromObject(base), collisionRadius: 2.95, type: 'lighthouse' };
             this.walls.push(grp);
 
         } else if (type === 'R') { // 3-Tiered Lush 3D Tree
@@ -2497,7 +2538,8 @@ export class GameEngine {
             grp.add(leavesTop);
 
             this.scene.add(grp);
-            grp.userData = { bounds: new THREE.Box3().setFromObject(trunk), type: 'tree' };
+            grp.updateMatrixWorld(true);
+            grp.userData = { bounds: new THREE.Box3().setFromObject(trunk), collisionRadius: 1.15, type: 'tree' };
             this.walls.push(grp);
         }
         // --- NEW INTERACTIVE TOKENS ---
@@ -2547,7 +2589,7 @@ export class GameEngine {
            if (type === '4') enemyType = 'heavy';
            if (type === 'E') enemyType = 'basic';
 
-           this.entities.push(new EnemyTank(this.scene, x, z, enemyType));
+           this.entities.push(new EnemyTank(this.scene, x, z, enemyType, null, this.aiDifficulty));
         }
       }
     }
@@ -2622,9 +2664,11 @@ export class GameEngine {
         const bx = targetEnemy.mesh.position.x;
         const bz = targetEnemy.mesh.position.z;
         this.scene.remove(targetEnemy.mesh);
+        targetEnemy.isDead = true;
+        targetEnemy.mesh = null;
         this.entities = this.entities.filter(e => e !== targetEnemy);
 
-        const bossTank = new EnemyTank(this.scene, bx, bz, 'boss', bossCfg);
+        const bossTank = new EnemyTank(this.scene, bx, bz, 'boss', bossCfg, this.aiDifficulty);
         this.entities.push(bossTank);
         this.bossEntity = bossTank;
         this.stats.bossInfo = {
@@ -2665,6 +2709,7 @@ export class GameEngine {
     this.deathFocusPos = null;
     this.bossEntity = null;
     this.stats.bossInfo = null;
+    this.stats.activePowerup = null;
 
     this.stageLightBoost = 0;
     if (this.input) this.input.resetInputs();
@@ -2763,6 +2808,59 @@ export class GameEngine {
       this.mines.push(m);
       this.audio.play('mine_drop');
       this.vfx.spawnFloatingText(owner.mesh.position, '💣 MINA ACTIVA', '#ff5252', 0.85);
+  }
+
+  spawnBazookaProjectile(sourceTank) {
+      if (!sourceTank || !sourceTank.mesh) return;
+      const p = new Projectile(this.scene, sourceTank.mesh.position, sourceTank.turret.rotation.y, sourceTank, 0, true);
+      this.projectiles.push(p);
+
+      this.audio.play('shoot');
+      this.audio.play('explosion');
+
+      const barrelOffset = new THREE.Vector3(0, 1.3, 2.9);
+      const totalRotation = sourceTank.mesh.rotation.y + sourceTank.turret.rotation.y;
+      barrelOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), totalRotation);
+      const tipPos = sourceTank.mesh.position.clone().add(barrelOffset);
+
+      this.vfx.spawnMuzzleEffect(tipPos, totalRotation);
+      this.vfx.spawnShockwave(tipPos, 0xff3d00, 3.4);
+      this.vfx.spawnFloatingText(sourceTank.mesh.position, '🚀 ¡BAZOCA!', '#ff6d00', 0.95);
+      this.screenShake = 0.65;
+  }
+
+  triggerBazookaDemolition(pos, primaryWall = null) {
+      this.audio.play('barrel_explosion');
+      this.vfx.spawnScorchDecal(pos, 1.15);
+      this.vfx.spawnExplosion(pos, 0xff3d00, 38, 2.3);
+      this.vfx.spawnShockwave(pos, 0xff9100, 8.5);
+      this.screenShake = Math.max(this.screenShake, 1.05);
+      this.hitStopTimer = 0.04;
+
+      if (primaryWall && (!primaryWall.userData || !primaryWall.userData.isBorder)) {
+          this.destroyBlock(primaryWall);
+      }
+
+      // Demolish any interior obstacle within blast radius (strictly preserving outer arena borders!)
+      const blastRadius = 5.0;
+      const allBreakables = [...this.walls, ...this.destructibles];
+      allBreakables.forEach(w => {
+          if (!w || (w.userData && w.userData.isBorder)) return;
+          const d = Math.hypot(w.position.x - pos.x, w.position.z - pos.z);
+          if (d <= blastRadius) {
+              this.destroyBlock(w);
+          }
+      });
+
+      // Heavy splash damage to enemy tanks in radius
+      const enemySplashRadius = 7.5;
+      [...this.entities].forEach(entity => {
+          if (entity instanceof EnemyTank && entity.mesh) {
+              if (entity.mesh.position.distanceTo(pos) <= enemySplashRadius) {
+                  this.destroyEntity(entity, 'BAZOOKA');
+              }
+          }
+      });
   }
 
   triggerMineExplosion(mine) {
@@ -2964,9 +3062,32 @@ export class GameEngine {
     if (this.player && !this.isDying) {
       const ready = this.player.mineCooldown <= 0;
       const progress = ready ? 1.0 : Math.max(0, 1 - (this.player.mineCooldown / this.player.maxMineCooldown));
-      if (this.stats.mineReady !== ready || Math.abs((this.stats.mineCooldownProgress || 0) - progress) > 0.08) {
+
+      const bazookaReady = (this.player.bazookaCooldown || 0) <= 0;
+      const bazookaProgress = bazookaReady ? 1.0 : Math.max(0, 1 - ((this.player.bazookaCooldown || 0) / (this.player.maxBazookaCooldown || 4.5)));
+
+      // Live sync of active power-up status pill so it NEVER gets stuck when shield/timers expire
+      let currentPowerupLabel = null;
+      if (this.player.shieldActive) {
+        currentPowerupLabel = '🛡️ ESCUDO ENERGÉTICO ACTIVADO';
+      } else if (this.player.rapidFireTimer > 0) {
+        currentPowerupLabel = `⚡ RÁFAGA RÁPIDA (${Math.ceil(this.player.rapidFireTimer)}s)`;
+      } else if (this.player.speedBoostTimer > 0) {
+        currentPowerupLabel = `🚀 MOTOR TURBO (${Math.ceil(this.player.speedBoostTimer)}s)`;
+      }
+
+      if (
+        this.stats.mineReady !== ready ||
+        Math.abs((this.stats.mineCooldownProgress || 0) - progress) > 0.06 ||
+        this.stats.bazookaReady !== bazookaReady ||
+        Math.abs((this.stats.bazookaCooldownProgress || 0) - bazookaProgress) > 0.06 ||
+        this.stats.activePowerup !== currentPowerupLabel
+      ) {
         this.stats.mineReady = ready;
         this.stats.mineCooldownProgress = progress;
+        this.stats.bazookaReady = bazookaReady;
+        this.stats.bazookaCooldownProgress = bazookaProgress;
+        this.stats.activePowerup = currentPowerupLabel;
         this.updateUI();
       }
     }
@@ -3184,7 +3305,7 @@ export class GameEngine {
         
         entity.update(dt, collisionObstacles, visionObstacles, this.entities); 
         
-        if (entity.velocity && entity.velocity.length() > 0.5) {
+        if (entity.velocity && entity.velocity.lengthSq() > 0.04) {
             this.vfx.spawnTrack(entity.mesh.position, entity.mesh.rotation.y, entity);
             entity.exhaustTimer = (entity.exhaustTimer || 0) + dt;
             if (entity.exhaustTimer > 0.12) {
@@ -3194,6 +3315,10 @@ export class GameEngine {
             }
         }
 
+        if (entity.needsBazooka) {
+            this.spawnBazookaProjectile(entity);
+            entity.needsBazooka = false;
+        }
         if (entity.needsShoot) {
             this.spawnProjectile(entity);
             entity.needsShoot = false;
@@ -3256,9 +3381,9 @@ export class GameEngine {
 
         // Spawn glowing plasma tracer trail behind moving bullets
         p.trailTimer = (p.trailTimer || 0) + dt;
-        if (p.trailTimer >= 0.025) {
+        if (p.trailTimer >= (p.isBazooka ? 0.016 : 0.025)) {
             p.trailTimer = 0;
-            this.vfx.spawnBulletTrail(p.mesh.position, p.isPlayerBullet);
+            this.vfx.spawnBulletTrail(p.mesh.position, p.isPlayerBullet, p.isBazooka);
         }
 
         // Pass audio bounce callback and check for prism illumination
@@ -3272,7 +3397,19 @@ export class GameEngine {
             this.scene.remove(p.mesh);
             this.projectiles.splice(i, 1);
             
-            if (p.hitTarget && p.hitTarget.mesh) {
+            if (p.isBazooka) {
+                if (p.hitTarget && p.hitTarget.mesh) {
+                    if (p.hitTarget instanceof EnemyTank) {
+                        this.destroyEntity(p.hitTarget, 'BAZOOKA');
+                    } else if (p.hitTarget instanceof PlayerTank) {
+                        this.damagePlayer(1);
+                    }
+                }
+                if (p.hitMine) {
+                    this.triggerMineExplosion(p.hitMine);
+                }
+                this.triggerBazookaDemolition(p.mesh.position, p.hitWallToDemolish || p.hitDestructible);
+            } else if (p.hitTarget && p.hitTarget.mesh) {
                 if (p.hitTarget instanceof EnemyTank) {
                    const wasRicochet = p.bounces > 0;
                    this.destroyEntity(p.hitTarget, wasRicochet ? 'RICOCHET' : 'DIRECT');
@@ -3295,7 +3432,7 @@ export class GameEngine {
   }
 
   destroyBlock(block) {
-      if (!block) return;
+      if (!block || (block.userData && block.userData.isBorder)) return;
       if (block.userData && block.userData.type === 'barrel') {
           this.triggerBarrelExplosion(block);
           return;
@@ -3310,17 +3447,25 @@ export class GameEngine {
       let color = 0xd7a876;
       if (block.userData && block.userData.type === 'cork') color = 0xd7a876; 
       else if (block.userData && block.userData.type === 'stone') color = 0x888888;
-      else if (block.userData && block.userData.type === 'wall') color = 0x8d6e63;
+      else if (block.userData && block.userData.type === 'wall') color = 0xb86522;
+      else if (block.userData && block.userData.type === 'lighthouse') color = 0xef4444;
+      else if (block.userData && block.userData.type === 'tree') color = 0x22c55e;
       
       this.audio.play('explosion');
-      this.vfx.spawnExplosion(pos, color, 16, 1.0);
+      this.vfx.spawnExplosion(pos, color, 20, 1.15);
+      if (block.userData) block.userData.bounds = null;
       this.scene.remove(block);
       this.destructibles = this.destructibles.filter(b => b !== block);
+      this.walls = this.walls.filter(w => w !== block);
+      this.tankBlockers = this.tankBlockers.filter(t => t !== block);
+      this.lighthouses = this.lighthouses.filter(lh => lh.group !== block);
+      this.prisms = this.prisms.filter(pr => pr !== block);
   }
 
   triggerBarrelExplosion(barrel) {
       if (!barrel || barrel.userData.exploded) return;
       barrel.userData.exploded = true;
+      if (barrel.userData) barrel.userData.bounds = null;
 
       const pos = barrel.position.clone();
       this.vfx.spawnBarrelDebris(pos);
@@ -3371,6 +3516,7 @@ export class GameEngine {
   collectPowerUp(crate, tank) {
       if (!crate || crate.userData.collected) return;
       crate.userData.collected = true;
+      if (crate.userData) crate.userData.bounds = null;
 
       const pos = crate.position.clone();
       this.vfx.spawnPowerUpBurst(pos, 0x00E5FF);
@@ -3470,8 +3616,13 @@ export class GameEngine {
       this.screenShake = Math.max(this.screenShake, entity.isBoss ? 1.8 : 0.75);
       this.hitStopTimer = entity.isBoss ? 0.08 : 0.045;
 
-      this.scene.remove(entity.mesh);
-      this.entities = this.entities.filter(e => e !== entity);
+      const deadMesh = entity.mesh;
+      entity.isDead = true;
+      entity.mesh = null;
+      if (deadMesh) {
+          this.scene.remove(deadMesh);
+      }
+      this.entities = this.entities.filter(e => e !== entity && !e.isDead && e.mesh);
       if (entity instanceof EnemyTank) {
           this.stats.enemiesLeft--;
 
@@ -3566,6 +3717,14 @@ export class GameEngine {
       return this.audio ? this.audio.isMuted : false;
   }
 
+  toggleMusic() {
+      return this.audio ? this.audio.toggleMusic() : false;
+  }
+
+  isMusicMuted() {
+      return this.audio ? this.audio.isMusicMuted : false;
+  }
+
   // --- Mobile Touch Virtual Controls Delegates ---
   setJoystickInput(x, y, active) {
       if (this.input) this.input.setJoystickInput(x, y, active);
@@ -3639,6 +3798,22 @@ export class GameEngine {
           return placed;
       }
       if (this.input) this.input.triggerMine();
+      return false;
+  }
+
+  triggerBazooka() {
+      if (this.player) {
+          const fired = this.player.fireBazooka();
+          if (fired && this.player.needsBazooka) {
+              this.spawnBazookaProjectile(this.player);
+              this.player.needsBazooka = false;
+          }
+          this.stats.bazookaReady = this.player.bazookaCooldown <= 0;
+          this.stats.bazookaCooldownProgress = this.player.bazookaCooldown <= 0 ? 1.0 : Math.max(0, 1.0 - (this.player.bazookaCooldown / this.player.maxBazookaCooldown));
+          this.updateUI();
+          return fired;
+      }
+      if (this.input) this.input.triggerBazooka();
       return false;
   }
 
@@ -3728,6 +3903,9 @@ export class GameEngine {
     if (this.winTimeout) {
       clearTimeout(this.winTimeout);
       this.winTimeout = null;
+    }
+    if (this.audio && typeof this.audio.dispose === 'function') {
+      this.audio.dispose();
     }
     this.cleanup();
     window.removeEventListener('resize', this.onResize);
