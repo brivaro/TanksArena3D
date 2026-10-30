@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 
+const _startVec = new THREE.Vector3();
+const _targetVec = new THREE.Vector3();
+const _dirVec = new THREE.Vector3();
+const _hitPt = new THREE.Vector3();
+const _normalVec = new THREE.Vector3();
+const _reflectDir = new THREE.Vector3();
+const _bounceEnd = new THREE.Vector3();
+const _rayCandidates = [];
+
 export class Cursor {
   constructor(scene) {
     this.scene = scene;
@@ -38,7 +47,7 @@ export class Cursor {
       this.mesh.add(tick);
     }
 
-    // Primary Laser Aim Dashed Line
+    // Primary Laser Aim Dashed Line (In-place reusable Float32Array buffer)
     const lineMat = new THREE.LineDashedMaterial({
       color: 0x00E5FF,
       dashSize: 1.1,
@@ -47,15 +56,15 @@ export class Cursor {
       transparent: true,
       opacity: 0.72
     });
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0.5, 0),
-      new THREE.Vector3(0, 0.5, 0)
-    ]);
+    const lineGeo = new THREE.BufferGeometry();
+    this.aimPosAttr = new THREE.BufferAttribute(new Float32Array(6), 3);
+    lineGeo.setAttribute('position', this.aimPosAttr);
     this.aimLine = new THREE.Line(lineGeo, lineMat);
+    this.aimLine.frustumCulled = false;
     this.aimLine.renderOrder = 998;
     this.scene.add(this.aimLine);
 
-    // Secondary Ricochet Bounce Prediction Line (Golden Amber / Cyan)
+    // Secondary Ricochet Bounce Prediction Line (In-place reusable Float32Array buffer)
     const bounceMat = new THREE.LineDashedMaterial({
       color: 0xFFD54F,
       dashSize: 0.85,
@@ -64,11 +73,11 @@ export class Cursor {
       transparent: true,
       opacity: 0.65
     });
-    const bounceGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0.5, 0),
-      new THREE.Vector3(0, 0.5, 0)
-    ]);
+    const bounceGeo = new THREE.BufferGeometry();
+    this.bouncePosAttr = new THREE.BufferAttribute(new Float32Array(6), 3);
+    bounceGeo.setAttribute('position', this.bouncePosAttr);
     this.bounceLine = new THREE.Line(bounceGeo, bounceMat);
+    this.bounceLine.frustumCulled = false;
     this.bounceLine.renderOrder = 998;
     this.bounceLine.visible = false;
     this.scene.add(this.bounceLine);
@@ -118,26 +127,51 @@ export class Cursor {
 
     // Predictive Laser & 1-Bounce Ricochet Trajectory Calculation
     if (playerPos && this.aimLine) {
-      const start = new THREE.Vector3(playerPos.x, 1.3, playerPos.z);
-      const target = new THREE.Vector3(mousePos.x, 1.3, mousePos.z);
-      const dir = new THREE.Vector3().subVectors(target, start);
-      const maxDist = Math.max(dir.length(), 42);
-      dir.normalize();
+      _startVec.set(playerPos.x, 1.3, playerPos.z);
+      _targetVec.set(mousePos.x, 1.3, mousePos.z);
+      _dirVec.subVectors(_targetVec, _startVec);
+      const maxDist = Math.max(_dirVec.length(), 42);
+      _dirVec.normalize();
 
-      this.raycaster.set(start, dir);
+      this.raycaster.set(_startVec, _dirVec);
       this.raycaster.far = maxDist;
 
-      const allObstacles = [...walls, ...destructibles];
-      const hits = allObstacles.length > 0 ? this.raycaster.intersectObjects(allObstacles, true) : [];
+      // Fast Box3 broadphase: only raycast against obstacles whose bounding box intersects the laser ray!
+      _rayCandidates.length = 0;
+      const ray = this.raycaster.ray;
 
-      if (hits.length > 0) {
-        const firstHit = hits[0];
-        const hitPoint = new THREE.Vector3(firstHit.point.x, 0.9, firstHit.point.z);
+      for (let i = 0; i < walls.length; i++) {
+        const w = walls[i];
+        const b = w.userData && w.userData.bounds;
+        if (!b || ray.intersectsBox(b)) {
+          _rayCandidates.push(w);
+        }
+      }
+      for (let i = 0; i < destructibles.length; i++) {
+        const d = destructibles[i];
+        if (_rayCandidates.includes(d)) continue;
+        const b = d.userData && d.userData.bounds;
+        if (!b || ray.intersectsBox(b)) {
+          _rayCandidates.push(d);
+        }
+      }
+
+      const hits = _rayCandidates.length > 0 ? this.raycaster.intersectObjects(_rayCandidates, true) : [];
+
+      let firstHit = null;
+      for (let i = 0; i < hits.length; i++) {
+        if (!hits[i].object.userData || !hits[i].object.userData.isEffect) {
+          firstHit = hits[i];
+          break;
+        }
+      }
+
+      if (firstHit) {
+        _hitPt.set(firstHit.point.x, 0.9, firstHit.point.z);
         this.aimLine.visible = true;
-        this.aimLine.geometry.setFromPoints([
-          new THREE.Vector3(start.x, 0.9, start.z),
-          hitPoint
-        ]);
+        this.aimPosAttr.setXYZ(0, _startVec.x, 0.9, _startVec.z);
+        this.aimPosAttr.setXYZ(1, _hitPt.x, 0.9, _hitPt.z);
+        this.aimPosAttr.needsUpdate = true;
         this.aimLine.computeLineDistances();
 
         // Check if it hits an indestructible bounce wall (not destructible cork/barrel)
@@ -145,21 +179,23 @@ export class Cursor {
         const isDestructible = destructibles.includes(hitObj) || (hitObj.parent && destructibles.includes(hitObj.parent));
 
         if (!isDestructible && firstHit.face) {
-          const normal = firstHit.face.normal.clone().transformDirection(hitObj.matrixWorld).normalize();
-          normal.y = 0;
-          normal.normalize();
+          _normalVec.copy(firstHit.face.normal).transformDirection(hitObj.matrixWorld).normalize();
+          _normalVec.y = 0;
+          _normalVec.normalize();
 
-          const reflectDir = dir.clone().reflect(normal);
-          reflectDir.y = 0;
-          reflectDir.normalize();
+          _reflectDir.copy(_dirVec).reflect(_normalVec);
+          _reflectDir.y = 0;
+          _reflectDir.normalize();
 
-          const bounceEnd = hitPoint.clone().add(reflectDir.multiplyScalar(18));
+          _bounceEnd.copy(_hitPt).addScaledVector(_reflectDir, 18);
           this.bounceLine.visible = true;
-          this.bounceLine.geometry.setFromPoints([hitPoint, bounceEnd]);
+          this.bouncePosAttr.setXYZ(0, _hitPt.x, 0.9, _hitPt.z);
+          this.bouncePosAttr.setXYZ(1, _bounceEnd.x, 0.9, _bounceEnd.z);
+          this.bouncePosAttr.needsUpdate = true;
           this.bounceLine.computeLineDistances();
 
           this.bounceNode.visible = true;
-          this.bounceNode.position.set(hitPoint.x, 0.55, hitPoint.z);
+          this.bounceNode.position.set(_hitPt.x, 0.55, _hitPt.z);
           this.bounceNode.rotation.z = -time * 1.5;
         } else {
           this.bounceLine.visible = false;
@@ -167,10 +203,9 @@ export class Cursor {
         }
       } else {
         this.aimLine.visible = true;
-        this.aimLine.geometry.setFromPoints([
-          new THREE.Vector3(start.x, 0.9, start.z),
-          new THREE.Vector3(mousePos.x, 0.5, mousePos.z)
-        ]);
+        this.aimPosAttr.setXYZ(0, _startVec.x, 0.9, _startVec.z);
+        this.aimPosAttr.setXYZ(1, mousePos.x, 0.5, mousePos.z);
+        this.aimPosAttr.needsUpdate = true;
         this.aimLine.computeLineDistances();
         this.bounceLine.visible = false;
         this.bounceNode.visible = false;
@@ -196,3 +231,4 @@ export class Cursor {
     if (this.bounceNode) this.scene.remove(this.bounceNode);
   }
 }
+

@@ -707,10 +707,18 @@ export class GameEngine {
     rightRail.castShadow = true;
     bridgeGroup.add(rightRail);
 
-    // 4 Corner Stone Baluster Pillars with glowing lanterns
+    // 4 Corner Stone Baluster Pillars with glowing lanterns (Additive aura halo instead of 16 PointLights!)
     const pillarGeo = new THREE.BoxGeometry(1.2, 2.4, 1.2);
-    const lanternGeo = new THREE.SphereGeometry(0.45, 12, 8);
+    const lanternGeo = new THREE.SphereGeometry(0.45, 10, 8);
     const lanternMat = new THREE.MeshBasicMaterial({ color: lanternColor });
+    const lanternHaloGeo = new THREE.SphereGeometry(0.95, 10, 8);
+    const lanternHaloMat = new THREE.MeshBasicMaterial({
+      color: lanternColor,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
 
     const cornerOffsets = [
       { x: -width / 2 + 0.6, z: -length / 2 + 0.6 },
@@ -729,10 +737,9 @@ export class GameEngine {
       lantern.position.set(pos.x, 2.3, pos.z);
       bridgeGroup.add(lantern);
 
-      // Soft light beacon on the bridge lantern
-      const pLight = new THREE.PointLight(lanternColor, 0.45, 14, 1.5);
-      pLight.position.set(pos.x, 2.5, pos.z);
-      bridgeGroup.add(pLight);
+      const halo = new THREE.Mesh(lanternHaloGeo, lanternHaloMat);
+      halo.position.set(pos.x, 2.3, pos.z);
+      bridgeGroup.add(halo);
     });
 
     return bridgeGroup;
@@ -2634,6 +2641,14 @@ export class GameEngine {
     this.missionStartTime = performance.now();
     this.missionDamageTaken = 0;
     this.isRunning = true;
+
+    // Pre-compile scene shaders once on level load so shooting/explosions never stall the frame
+    try {
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.compile(this.scene, this.camera);
+      }
+    } catch (_) {}
+
     this.updateUI();
   }
 

@@ -83,6 +83,8 @@ export class EnemyTank extends Tank {
     }
     
     this.raycaster = new THREE.Raycaster();
+    this.losTimer = Math.random() * 0.12;
+    this.cachedCanSeePlayer = false;
     
     this.moveDir = new THREE.Vector3(0,0,1);
     this.changeDirTimer = 0;
@@ -227,16 +229,53 @@ export class EnemyTank extends Tank {
     
     this.turret.rotation.y += Math.sign(turretDiff) * Math.min(Math.abs(turretDiff), 5.0 * dt);
 
-    // Check Line of Sight using visionObstacles (Walls Only, NO HOLES)
-    let canSeePlayer = false;
-    if (distToPlayer < 75) {
-        const start = this.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0));
-        this.raycaster.set(start, vecToPlayer);
-        const hits = this.raycaster.intersectObjects(visionObstacles, true);
-        if (hits.length === 0 || hits[0].distance > distToPlayer) {
-            canSeePlayer = true;
+    // Throttled Line of Sight check with Box3 broadphase (10x faster than per-frame full-scene raycast!)
+    this.losTimer -= dt;
+    if (this.losTimer <= 0) {
+        this.losTimer = 0.11;
+        this.cachedCanSeePlayer = false;
+        if (distToPlayer < 75) {
+            const start = new THREE.Vector3(this.mesh.position.x, 1.5, this.mesh.position.z);
+            this.raycaster.set(start, vecToPlayer);
+            this.raycaster.far = distToPlayer;
+
+            const losCandidates = [];
+            const ray = this.raycaster.ray;
+            const hitBoxPt = new THREE.Vector3();
+            let blockedByBox = false;
+
+            for (let i = 0; i < visionObstacles.length; i++) {
+                const obs = visionObstacles[i];
+                const b = obs.userData && obs.userData.bounds;
+                if (b) {
+                    if (ray.intersectBox(b, hitBoxPt)) {
+                        if (start.distanceToSquared(hitBoxPt) < distToPlayer * distToPlayer) {
+                            const t = obs.userData.type;
+                            if (t === 'wall' || t === 'stone' || t === 'cork') {
+                                blockedByBox = true;
+                                break;
+                            }
+                            losCandidates.push(obs);
+                        }
+                    }
+                } else {
+                    losCandidates.push(obs);
+                }
+            }
+
+            if (!blockedByBox) {
+                if (losCandidates.length === 0) {
+                    this.cachedCanSeePlayer = true;
+                } else {
+                    const hits = this.raycaster.intersectObjects(losCandidates, true);
+                    if (hits.length === 0 || hits[0].distance > distToPlayer) {
+                        this.cachedCanSeePlayer = true;
+                    }
+                }
+            }
         }
     }
+    const canSeePlayer = this.cachedCanSeePlayer;
 
     // Update visor glow color: bright red when locked onto player, amber when scanning
     if (this.visorMat) {

@@ -1,11 +1,12 @@
-
 export class AudioManager {
   constructor() {
     this.ctx = null;
     this.masterGain = null;
+    this.noiseBuffer = null;
     this.initialized = false;
     this.isMuted = false;
     this.savedVolume = 0.32;
+    this.lastPlayed = {};
   }
 
   init() {
@@ -17,6 +18,14 @@ export class AudioManager {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.isMuted ? 0 : this.savedVolume; 
       this.masterGain.connect(this.ctx.destination);
+
+      // Pre-allocate shared white noise buffer once (avoids 50k Math.random() loop on main thread during explosions!)
+      const bufferSize = Math.floor(this.ctx.sampleRate * 1.2);
+      this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
       
       this.createAmbience();
       this.initialized = true;
@@ -70,8 +79,15 @@ export class AudioManager {
   }
 
   play(type, param = 1) {
-    if (!this.ctx) return;
+    if (!this.ctx || this.isMuted) return;
     const t = this.ctx.currentTime;
+
+    // Prevent audio node flooding during rapid fire or simultaneous multi-pellet bounces
+    const minInterval = (type === 'shoot' || type === 'impact') ? 0.032 : 0.045;
+    if (this.lastPlayed[type] && (t - this.lastPlayed[type]) < minInterval) {
+      return;
+    }
+    this.lastPlayed[type] = t;
 
     if (type === 'shoot') {
         // Punchy Cannon Thump + High Mechanical Snap
@@ -87,9 +103,13 @@ export class AudioManager {
         
         osc.connect(gain);
         gain.connect(this.masterGain);
+        osc.onended = () => {
+          osc.disconnect();
+          gain.disconnect();
+        };
         
         osc.start(t);
-        osc.stop(t + 0.18);
+        osc.stop(t + 0.17);
     } 
     else if (type === 'impact') {
         // Crisp Metallic Ricochet Ping
@@ -105,6 +125,10 @@ export class AudioManager {
 
         osc.connect(gain);
         gain.connect(this.masterGain);
+        osc.onended = () => {
+          osc.disconnect();
+          gain.disconnect();
+        };
 
         osc.start(t);
         osc.stop(t + 0.09);
@@ -123,6 +147,10 @@ export class AudioManager {
 
         osc.connect(gain);
         gain.connect(this.masterGain);
+        osc.onended = () => {
+          osc.disconnect();
+          gain.disconnect();
+        };
         osc.start(t);
         osc.stop(t + 0.24);
     }
@@ -138,19 +166,19 @@ export class AudioManager {
             gain.gain.exponentialRampToValueAtTime(0.008, start + 0.07);
             osc.connect(gain);
             gain.connect(this.masterGain);
+            osc.onended = () => {
+              osc.disconnect();
+              gain.disconnect();
+            };
             osc.start(start);
             osc.stop(start + 0.08);
         });
     }
     else if (type === 'explosion') {
+        if (!this.noiseBuffer) return;
         const dur = 0.4;
-        const bufferSize = this.ctx.sampleRate * dur;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
         const noise = this.ctx.createBufferSource();
-        noise.buffer = buffer;
+        noise.buffer = this.noiseBuffer;
 
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
@@ -164,18 +192,20 @@ export class AudioManager {
         noise.connect(filter);
         filter.connect(gain);
         gain.connect(this.masterGain);
+        noise.onended = () => {
+          noise.disconnect();
+          filter.disconnect();
+          gain.disconnect();
+        };
 
         noise.start(t);
+        noise.stop(t + dur);
     }
     else if (type === 'big_explosion') {
+         if (!this.noiseBuffer) return;
          const dur = 0.85;
-         const bufferSize = this.ctx.sampleRate * dur;
-         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-         const data = buffer.getChannelData(0);
-         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
- 
          const noise = this.ctx.createBufferSource();
-         noise.buffer = buffer;
+         noise.buffer = this.noiseBuffer;
  
          const filter = this.ctx.createBiquadFilter();
          filter.type = 'lowpass';
@@ -192,6 +222,10 @@ export class AudioManager {
          subGain.gain.exponentialRampToValueAtTime(0.01, t + 0.48);
          sub.connect(subGain);
          subGain.connect(this.masterGain);
+         sub.onended = () => {
+           sub.disconnect();
+           subGain.disconnect();
+         };
          sub.start(t);
          sub.stop(t + 0.5);
 
@@ -202,18 +236,20 @@ export class AudioManager {
          noise.connect(filter);
          filter.connect(gain);
          gain.connect(this.masterGain);
+         noise.onended = () => {
+           noise.disconnect();
+           filter.disconnect();
+           gain.disconnect();
+         };
  
          noise.start(t);
+         noise.stop(t + dur);
     }
     else if (type === 'barrel_explosion') {
+         if (!this.noiseBuffer) return;
          const dur = 1.1;
-         const bufferSize = this.ctx.sampleRate * dur;
-         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-         const data = buffer.getChannelData(0);
-         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
          const noise = this.ctx.createBufferSource();
-         noise.buffer = buffer;
+         noise.buffer = this.noiseBuffer;
 
          const filter = this.ctx.createBiquadFilter();
          filter.type = 'lowpass';
@@ -229,6 +265,10 @@ export class AudioManager {
          subGain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
          subOsc.connect(subGain);
          subGain.connect(this.masterGain);
+         subOsc.onended = () => {
+           subOsc.disconnect();
+           subGain.disconnect();
+         };
          subOsc.start(t);
          subOsc.stop(t + 0.6);
 
@@ -239,8 +279,14 @@ export class AudioManager {
          noise.connect(filter);
          filter.connect(gain);
          gain.connect(this.masterGain);
+         noise.onended = () => {
+           noise.disconnect();
+           filter.disconnect();
+           gain.disconnect();
+         };
 
          noise.start(t);
+         noise.stop(t + dur);
     }
     else if (type === 'powerup') {
          const freqs = [523.25, 659.25, 783.99, 1046.50];
@@ -256,6 +302,10 @@ export class AudioManager {
 
              osc.connect(gain);
              gain.connect(this.masterGain);
+             osc.onended = () => {
+               osc.disconnect();
+               gain.disconnect();
+             };
              osc.start(start);
              osc.stop(start + 0.3);
          });
@@ -272,6 +322,10 @@ export class AudioManager {
 
          osc.connect(gain);
          gain.connect(this.masterGain);
+         osc.onended = () => {
+           osc.disconnect();
+           gain.disconnect();
+         };
          osc.start(t);
          osc.stop(t + 0.32);
     }
@@ -287,9 +341,14 @@ export class AudioManager {
              gain.gain.exponentialRampToValueAtTime(0.008, start + 0.38);
              osc.connect(gain);
              gain.connect(this.masterGain);
+             osc.onended = () => {
+               osc.disconnect();
+               gain.disconnect();
+             };
              osc.start(start);
              osc.stop(start + 0.4);
          });
     }
   }
 }
+

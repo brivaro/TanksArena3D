@@ -1,5 +1,8 @@
-
 import * as THREE from 'three';
+
+const _upAxis = new THREE.Vector3(0, 1, 0);
+const _tempDir = new THREE.Vector3();
+const _tempRight = new THREE.Vector3();
 
 export class VFXManager {
   constructor(scene) {
@@ -9,20 +12,66 @@ export class VFXManager {
     this.shockwaves = [];
     this.markers = [];
     this.bulletTrails = [];
+    this.trailPool = [];
     this.floatingTexts = [];
-    this.flashLights = [];
+
+    // Material caches (prevents creating/compiling new materials during combat!)
+    this.explosionMatCache = new Map();
 
     // Reusable geometries
     this.cubeGeo = new THREE.BoxGeometry(0.32, 0.32, 0.32);
     this.smallSparkGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    this.muzzleBoxGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+    this.muzzleFlashGeo = new THREE.SphereGeometry(0.48, 8, 8);
     this.trailGeo = new THREE.SphereGeometry(0.18, 6, 6);
     this.trackGeo = new THREE.PlaneGeometry(0.5, 0.42);
-    this.scorchGeo = new THREE.CircleGeometry(2.2, 20);
+    this.scorchGeo = new THREE.CircleGeometry(2.2, 16);
+    this.starGeo = new THREE.BoxGeometry(0.26, 0.26, 0.26);
+    this.shockwaveGeo = new THREE.RingGeometry(0.5, 1.05, 28);
+
+    // Pre-allocated shared materials for frequent effects (Zero shader compilation or GC on shoot!)
+    this.sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE082 });
+    this.muzzleSmokeMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.65, depthWrite: false });
+    this.muzzleFlashMat = new THREE.MeshBasicMaterial({ color: 0xFFF59D, transparent: true, opacity: 0.95, depthWrite: false });
+    this.exhaustNormalMat = new THREE.MeshBasicMaterial({ color: 0xfff8e7, transparent: true, opacity: 0.32, depthWrite: false });
+    this.exhaustBoostMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.35, depthWrite: false });
+    this.playerTrailMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false
+    });
+    this.enemyTrailMat = new THREE.MeshBasicMaterial({
+      color: 0xff5722,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false
+    });
 
     // Soft, subtle tread decal texture (fades at edges)
     this.trackTex = this.createSoftTrackTexture();
 
-    this.shockwaveGeo = new THREE.RingGeometry(0.5, 1.05, 32);
+    // Permanent Pooled PointLight for explosions & cannon flashes
+    // Kept in scene permanently (intensity = 0 when idle) so NUM_POINT_LIGHTS never changes and WebGL NEVER recompiles shaders!
+    this.pooledFlashLight = new THREE.PointLight(0xffe082, 0, 24, 1.8);
+    this.pooledFlashLight.position.set(0, -50, 0);
+    this.pooledFlashLight.userData = { isEnvironment: true };
+    this.scene.add(this.pooledFlashLight);
+    this.activeFlash = null;
+  }
+
+  getExplosionMaterial(color) {
+    let mat = this.explosionMatCache.get(color);
+    if (!mat) {
+      mat = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.65,
+        roughness: 0.25
+      });
+      this.explosionMatCache.set(color, mat);
+    }
+    return mat;
   }
 
   createSoftTrackTexture() {
@@ -126,59 +175,66 @@ export class VFXManager {
     });
   }
 
-  // Spawn a brief dynamic point light flash for explosions and cannon fire
+  // Reuses permanent PointLight so scene light count never changes (zero shader recompilation!)
   spawnLightFlash(pos, color, intensity = 5.0, distance = 18, duration = 0.18) {
-    const light = new THREE.PointLight(color, intensity, distance, 1.8);
-    light.position.copy(pos);
-    light.position.y = Math.max(1.2, pos.y + 0.8);
-    this.scene.add(light);
-    this.flashLights.push({
-      light,
+    if (!this.pooledFlashLight) return;
+    // Only override if stronger or current flash is nearly done
+    if (this.activeFlash && this.pooledFlashLight.intensity > intensity) return;
+
+    if (!this.pooledFlashLight.parent) {
+      this.scene.add(this.pooledFlashLight);
+    }
+    this.pooledFlashLight.color.setHex(color);
+    this.pooledFlashLight.intensity = intensity;
+    this.pooledFlashLight.distance = distance;
+    this.pooledFlashLight.position.set(pos.x, Math.max(1.2, pos.y + 0.8), pos.z);
+    this.activeFlash = {
       maxIntensity: intensity,
       age: 0,
       duration
-    });
+    };
   }
 
-  // Spawn glowing plasma tracer trail behind moving bullets
+  // Spawn glowing plasma tracer trail behind moving bullets (Uses object pool & shared materials — zero GC!)
   spawnBulletTrail(pos, isPlayerBullet = true) {
-    const mat = new THREE.MeshBasicMaterial({
-      color: isPlayerBullet ? 0x00e5ff : 0xff5722,
-      transparent: true,
-      opacity: 0.65,
-      depthWrite: false
-    });
-    const mesh = new THREE.Mesh(this.trailGeo, mat);
+    const mat = isPlayerBullet ? this.playerTrailMat : this.enemyTrailMat;
+    let mesh = this.trailPool.pop();
+    if (mesh) {
+      mesh.material = mat;
+      mesh.visible = true;
+    } else {
+      mesh = new THREE.Mesh(this.trailGeo, mat);
+      this.scene.add(mesh);
+    }
     mesh.position.copy(pos);
-    this.scene.add(mesh);
-    this.bulletTrails.push({ mesh, mat, age: 0, maxAge: 0.18 });
+    mesh.scale.setScalar(1.0);
+    this.bulletTrails.push({ mesh, age: 0, maxAge: 0.16 });
   }
 
   // Spawn engine exhaust puff behind moving tank
   spawnExhaustPuff(pos, rotationY, isBoosted = false) {
-    const backDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
+    _tempDir.set(0, 0, -1).applyAxisAngle(_upAxis, rotationY);
     const sideOffset = (Math.random() > 0.5 ? 0.65 : -0.65);
-    const rightDir = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
+    _tempRight.set(1, 0, 0).applyAxisAngle(_upAxis, rotationY);
 
-    const puffPos = pos.clone()
-      .add(backDir.clone().multiplyScalar(1.65))
-      .add(rightDir.multiplyScalar(sideOffset));
-    puffPos.y = 1.4;
-
-    const mat = new THREE.MeshBasicMaterial({
-      color: isBoosted ? 0x00e5ff : 0xfff8e7,
-      transparent: true,
-      opacity: 0.32,
-      depthWrite: false
-    });
+    const mat = isBoosted ? this.exhaustBoostMat : this.exhaustNormalMat;
     const mesh = new THREE.Mesh(this.smallSparkGeo, mat);
-    mesh.position.copy(puffPos);
+    mesh.position.set(
+      pos.x + _tempDir.x * 1.65 + _tempRight.x * sideOffset,
+      1.4,
+      pos.z + _tempDir.z * 1.65 + _tempRight.z * sideOffset
+    );
+    mesh.scale.setScalar(1.0);
 
-    const velocity = backDir.multiplyScalar(2.0 + Math.random() * 1.4);
-    velocity.y = 1.2 + Math.random() * 0.9;
+    const speed = 2.0 + Math.random() * 1.4;
+    const velocity = new THREE.Vector3(
+      _tempDir.x * speed,
+      1.2 + Math.random() * 0.9,
+      _tempDir.z * speed
+    );
 
     this.scene.add(mesh);
-    this.particles.push({ mesh, velocity, life: 0.3, type: 'smoke' });
+    this.particles.push({ mesh, velocity, life: 0.28, type: 'smokeShared' });
   }
 
   // Spawn scorched blast crater decal on floor
@@ -199,20 +255,16 @@ export class VFXManager {
   }
 
   spawnExplosion(pos, color, count, scale) {
-    const mat = new THREE.MeshStandardMaterial({ 
-      color: color, 
-      emissive: color, 
-      emissiveIntensity: 0.65,
-      roughness: 0.25 
-    });
+    const mat = this.getExplosionMaterial(color);
     
     for (let i = 0; i < count; i++) {
       const mesh = new THREE.Mesh(this.cubeGeo, mat);
-      mesh.position.copy(pos);
-      
-      mesh.position.x += (Math.random() - 0.5) * scale;
-      mesh.position.z += (Math.random() - 0.5) * scale;
-      mesh.position.y += Math.random() * scale;
+      mesh.position.set(
+        pos.x + (Math.random() - 0.5) * scale,
+        pos.y + Math.random() * scale,
+        pos.z + (Math.random() - 0.5) * scale
+      );
+      mesh.scale.setScalar(1.0);
 
       const velocity = new THREE.Vector3(
         (Math.random() - 0.5) * 16,
@@ -230,50 +282,52 @@ export class VFXManager {
   }
 
   spawnRicochetSpark(pos) {
-    const mat = new THREE.MeshBasicMaterial({ color: 0xFFE082 });
-    for (let i = 0; i < 8; i++) {
-      const mesh = new THREE.Mesh(this.smallSparkGeo, mat);
+    for (let i = 0; i < 7; i++) {
+      const mesh = new THREE.Mesh(this.smallSparkGeo, this.sparkMat);
       mesh.position.copy(pos);
+      mesh.scale.setScalar(1.0);
       const velocity = new THREE.Vector3(
         (Math.random() - 0.5) * 11,
         Math.random() * 7 + 2.5,
         (Math.random() - 0.5) * 11
       );
       this.scene.add(mesh);
-      this.particles.push({ mesh, velocity, life: 0.28, type: 'spark' });
+      this.particles.push({ mesh, velocity, life: 0.26, type: 'spark' });
     }
     this.spawnShockwave(pos, 0xFFE082, 2.6);
   }
 
   spawnMuzzleEffect(pos, rotationY) {
-      const count = 6;
-      const mat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.7 });
-      const geo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
-
-      const dir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
+      const count = 5;
+      _tempDir.set(0, 0, 1).applyAxisAngle(_upAxis, rotationY);
 
       for (let i = 0; i < count; i++) {
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.copy(pos);
-          mesh.position.add(new THREE.Vector3((Math.random()-0.5)*0.25, (Math.random()-0.5)*0.25, (Math.random()-0.5)*0.25));
+          const mesh = new THREE.Mesh(this.muzzleBoxGeo, this.muzzleSmokeMat);
+          mesh.position.set(
+              pos.x + (Math.random() - 0.5) * 0.25,
+              pos.y + (Math.random() - 0.5) * 0.25,
+              pos.z + (Math.random() - 0.5) * 0.25
+          );
+          mesh.scale.setScalar(1.0);
 
-          const velocity = dir.clone().multiplyScalar(5 + Math.random() * 3.5); 
-          velocity.x += (Math.random() - 0.5) * 1.2;
-          velocity.y += (Math.random() * 1.6);
-          velocity.z += (Math.random() - 0.5) * 1.2;
+          const spd = 5 + Math.random() * 3.5;
+          const velocity = new THREE.Vector3(
+              _tempDir.x * spd + (Math.random() - 0.5) * 1.2,
+              Math.random() * 1.6,
+              _tempDir.z * spd + (Math.random() - 0.5) * 1.2
+          );
 
           this.scene.add(mesh);
-          this.particles.push({ mesh, velocity, life: 0.35, type: 'smoke' });
+          this.particles.push({ mesh, velocity, life: 0.3, type: 'smokeShared' });
       }
 
-      const flashGeo = new THREE.SphereGeometry(0.48, 8, 8);
-      const flashMat = new THREE.MeshBasicMaterial({ color: 0xFFF59D, transparent: true, opacity: 0.95 });
-      const flash = new THREE.Mesh(flashGeo, flashMat);
+      const flash = new THREE.Mesh(this.muzzleFlashGeo, this.muzzleFlashMat);
       flash.position.copy(pos);
+      flash.scale.setScalar(1.0);
       this.scene.add(flash);
-      this.particles.push({ mesh: flash, velocity: new THREE.Vector3(), life: 0.06, type: 'flash' });
+      this.particles.push({ mesh: flash, velocity: null, life: 0.06, type: 'flash' });
 
-      this.spawnLightFlash(pos, 0xFFE082, 3.5, 14, 0.1);
+      this.spawnLightFlash(pos, 0xFFE082, 3.2, 14, 0.09);
   }
 
   spawnShockwave(pos, color, maxRadius) {
@@ -291,7 +345,7 @@ export class VFXManager {
       mesh.position.y = 0.12;
       
       this.scene.add(mesh);
-      this.shockwaves.push({ mesh, speed: 18, maxRadius, age: 0 });
+      this.shockwaves.push({ mesh, mat, speed: 18, maxRadius, age: 0 });
   }
 
   // Soft, subtle tank tread marks that fade out smoothly and quickly (~2.1s)
@@ -311,7 +365,7 @@ export class VFXManager {
       }
 
       const offset = 1.45;
-      const rightVec = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
+      _tempRight.set(1, 0, 0).applyAxisAngle(_upAxis, rotationY);
       const maxAge = 2.1; // Short, clean lifetime
       const baseOpacity = 0.22; // Very subtle & soft
 
@@ -324,10 +378,11 @@ export class VFXManager {
               depthWrite: false
           });
           const mesh = new THREE.Mesh(this.trackGeo, mat);
-          const treadPos = pos.clone().add(rightVec.clone().multiplyScalar(sideOffset));
-          
-          mesh.position.copy(treadPos);
-          mesh.position.y = 0.03;
+          mesh.position.set(
+              pos.x + _tempRight.x * sideOffset,
+              0.03,
+              pos.z + _tempRight.z * sideOffset
+          );
           mesh.rotation.x = -Math.PI / 2;
           mesh.rotation.z = rotationY;
 
@@ -363,12 +418,11 @@ export class VFXManager {
   }
 
   spawnPowerUpBurst(pos, color = 0x00E5FF) {
-      const count = 26;
-      const mat = new THREE.MeshBasicMaterial({ color: color });
-      const starGeo = new THREE.BoxGeometry(0.26, 0.26, 0.26);
+      const count = 24;
+      const mat = this.getExplosionMaterial(color);
 
       for (let i = 0; i < count; i++) {
-          const mesh = new THREE.Mesh(starGeo, mat);
+          const mesh = new THREE.Mesh(this.starGeo, mat);
           mesh.position.copy(pos);
           mesh.position.y += 0.8;
 
@@ -472,7 +526,7 @@ export class VFXManager {
   }
 
   update(dt) {
-      // 1. Particles
+      // 1. Particles (Zero Vector3 clone allocations!)
       for (let i = this.particles.length - 1; i >= 0; i--) {
           const p = this.particles[i];
           p.life -= dt;
@@ -483,7 +537,7 @@ export class VFXManager {
           } else {
               if (p.type === 'cube' || p.type === 'spark') {
                   p.velocity.y -= 32 * dt;
-                  p.mesh.position.add(p.velocity.clone().multiplyScalar(dt));
+                  p.mesh.position.addScaledVector(p.velocity, dt);
                   p.mesh.rotation.x += dt * 4.5;
                   p.mesh.rotation.z += dt * 4.5;
                   
@@ -496,7 +550,7 @@ export class VFXManager {
                   if (p.life < 0.25) p.mesh.scale.setScalar(p.life / 0.25);
               } else if (p.type === 'wreckage') {
                   p.velocity.y -= 28 * dt;
-                  p.mesh.position.add(p.velocity.clone().multiplyScalar(dt));
+                  p.mesh.position.addScaledVector(p.velocity, dt);
                   if (p.rotVel) {
                       p.mesh.rotation.x += p.rotVel.x * dt;
                       p.mesh.rotation.y += p.rotVel.y * dt;
@@ -513,9 +567,13 @@ export class VFXManager {
                       if (p.rotVel) p.rotVel.multiplyScalar(0.65);
                   }
                   if (p.life < 0.35) p.mesh.scale.setScalar(p.life / 0.35);
+              } else if (p.type === 'smokeShared') {
+                  p.velocity.multiplyScalar(0.95);
+                  p.mesh.position.addScaledVector(p.velocity, dt);
+                  p.mesh.scale.setScalar(Math.max(0.05, (p.life / 0.3) * 1.15));
               } else if (p.type === 'smoke') {
                   p.velocity.multiplyScalar(0.95);
-                  p.mesh.position.add(p.velocity.clone().multiplyScalar(dt));
+                  p.mesh.position.addScaledVector(p.velocity, dt);
                   p.mesh.scale.addScalar(dt * 2.2);
                   p.mesh.material.opacity = Math.max(0, Math.min(0.65, p.life * 0.55));
               }
@@ -533,24 +591,28 @@ export class VFXManager {
           
           if (currentScale >= s.maxRadius) { 
               this.scene.remove(s.mesh);
+              if (s.mat) s.mat.dispose();
               this.shockwaves.splice(i, 1);
           } else {
               s.mesh.material.opacity = 0.88 * (1 - progress);
           }
       }
 
-      // 3. Bullet Tracer Trails
+      // 3. Bullet Tracer Trails (Pooled — zero material dispose/alloc!)
       for (let i = this.bulletTrails.length - 1; i >= 0; i--) {
           const bt = this.bulletTrails[i];
           bt.age += dt;
           if (bt.age >= bt.maxAge) {
-              this.scene.remove(bt.mesh);
-              bt.mat.dispose();
+              bt.mesh.visible = false;
+              if (this.trailPool.length < 120) {
+                  this.trailPool.push(bt.mesh);
+              } else {
+                  this.scene.remove(bt.mesh);
+              }
               this.bulletTrails.splice(i, 1);
           } else {
               const ratio = 1 - (bt.age / bt.maxAge);
               bt.mesh.scale.setScalar(ratio);
-              bt.mat.opacity = 0.65 * ratio;
           }
       }
 
@@ -574,15 +636,14 @@ export class VFXManager {
           }
       }
 
-      // 5. Dynamic PointLight Flashes
-      for (let i = this.flashLights.length - 1; i >= 0; i--) {
-          const fl = this.flashLights[i];
-          fl.age += dt;
-          if (fl.age >= fl.duration) {
-              this.scene.remove(fl.light);
-              this.flashLights.splice(i, 1);
+      // 5. Permanent Pooled PointLight Flash Fade
+      if (this.activeFlash && this.pooledFlashLight) {
+          this.activeFlash.age += dt;
+          if (this.activeFlash.age >= this.activeFlash.duration) {
+              this.pooledFlashLight.intensity = 0;
+              this.activeFlash = null;
           } else {
-              fl.light.intensity = fl.maxIntensity * (1 - fl.age / fl.duration);
+              this.pooledFlashLight.intensity = this.activeFlash.maxIntensity * (1 - this.activeFlash.age / this.activeFlash.duration);
           }
       }
 
@@ -608,6 +669,7 @@ export class VFXManager {
           m.age += dt;
           if (m.age >= m.maxAge) {
               this.scene.remove(m.mesh);
+              if (m.mat) m.mat.dispose();
               this.markers.splice(i, 1);
           } else if (m.age > m.maxAge - 1.5) {
               const fade = (m.maxAge - m.age) / 1.5;
@@ -622,18 +684,34 @@ export class VFXManager {
           this.scene.remove(t.mesh);
           if (t.mat) t.mat.dispose();
       });
-      this.shockwaves.forEach(s => this.scene.remove(s.mesh));
-      this.markers.forEach(m => this.scene.remove(m.mesh));
+      this.shockwaves.forEach(s => {
+          this.scene.remove(s.mesh);
+          if (s.mat) s.mat.dispose();
+      });
+      this.markers.forEach(m => {
+          this.scene.remove(m.mesh);
+          if (m.mat) m.mat.dispose();
+      });
       this.bulletTrails.forEach(bt => {
-          this.scene.remove(bt.mesh);
-          bt.mat.dispose();
+          bt.mesh.visible = false;
+          if (this.trailPool.length < 120) {
+              this.trailPool.push(bt.mesh);
+          } else {
+              this.scene.remove(bt.mesh);
+          }
       });
       this.floatingTexts.forEach(ft => {
           this.scene.remove(ft.sprite);
           ft.tex.dispose();
           ft.mat.dispose();
       });
-      this.flashLights.forEach(fl => this.scene.remove(fl.light));
+      if (this.pooledFlashLight) {
+          this.pooledFlashLight.intensity = 0;
+          if (!this.pooledFlashLight.parent) {
+              this.scene.add(this.pooledFlashLight);
+          }
+      }
+      this.activeFlash = null;
 
       this.particles = [];
       this.tracks = [];
@@ -641,6 +719,6 @@ export class VFXManager {
       this.markers = [];
       this.bulletTrails = [];
       this.floatingTexts = [];
-      this.flashLights = [];
   }
 }
+
