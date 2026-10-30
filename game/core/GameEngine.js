@@ -246,176 +246,355 @@ export class GameEngine {
 
   toggleNightMode() {
     this.nightModeOverride = !this.nightModeOverride;
-    this.applyBiomeLighting(this.currentBiome);
+    this.applyBiomeLighting(this.currentBiome, false);
     this.stats.isNightMode = this.isNightStealthActive();
     this.updateUI();
     return this.stats.isNightMode;
   }
 
-  applyBiomeLighting(biome) {
+  applyBiomeLighting(biome, fromLevelLoad = false) {
     if (!this.ambientLight || !this.dirLight) return;
 
-    if (biome === 'night_stealth' || this.nightModeOverride) {
-      // Tactical Moonlit Night Stealth: Crisp silver-blue moonlight so all 3D walls, bevels, and tanks remain clearly readable while searchlight beams pop!
-      this.scene.background = new THREE.Color(0x0b1326);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x0b1326);
-      this.ambientLight.color.setHex(0x90caf9);
-      this.ambientLight.groundColor.setHex(0x1e293b);
-      this.ambientLight.intensity = 0.78;
-      this.dirLight.color.setHex(0xb3e5fc);
-      this.dirLight.intensity = 1.12;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x64b5f6);
-        this.fillLight.intensity = 0.50;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x0f172a);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x090f1d);
-      this.baseAmbientIntensity = this.ambientLight.intensity;
-      this.baseDirIntensity = this.dirLight.intensity;
-      this.stageLightBoost = 0;
-      return;
-    }
+    const isNight = (biome === 'night_stealth' || this.nightModeOverride);
 
-    if (biome === 'workshop') {
-      // Rich warm golden sunlight over vivid green meadow & oak table
-      this.scene.background = new THREE.Color(0xc8beae);
-      if (this.scene.fog) this.scene.fog.color.setHex(0xc8beae);
-      this.ambientLight.color.setHex(0xfff8e7);
-      this.ambientLight.groundColor.setHex(0x5d4037);
-      this.ambientLight.intensity = 0.85;
-      this.dirLight.color.setHex(0xffecb3);
-      this.dirLight.intensity = 1.55;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x90caf9);
-        this.fillLight.intensity = 0.45;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0xb8a996);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x9c8c78);
+    let target = {
+      bgColor: 0xc8beae,
+      ambientColor: 0xfff8e7,
+      groundColor: 0x5d4037,
+      ambientIntensity: 0.85,
+      dirColor: 0xffecb3,
+      dirIntensity: 1.55,
+      fillColor: 0x90caf9,
+      fillIntensity: 0.45,
+      tableColor: 0xb8a996,
+      deskMatColor: 0x9c8c78,
+      landscapeTint: 0xffffff,
+      floorTint: 0xffffff,
+      exposure: 1.22,
+      envIntensity: 0.72
+    };
+
+    if (isNight) {
+      // Authentic Moonlit Night Stealth: Deep nocturnal atmosphere where ambient light dims down smoothly while 3D wall bevels, silhouettes, and searchlight cones remain crisp and readable!
+      target = {
+        bgColor: 0x050a14,
+        ambientColor: 0x38bdf8,
+        groundColor: 0x040812,
+        ambientIntensity: 0.24,
+        dirColor: 0x7dd3fc,
+        dirIntensity: 0.36,
+        fillColor: 0x2563eb,
+        fillIntensity: 0.24,
+        tableColor: 0x070d19,
+        deskMatColor: 0x050912,
+        landscapeTint: biome === 'night_stealth' ? 0x64748b : 0x1e293b,
+        floorTint: biome === 'night_stealth' ? 0x829ab8 : 0x334155,
+        exposure: 0.78,
+        envIntensity: 0.14
+      };
+    } else if (biome === 'workshop') {
+      target = {
+        bgColor: 0xc8beae,
+        ambientColor: 0xfff8e7,
+        groundColor: 0x5d4037,
+        ambientIntensity: 0.85,
+        dirColor: 0xffecb3,
+        dirIntensity: 1.55,
+        fillColor: 0x90caf9,
+        fillIntensity: 0.45,
+        tableColor: 0xb8a996,
+        deskMatColor: 0x9c8c78,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.22,
+        envIntensity: 0.72
+      };
     } else if (biome === 'desert') {
-      // Vibrant golden-hour desert sun with rich amber shadows
-      this.scene.background = new THREE.Color(0xeccfa2);
-      if (this.scene.fog) this.scene.fog.color.setHex(0xeccfa2);
-      this.ambientLight.color.setHex(0xfff3e0);
-      this.ambientLight.groundColor.setHex(0x8d5524);
-      this.ambientLight.intensity = 0.88;
-      this.dirLight.color.setHex(0xffd54f);
-      this.dirLight.intensity = 1.65;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x4dd0e1);
-        this.fillLight.intensity = 0.42;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0xe0be8b);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0xc8a16b);
+      target = {
+        bgColor: 0xeccfa2,
+        ambientColor: 0xfff3e0,
+        groundColor: 0x8d5524,
+        ambientIntensity: 0.88,
+        dirColor: 0xffd54f,
+        dirIntensity: 1.65,
+        fillColor: 0x4dd0e1,
+        fillIntensity: 0.42,
+        tableColor: 0xe0be8b,
+        deskMatColor: 0xc8a16b,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.22,
+        envIntensity: 0.75
+      };
     } else if (biome === 'cyber') {
-      // Deep high-contrast synthwave cyber-grid with electric cyan & magenta lighting
-      this.scene.background = new THREE.Color(0x0b1324);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x0b1324);
-      this.ambientLight.color.setHex(0x80deea);
-      this.ambientLight.groundColor.setHex(0x111827);
-      this.ambientLight.intensity = 0.85;
-      this.dirLight.color.setHex(0x00e5ff);
-      this.dirLight.intensity = 1.45;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0xd500f9);
-        this.fillLight.intensity = 0.55;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x111c2d);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x0b1320);
+      target = {
+        bgColor: 0x0b1324,
+        ambientColor: 0x80deea,
+        groundColor: 0x111827,
+        ambientIntensity: 0.85,
+        dirColor: 0x00e5ff,
+        dirIntensity: 1.45,
+        fillColor: 0xd500f9,
+        fillIntensity: 0.55,
+        tableColor: 0x111c2d,
+        deskMatColor: 0x0b1320,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.18,
+        envIntensity: 0.65
+      };
     } else if (biome === 'arctic') {
-      // Crisp high-contrast alpine glacier: warm sunlight vs deep sapphire-blue shadow tones (never bleached!)
-      this.scene.background = new THREE.Color(0xb3e5fc);
-      if (this.scene.fog) this.scene.fog.color.setHex(0xb3e5fc);
-      this.ambientLight.color.setHex(0xe1f5fe);
-      this.ambientLight.groundColor.setHex(0x0277bd);
-      this.ambientLight.intensity = 0.82;
-      this.dirLight.color.setHex(0xfff9c4);
-      this.dirLight.intensity = 1.48;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x29b6f6);
-        this.fillLight.intensity = 0.48;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x90caf9);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x64b5f6);
+      target = {
+        bgColor: 0xb3e5fc,
+        ambientColor: 0xe1f5fe,
+        groundColor: 0x0277bd,
+        ambientIntensity: 0.82,
+        dirColor: 0xfff9c4,
+        dirIntensity: 1.48,
+        fillColor: 0x29b6f6,
+        fillIntensity: 0.48,
+        tableColor: 0x90caf9,
+        deskMatColor: 0x64b5f6,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.20,
+        envIntensity: 0.70
+      };
     } else if (biome === 'volcano') {
-      // Dramatic obsidian caldera with intense molten orange-red directional glow
-      this.scene.background = new THREE.Color(0x2b110c);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x2b110c);
-      this.ambientLight.color.setHex(0xff8a65);
-      this.ambientLight.groundColor.setHex(0x210b07);
-      this.ambientLight.intensity = 0.92;
-      this.dirLight.color.setHex(0xff6d00);
-      this.dirLight.intensity = 1.6;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0xffd600);
-        this.fillLight.intensity = 0.5;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x2d140e);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x1f0d09);
+      target = {
+        bgColor: 0x2b110c,
+        ambientColor: 0xff8a65,
+        groundColor: 0x210b07,
+        ambientIntensity: 0.92,
+        dirColor: 0xff6d00,
+        dirIntensity: 1.6,
+        fillColor: 0xffd600,
+        fillIntensity: 0.5,
+        tableColor: 0x2d140e,
+        deskMatColor: 0x1f0d09,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.20,
+        envIntensity: 0.68
+      };
     } else if (biome === 'sunset_city') {
-      // Twilight sunset-to-night metropolis: warm golden-coral sunset rays vs deep dusk violet-indigo shadows
-      this.scene.background = new THREE.Color(0x241438);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x241438);
-      this.ambientLight.color.setHex(0xffb74d);
-      this.ambientLight.groundColor.setHex(0x281845);
-      this.ambientLight.intensity = 0.9;
-      this.dirLight.color.setHex(0xff6e40);
-      this.dirLight.intensity = 1.65;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x7c4dff);
-        this.fillLight.intensity = 0.56;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x1f1630);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x140e22);
+      target = {
+        bgColor: 0x241438,
+        ambientColor: 0xffb74d,
+        groundColor: 0x281845,
+        ambientIntensity: 0.9,
+        dirColor: 0xff6e40,
+        dirIntensity: 1.65,
+        fillColor: 0x7c4dff,
+        fillIntensity: 0.56,
+        tableColor: 0x1f1630,
+        deskMatColor: 0x140e22,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.18,
+        envIntensity: 0.65
+      };
     } else if (biome === 'matsuri') {
-      // Festive Japanese Night Festival (Matsuri): warm golden-crimson paper lantern glow & sakura pink rim light
-      this.scene.background = new THREE.Color(0x160f29);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x160f29);
-      this.ambientLight.color.setHex(0xffcc80);
-      this.ambientLight.groundColor.setHex(0x311b32);
-      this.ambientLight.intensity = 0.92;
-      this.dirLight.color.setHex(0xffab40);
-      this.dirLight.intensity = 1.62;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0xff80ab);
-        this.fillLight.intensity = 0.55;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x28152b);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x1a0d1c);
+      target = {
+        bgColor: 0x160f29,
+        ambientColor: 0xffcc80,
+        groundColor: 0x311b32,
+        ambientIntensity: 0.92,
+        dirColor: 0xffab40,
+        dirIntensity: 1.62,
+        fillColor: 0xff80ab,
+        fillIntensity: 0.55,
+        tableColor: 0x28152b,
+        deskMatColor: 0x1a0d1c,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.18,
+        envIntensity: 0.65
+      };
     } else if (biome === 'tropical_island') {
-      // Sun-drenched Caribbean / Polynesian paradise island: bright tropical sunlight & turquoise lagoon bounce
-      this.scene.background = new THREE.Color(0x80deea);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x80deea);
-      this.ambientLight.color.setHex(0xfffde7);
-      this.ambientLight.groundColor.setHex(0x00838f);
-      this.ambientLight.intensity = 0.94;
-      this.dirLight.color.setHex(0xfff59d);
-      this.dirLight.intensity = 1.65;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x00e5ff);
-        this.fillLight.intensity = 0.52;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0xf5d799);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0xe6c278);
+      // Warm Golden-Orange Tropical Sunset Beach: Rich toasted sand & amber-orange glow (never washed-out white!)
+      target = {
+        bgColor: 0xe08e45,
+        ambientColor: 0xffb74d,
+        groundColor: 0x8d4e1f,
+        ambientIntensity: 0.68,
+        dirColor: 0xff9800,
+        dirIntensity: 1.25,
+        fillColor: 0xff7043,
+        fillIntensity: 0.36,
+        tableColor: 0xd98a3c,
+        deskMatColor: 0xb86b23,
+        landscapeTint: 0xf2b476,
+        floorTint: 0xf7c88e,
+        exposure: 1.04,
+        envIntensity: 0.36
+      };
     } else { // jungle
-      // Lush emerald rainforest & golden El Dorado sunbeams
-      this.scene.background = new THREE.Color(0x1b3b2b);
-      if (this.scene.fog) this.scene.fog.color.setHex(0x1b3b2b);
-      this.ambientLight.color.setHex(0xc8e6c9);
-      this.ambientLight.groundColor.setHex(0x1b5e20);
-      this.ambientLight.intensity = 0.9;
-      this.dirLight.color.setHex(0xffe082);
-      this.dirLight.intensity = 1.6;
-      if (this.fillLight) {
-        this.fillLight.color.setHex(0x00e676);
-        this.fillLight.intensity = 0.48;
-      }
-      if (this.tableMesh) this.tableMesh.material.color.setHex(0x204632);
-      if (this.deskMatMesh) this.deskMatMesh.material.color.setHex(0x163324);
+      target = {
+        bgColor: 0x1b3b2b,
+        ambientColor: 0xc8e6c9,
+        groundColor: 0x1b5e20,
+        ambientIntensity: 0.9,
+        dirColor: 0xffe082,
+        dirIntensity: 1.6,
+        fillColor: 0x00e676,
+        fillIntensity: 0.48,
+        tableColor: 0x204632,
+        deskMatColor: 0x163324,
+        landscapeTint: 0xffffff,
+        floorTint: 0xffffff,
+        exposure: 1.22,
+        envIntensity: 0.72
+      };
     }
 
-    this.baseAmbientIntensity = this.ambientLight.intensity;
-    this.baseDirIntensity = this.dirLight.intensity;
+    this.lightingTarget = {
+      bgColor: new THREE.Color(target.bgColor),
+      ambientColor: new THREE.Color(target.ambientColor),
+      groundColor: new THREE.Color(target.groundColor),
+      ambientIntensity: target.ambientIntensity,
+      dirColor: new THREE.Color(target.dirColor),
+      dirIntensity: target.dirIntensity,
+      fillColor: new THREE.Color(target.fillColor),
+      fillIntensity: target.fillIntensity,
+      tableColor: new THREE.Color(target.tableColor),
+      deskMatColor: new THREE.Color(target.deskMatColor),
+      landscapeTint: new THREE.Color(target.landscapeTint),
+      floorTint: new THREE.Color(target.floorTint),
+      exposure: target.exposure,
+      envIntensity: target.envIntensity
+    };
+
+    this.baseAmbientIntensity = target.ambientIntensity;
+    this.baseDirIntensity = target.dirIntensity;
     this.stageLightBoost = 0;
+
+    if (!this.scene.background || !(this.scene.background instanceof THREE.Color)) {
+      this.scene.background = new THREE.Color(target.bgColor);
+    }
+    if (this.currentEnvIntensity === undefined) {
+      this.currentEnvIntensity = 0.72;
+    }
+
+    // When entering Night Stealth on level load (or coming from a bright menu/biome), seed a strong twilight/daylight ambient start so the player visibly sees the ambient light smoothly dim down into night ("no bruscamente, sino que baje la luz cuando vengamos de una luz ambiental potente")!
+    if (isNight && fromLevelLoad) {
+      this.ambientLight.intensity = Math.max(this.ambientLight.intensity, 0.92);
+      this.dirLight.intensity = Math.max(this.dirLight.intensity, 1.55);
+      if (this.fillLight) this.fillLight.intensity = Math.max(this.fillLight.intensity, 0.52);
+      if (this.renderer) this.renderer.toneMappingExposure = Math.max(this.renderer.toneMappingExposure, 1.24);
+      this.currentEnvIntensity = Math.max(this.currentEnvIntensity, 0.78);
+      if (this.landscapeMat) this.landscapeMat.color.setHex(0xdbeafe);
+      if (this.floorMat) this.floorMat.color.setHex(0xe2e8f0);
+      this.applySceneEnvIntensity(this.currentEnvIntensity);
+    } else if (!isNight && fromLevelLoad) {
+      // For standard daytime biome loads, apply immediately unless transitioning from Night Mode
+      this.scene.background.copy(this.lightingTarget.bgColor);
+      if (this.scene.fog) this.scene.fog.color.copy(this.lightingTarget.bgColor);
+      this.ambientLight.color.copy(this.lightingTarget.ambientColor);
+      this.ambientLight.groundColor.copy(this.lightingTarget.groundColor);
+      this.ambientLight.intensity = target.ambientIntensity;
+      this.dirLight.color.copy(this.lightingTarget.dirColor);
+      this.dirLight.intensity = target.dirIntensity;
+      if (this.fillLight) {
+        this.fillLight.color.copy(this.lightingTarget.fillColor);
+        this.fillLight.intensity = target.fillIntensity;
+      }
+      if (this.tableMesh) this.tableMesh.material.color.copy(this.lightingTarget.tableColor);
+      if (this.deskMatMesh) this.deskMatMesh.material.color.copy(this.lightingTarget.deskMatColor);
+      if (this.landscapeMat) this.landscapeMat.color.copy(this.lightingTarget.landscapeTint);
+      if (this.floorMat) this.floorMat.color.copy(this.lightingTarget.floorTint);
+      if (this.renderer) this.renderer.toneMappingExposure = target.exposure;
+      this.currentEnvIntensity = target.envIntensity;
+      this.applySceneEnvIntensity(this.currentEnvIntensity);
+    }
+  }
+
+  applySceneEnvIntensity(envInt) {
+    if (!this.scene) return;
+    this.scene.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(m => {
+            if (m && 'envMapIntensity' in m) m.envMapIntensity = envInt;
+          });
+        } else if ('envMapIntensity' in obj.material) {
+          obj.material.envMapIntensity = envInt;
+        }
+      }
+    });
+  }
+
+  updateLightingTransition(dt) {
+    if (!this.lightingTarget || !this.ambientLight || !this.dirLight) return;
+
+    // Smooth exponential damping (~2.5 seconds gradual dimming from strong ambient light down to deep night)
+    const speed = 1.35;
+    const alpha = 1.0 - Math.exp(-speed * Math.min(dt, 0.1));
+
+    // Calculate temporary boost if a prism crystal or lighthouse was shot
+    let boostRatio = 0;
+    if (this.stageLightBoost > 0) {
+      this.stageLightBoost = Math.max(0, this.stageLightBoost - dt);
+      boostRatio = this.stageLightBoost / 5.0;
+    }
+
+    const targetAmb = this.lightingTarget.ambientIntensity + (boostRatio * 0.80);
+    const targetDir = this.lightingTarget.dirIntensity + (boostRatio * 0.65);
+    const targetFill = this.lightingTarget.fillIntensity + (boostRatio * 0.25);
+    const targetExp = this.lightingTarget.exposure + (boostRatio * 0.32);
+    const targetEnv = this.lightingTarget.envIntensity + (boostRatio * 0.45);
+
+    this.ambientLight.intensity += (targetAmb - this.ambientLight.intensity) * alpha;
+    this.dirLight.intensity += (targetDir - this.dirLight.intensity) * alpha;
+    this.ambientLight.color.lerp(this.lightingTarget.ambientColor, alpha);
+    this.ambientLight.groundColor.lerp(this.lightingTarget.groundColor, alpha);
+    this.dirLight.color.lerp(this.lightingTarget.dirColor, alpha);
+
+    if (this.fillLight) {
+      this.fillLight.intensity += (targetFill - this.fillLight.intensity) * alpha;
+      this.fillLight.color.lerp(this.lightingTarget.fillColor, alpha);
+    }
+
+    if (this.scene.background && this.scene.background instanceof THREE.Color) {
+      this.scene.background.lerp(this.lightingTarget.bgColor, alpha);
+      if (this.scene.fog) this.scene.fog.color.copy(this.scene.background);
+    }
+
+    if (this.tableMesh && this.tableMesh.material) {
+      this.tableMesh.material.color.lerp(this.lightingTarget.tableColor, alpha);
+    }
+    if (this.deskMatMesh && this.deskMatMesh.material) {
+      this.deskMatMesh.material.color.lerp(this.lightingTarget.deskMatColor, alpha);
+    }
+    if (this.landscapeMat) {
+      this.landscapeMat.color.lerp(this.lightingTarget.landscapeTint, alpha);
+    }
+    if (this.floorMat) {
+      this.floorMat.color.lerp(this.lightingTarget.floorTint, alpha);
+    }
+
+    if (this.renderer) {
+      this.renderer.toneMappingExposure += (targetExp - this.renderer.toneMappingExposure) * alpha;
+    }
+
+    if (this.currentEnvIntensity === undefined) this.currentEnvIntensity = targetEnv;
+    const prevEnv = this.currentEnvIntensity;
+    this.currentEnvIntensity += (targetEnv - this.currentEnvIntensity) * alpha;
+    if (Math.abs(this.currentEnvIntensity - prevEnv) > 0.002) {
+      this.applySceneEnvIntensity(this.currentEnvIntensity);
+    }
+
+    // Smoothly fade in the player tank's tactical nocturnal aura light as the ambient light dims at night
+    if (this.playerNightLight && this.player && this.player.mesh && !this.player.isDead) {
+      this.playerNightLight.position.set(
+        this.player.mesh.position.x,
+        3.2,
+        this.player.mesh.position.z
+      );
+      const isNight = this.isNightStealthActive();
+      const targetPlayerGlow = isNight ? 1.85 : 0.0;
+      this.playerNightLight.intensity += (targetPlayerGlow - this.playerNightLight.intensity) * alpha;
+    }
   }
 
   createWaterTexture(biome) {
@@ -741,6 +920,7 @@ export class GameEngine {
     else if (biome === 'sunset_city') mountainColor = 0x311b47;
     else if (biome === 'matsuri') mountainColor = 0x28183b;
     else if (biome === 'tropical_island') mountainColor = 0x26a69a;
+    else if (biome === 'night_stealth') mountainColor = 0x0a1426;
 
     const mtnMat = new THREE.MeshStandardMaterial({ 
       color: mountainColor, 
@@ -806,6 +986,11 @@ export class GameEngine {
       stoneColor = 0xd7b377;
       railColor = 0xa1662f;
       lanternColor = 0xffea00;
+    } else if (biome === 'night_stealth') {
+      // Dark Midnight Tactical Steel & Cyan Beacon Bridge
+      stoneColor = 0x162238;
+      railColor = 0x0284c7;
+      lanternColor = 0x38bdf8;
     }
 
     const stoneMat = new THREE.MeshStandardMaterial({ 
@@ -987,10 +1172,10 @@ export class GameEngine {
         ctx.fill();
       }
     } else if (biome === 'tropical_island') {
-      // Sun-kissed golden coral beach sand with wave ripples & lush palm grass patches
-      ctx.fillStyle = '#f5d488';
+      // Rich warm golden-orange tropical beach sand with toasted amber dune ripples & terracotta coral accents
+      ctx.fillStyle = '#e09145';
       ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = 'rgba(218, 168, 82, 0.35)';
+      ctx.strokeStyle = 'rgba(176, 96, 26, 0.42)';
       ctx.lineWidth = 3;
       for (let y = 16; y < 256; y += 32) {
         ctx.beginPath();
@@ -999,10 +1184,27 @@ export class GameEngine {
         ctx.stroke();
       }
       for (let i = 0; i < 36; i++) {
-        ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(76, 175, 80, 0.25)';
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(214, 114, 32, 0.42)' : 'rgba(46, 139, 87, 0.32)';
         ctx.beginPath();
         ctx.arc((i * 61) % 256, (i * 97) % 256, 5, 0, Math.PI * 2);
         ctx.fill();
+      }
+    } else if (biome === 'night_stealth') {
+      // Deep nocturnal midnight slate-blue terrain with subtle tactical grid & dark shadow foliage
+      ctx.fillStyle = '#081020';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = 'rgba(15, 28, 52, 0.65)';
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.fillRect(128, 128, 128, 128);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i <= 256; i += 64) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+      }
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(15, 23, 42, 0.5)';
+        ctx.fillRect((i * 47) % 248, (i * 83) % 248, 5, 5);
       }
     } else {
       // Workshop lush alpine meadow grass with subtle clover & tile variation
@@ -1139,6 +1341,7 @@ export class GameEngine {
       map: landscapeTex,
       roughness: 0.86 
     });
+    this.landscapeMat = landscapeMat;
     const landscapeMesh = new THREE.Mesh(landscapeGeo, landscapeMat);
     landscapeMesh.rotation.x = -Math.PI / 2;
     landscapeMesh.position.y = -1.45;
@@ -1165,6 +1368,7 @@ export class GameEngine {
       : biome === 'sunset_city' ? 0x1a1033
       : biome === 'matsuri' ? 0x141229
       : biome === 'tropical_island' ? 0x00acc1
+      : biome === 'night_stealth' ? 0x050d1a
       : 0x014f86;
     const bedMat = new THREE.MeshStandardMaterial({ color: bedColor, roughness: 0.9 });
 
@@ -1236,7 +1440,8 @@ export class GameEngine {
         : biome === 'jungle' ? 0x33691e
         : biome === 'sunset_city' ? 0x334155
         : biome === 'matsuri' ? 0xb71c1c
-        : biome === 'tropical_island' ? 0xf5d799
+        : biome === 'tropical_island' ? 0xd4853b
+        : biome === 'night_stealth' ? 0x162238
         : 0x795548,
       roughness: 0.65
     });
@@ -1303,13 +1508,14 @@ export class GameEngine {
       : biome === 'jungle' ? 0x557153
       : biome === 'sunset_city' ? 0x1e293b
       : biome === 'matsuri' ? 0x4e342e
-      : biome === 'tropical_island' ? 0xe6c278
+      : biome === 'tropical_island' ? 0xc87a32
+      : biome === 'night_stealth' ? 0x111a2e
       : 0x9e9284;
     const roadMat = new THREE.MeshStandardMaterial({
       color: roadColor,
       roughness: 0.78,
-      emissive: biome === 'cyber' ? 0x00e5ff : (biome === 'volcano' ? 0xbf360c : (biome === 'sunset_city' ? 0xff6e40 : 0x000000)),
-      emissiveIntensity: biome === 'cyber' ? 0.15 : (biome === 'volcano' ? 0.12 : (biome === 'sunset_city' ? 0.1 : 0))
+      emissive: biome === 'cyber' ? 0x00e5ff : (biome === 'volcano' ? 0xbf360c : (biome === 'sunset_city' ? 0xff6e40 : (biome === 'night_stealth' ? 0x0284c7 : 0x000000))),
+      emissiveIntensity: biome === 'cyber' ? 0.15 : (biome === 'volcano' ? 0.12 : (biome === 'sunset_city' ? 0.1 : (biome === 'night_stealth' ? 0.12 : 0)))
     });
     const nsRoadGeo = new THREE.BoxGeometry(roadW, 0.22, roadLen);
     const ewRoadGeo = new THREE.BoxGeometry(roadLen, 0.22, roadW);
@@ -2154,41 +2360,45 @@ export class GameEngine {
         ctx.fill();
       }
     } else if (biome === 'tropical_island') {
-      // Sun-drenched Caribbean Coral Beach Sand Tiles with warm sand ripples, turquoise shells & bamboo joints
-      ctx.fillStyle = '#ffe596'; ctx.fillRect(0, 0, 256, 256);
-      ctx.fillStyle = '#f7d574';
-      for (let i = 0; i < 420; i++) ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 2);
-      // Subtle wind-swept beach sand ripple curves
-      ctx.strokeStyle = 'rgba(217, 155, 56, 0.35)'; ctx.lineWidth = 2.5;
+      // Rich Toasted Golden-Orange Beach Sand Tiles ("tono arena, naranjita, no tan iluminado de blanco")
+      ctx.fillStyle = '#e59849'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#db8a37';
+      ctx.fillRect(10, 10, 236, 236);
+      for (let i = 0; i < 420; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(181, 95, 22, 0.35)' : 'rgba(242, 168, 82, 0.35)';
+        ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 2);
+      }
+      // Warm wind-swept orange-amber sand ripple curves
+      ctx.strokeStyle = 'rgba(163, 82, 18, 0.45)'; ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(0, 85); ctx.bezierCurveTo(80, 75, 175, 95, 256, 85);
       ctx.moveTo(0, 175); ctx.bezierCurveTo(80, 165, 175, 185, 256, 175);
       ctx.stroke();
-      // Warm bamboo border
-      ctx.strokeStyle = '#c6842f'; ctx.lineWidth = 5;
+      // Rich toasted bamboo border
+      ctx.strokeStyle = '#9c4d14'; ctx.lineWidth = 5;
       ctx.strokeRect(3, 3, 250, 250);
-      // Turquoise lagoon shell corner accents
-      ctx.fillStyle = '#00bcd4';
+      // Warm coral-orange shell corner accents
+      ctx.fillStyle = '#ff6d00';
       ctx.fillRect(14, 14, 8, 8);
       ctx.fillRect(234, 14, 8, 8);
       ctx.fillRect(14, 234, 8, 8);
       ctx.fillRect(234, 234, 8, 8);
     } else if (biome === 'night_stealth') {
-      // Moonlit Tactical Stealth Base Slate-Blue Floor Tiles: Clear readable geometry at night with silver-cyan tactical grid lines
-      ctx.fillStyle = '#25354d'; ctx.fillRect(0, 0, 256, 256);
-      ctx.fillStyle = '#2d405e';
+      // Deep Nocturnal Stealth Base Slate-Blue Floor Tiles: Genuinely dark night floor where golden searchlights pop while silver-cyan grid lines keep every cell readable!
+      ctx.fillStyle = '#152033'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#1b2942';
       ctx.fillRect(10, 10, 236, 236);
       for (let i = 0; i < 300; i++) {
-        ctx.fillStyle = i % 2 === 0 ? 'rgba(144, 202, 249, 0.12)' : 'rgba(15, 23, 42, 0.35)';
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(56, 189, 248, 0.08)' : 'rgba(9, 14, 26, 0.42)';
         ctx.fillRect(Math.random() * 256, Math.random() * 256, 4, 3);
       }
-      // Crisp moonlit steel-cyan tile border so every cell shape is clearly visible at night
-      ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4;
+      // Subtle moonlit steel-cyan tile border so every cell shape is clearly visible at night without over-brightening
+      ctx.strokeStyle = '#0284c7'; ctx.lineWidth = 4;
       ctx.strokeRect(3, 3, 250, 250);
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)'; ctx.lineWidth = 1.5;
       ctx.strokeRect(16, 16, 224, 224);
       // Subtle tactical corner markers
-      ctx.fillStyle = '#7dd3fc';
+      ctx.fillStyle = '#38bdf8';
       ctx.fillRect(12, 12, 7, 7);
       ctx.fillRect(237, 12, 7, 7);
       ctx.fillRect(12, 237, 7, 7);
@@ -2947,40 +3157,160 @@ export class GameEngine {
       return this.aiDifficulty || 'normal';
   }
 
-  // --- Realistic Scenario-Adaptive Lighthouse Searchlight & Night Stealth System ---
+  // --- Realistic Single-Origin GLSL Lighthouse Searchlight & Night Stealth System ---
 
-  createSearchlightBeamTexture() {
-      if (this.searchlightBeamTex) return this.searchlightBeamTex;
-      const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      // Radial-longitudinal soft falloff: u = 0..1 across cone width (soft feathered edges), v = 0..1 from origin to tip
-      const imgData = ctx.createImageData(128, 128);
-      const data = imgData.data;
-      for (let y = 0; y < 128; y++) {
-          const v = y / 127; // 0 = at lighthouse origin, 1 = outer tip
-          // Smooth longitudinal attenuation that stays bright along the beam and feathers out near the tip
-          const distFade = Math.pow(Math.max(0, 1.0 - v * 0.82), 1.25);
-          for (let x = 0; x < 128; x++) {
-              const u = (x / 127) * 2.0 - 1.0; // -1..+1 across beam width
-              const edgeFade = Math.pow(Math.max(0, 1.0 - u * u), 1.65);
-              const alpha = Math.round(Math.min(1, distFade * edgeFade) * 255);
-              const idx = (y * 128 + x) * 4;
-              data[idx] = 255;
-              data[idx + 1] = 255;
-              data[idx + 2] = 255;
-              data[idx + 3] = alpha;
-          }
-      }
-      ctx.putImageData(imgData, 0, 0);
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.needsUpdate = true;
-      this.searchlightBeamTex = tex;
-      return tex;
+  // Creates the smooth Fresnel volumetric shader material for the upper lantern cone (originating strictly at the top lantern y = 7.65)
+  createUpperBeamMaterial() {
+      return new THREE.ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          uniforms: {
+              uColor: { value: new THREE.Color(0xffe082) },
+              uOpacity: { value: 0.22 }
+          },
+          vertexShader: `
+              varying vec2 vUv;
+              varying vec3 vNormalView;
+              varying vec3 vViewPos;
+              void main() {
+                  vUv = uv;
+                  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                  vViewPos = -mvPosition.xyz;
+                  vNormalView = normalMatrix * normal;
+                  gl_Position = projectionMatrix * mvPosition;
+              }
+          `,
+          fragmentShader: `
+              uniform vec3 uColor;
+              uniform float uOpacity;
+              varying vec2 vUv;
+              varying vec3 vNormalView;
+              varying vec3 vViewPos;
+              void main() {
+                  // vUv.y = 1.0 at the lantern lens apex, 0.0 at the far end of the cylinder
+                  float distFromLens = 1.0 - vUv.y;
+                  // Smooth longitudinal fade: bright near lantern lens, softly vanishes as it meets the ground light pool
+                  float longFade = smoothstep(0.0, 0.08, distFromLens) * pow(clamp(1.0 - distFromLens, 0.0, 1.0), 1.65);
+                  // Smooth view-space Fresnel rim fade so the cone edges never look sharp or striated
+                  vec3 N = normalize(vNormalView);
+                  vec3 V = normalize(vViewPos);
+                  float fresnel = pow(abs(dot(N, V)), 1.45);
+                  float alpha = longFade * (0.32 + 0.68 * fresnel) * uOpacity;
+                  gl_FragColor = vec4(uColor, alpha);
+              }
+          `
+      });
   }
 
-  // Computes exact 2D ray distance from lighthouse (ox, oz) along direction (dx, dz) to the nearest wall, crate, pillar, or border
+  // Creates the per-pixel world-space Ground Searchlight Shader (no cone at the base of the lighthouse, zero radial triangle seams, smooth wall shadows)
+  createGroundSearchlightMaterial(ox, oz, halfCone, maxRange) {
+      const initialDists = new Float32Array(64);
+      initialDists.fill(maxRange);
+      return new THREE.ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          uniforms: {
+              uOrigin: { value: new THREE.Vector2(ox, oz) },
+              uAngle: { value: 0.0 },
+              uHalfCone: { value: halfCone },
+              uMaxRange: { value: maxRange },
+              uColor: { value: new THREE.Color(0xffd54f) },
+              uOpacity: { value: 0.36 },
+              uWallDist: { value: initialDists }
+          },
+          vertexShader: `
+              varying vec3 vWorldPos;
+              void main() {
+                  vec4 wp = modelMatrix * vec4(position, 1.0);
+                  vWorldPos = wp.xyz;
+                  gl_Position = projectionMatrix * viewMatrix * wp;
+              }
+          `,
+          fragmentShader: `
+              uniform vec2 uOrigin;
+              uniform float uAngle;
+              uniform float uHalfCone;
+              uniform float uMaxRange;
+              uniform vec3 uColor;
+              uniform float uOpacity;
+              uniform float uWallDist[64];
+              varying vec3 vWorldPos;
+
+              void main() {
+                  vec2 rel = vWorldPos.xz - uOrigin;
+                  float dist = length(rel);
+
+                  // The beam comes from the TOP lantern (y = 7.65) angled downward, so it only touches the ground starting ~5.5 units away from the tower!
+                  // This guarantees zero light ever comes out of the bottom base of the lighthouse.
+                  if (dist < 4.5 || dist > uMaxRange) discard;
+
+                  // Angle from lighthouse to this floor pixel (matching sin(angle) = X, cos(angle) = Z convention)
+                  float fragAngle = atan(rel.x, rel.y);
+                  float diff = fragAngle - uAngle;
+                  if (diff > 3.14159265) diff -= 6.2831853;
+                  if (diff < -3.14159265) diff += 6.2831853;
+
+                  float absDiff = abs(diff);
+                  if (absDiff > uHalfCone) discard;
+
+                  // Smooth bell-curve angular spotlight profile (zero radial lines!)
+                  float normAngle = absDiff / uHalfCone;
+                  float angularFade = pow(clamp(1.0 - normAngle * normAngle, 0.0, 1.0), 1.85);
+
+                  // Lookup smooth wall occlusion distance across the 64 angular samples
+                  float samplePos = ((diff / uHalfCone) * 0.5 + 0.5) * 63.0;
+                  int idx0 = int(clamp(floor(samplePos), 0.0, 62.0));
+                  int idx1 = idx0 + 1;
+                  float frac = fract(samplePos);
+
+                  float d0 = uWallDist[0];
+                  float d1 = uWallDist[0];
+                  for (int i = 0; i < 64; i++) {
+                      if (i == idx0) d0 = uWallDist[i];
+                      if (i == idx1) d1 = uWallDist[i];
+                  }
+                  float wallDist = mix(d0, d1, frac);
+
+                  // Soft shadow cutoff where the beam hits a wall, crate, pillar, or triangle prism
+                  float wallShadow = 1.0 - smoothstep(wallDist - 1.35, wallDist + 0.35, dist);
+                  if (wallShadow <= 0.005) discard;
+
+                  // Smooth inner ground touch-down (5.0 -> 9.5 units) and outer range attenuation
+                  float innerTouchdown = smoothstep(4.6, 9.2, dist);
+                  float outerFade = 1.0 - smoothstep(12.0, uMaxRange, dist);
+
+                  // Subtle warm hotspot where the main lantern axis hits the floor
+                  float hotspot = exp(-pow((dist - 12.5) / 6.5, 2.0) - pow(normAngle * 1.6, 2.0)) * 0.35;
+
+                  float intensity = (innerTouchdown * outerFade * angularFade + hotspot * innerTouchdown) * wallShadow;
+                  gl_FragColor = vec4(uColor, clamp(intensity * uOpacity, 0.0, 0.75));
+              }
+          `
+      });
+  }
+
+  // Exact 2D ray-vs-segment intersection distance helper (used for triangle prisms 'T')
+  raySegmentDistance(ox, oz, dx, dz, ax, az, bx, bz) {
+      const v1x = ox - ax;
+      const v1z = oz - az;
+      const v2x = bx - ax;
+      const v2z = bz - az;
+      const v3x = -dz;
+      const v3z = dx;
+      const dot = v2x * v3x + v2z * v3z;
+      if (Math.abs(dot) < 1e-6) return Infinity;
+      const t1 = (v2x * v1z - v2z * v1x) / dot;
+      const t2 = (v1x * v3x + v1z * v3z) / dot;
+      if (t1 > 1.8 && t2 >= 0.0 && t2 <= 1.0) {
+          return t1;
+      }
+      return Infinity;
+  }
+
+  // Computes exact 2D ray distance from lighthouse (ox, oz) along direction (dx, dz) to the nearest wall, crate, pillar, triangle prism, or border
   getSearchlightWallDistance(ox, oz, dx, dz, maxDist, ignoreGroup) {
       let closest = maxDist;
       const obstacles = this.walls;
@@ -2988,12 +3318,23 @@ export class GameEngine {
           const w = obstacles[i];
           if (!w || w === ignoreGroup || !w.userData) continue;
 
-          // Circular obstacles (pillars, trees, barrels, other lighthouses)
+          // 1. Triangle Prisms ('T') using exact 2D triangle edges
+          if (w.userData.triPoints && w.userData.triPoints.length === 3) {
+              const pts = w.userData.triPoints;
+              for (let e = 0; e < 3; e++) {
+                  const pA = pts[e];
+                  const pB = pts[(e + 1) % 3];
+                  const t = this.raySegmentDistance(ox, oz, dx, dz, pA.x, pA.z, pB.x, pB.z);
+                  if (t < closest) closest = t;
+              }
+              continue;
+          }
+
+          // 2. Circular obstacles (pillars, trees, barrels, other lighthouses)
           if (w.userData.collisionRadius) {
               const r = w.userData.collisionRadius;
               const fx = ox - w.position.x;
               const fz = oz - w.position.z;
-              // If ray starts inside this circle, skip
               if (fx * fx + fz * fz <= r * r + 0.2) continue;
               const b = 2 * (fx * dx + fz * dz);
               const c = (fx * fx + fz * fz) - r * r;
@@ -3007,7 +3348,7 @@ export class GameEngine {
               continue;
           }
 
-          // Rectangular AABB walls ('W', 'S', 'C', borders)
+          // 3. Rectangular AABB walls ('W', 'S', 'C', borders)
           const box = w.userData.bounds;
           if (!box) continue;
           const invDx = Math.abs(dx) > 1e-6 ? 1.0 / dx : 1e6;
@@ -3021,6 +3362,23 @@ export class GameEngine {
           const tmin = Math.max(Math.min(t1, t2), Math.min(t3, t4));
           const tmax = Math.min(Math.max(t1, t2), Math.max(t3, t4));
 
+          if (tmax >= 0 && tmin <= tmax && tmin > 1.8 && tmin < closest) {
+              closest = tmin;
+          }
+      }
+      // Also check destructible cork crates ('C') not in this.walls
+      for (let i = 0; i < this.destructibles.length; i++) {
+          const d = this.destructibles[i];
+          if (!d || !d.userData || !d.userData.bounds || d.userData.collisionRadius) continue;
+          const box = d.userData.bounds;
+          const invDx = Math.abs(dx) > 1e-6 ? 1.0 / dx : 1e6;
+          const invDz = Math.abs(dz) > 1e-6 ? 1.0 / dz : 1e6;
+          const t1 = (box.min.x - ox) * invDx;
+          const t2 = (box.max.x - ox) * invDx;
+          const t3 = (box.min.z - oz) * invDz;
+          const t4 = (box.max.z - oz) * invDz;
+          const tmin = Math.max(Math.min(t1, t2), Math.min(t3, t4));
+          const tmax = Math.min(Math.max(t1, t2), Math.max(t3, t4));
           if (tmax >= 0 && tmin <= tmax && tmin > 1.8 && tmin < closest) {
               closest = tmin;
           }
@@ -3044,105 +3402,88 @@ export class GameEngine {
           if (!lh || !lh.group) continue;
 
           lh.angle = (lh.angle || 0) - lh.speed * dt;
+          while (lh.angle > Math.PI) lh.angle -= Math.PI * 2;
+          while (lh.angle < -Math.PI) lh.angle += Math.PI * 2;
+
           if (lh.headGroup) {
               lh.headGroup.rotation.y = lh.angle;
           }
 
           const ox = lh.group.position.x;
           const oz = lh.group.position.z;
-          const N = lh.numRays || 24;
-          const halfCone = lh.halfCone || 0.43; // ~24.6 degrees half-angle (49 deg total sweep cone)
-          const maxRange = lh.maxRange || 34.0;
-          const minDeadzone = 2.6;
+          const N = 64;
+          const halfCone = lh.halfCone || 0.42;
+          const maxRange = lh.maxRange || 32.0;
 
-          const floorPos = lh.floorFanGeo.attributes.position.array;
-          const airPos = lh.airBeamGeo.attributes.position.array;
+          const rawDists = lh.rawDists;
+          const smoothDists = lh.smoothDists;
 
-          // Pre-sample occluded wall distance for each of the N+1 rays across the cone
-          const rayDirsX = lh.rayDirsX;
-          const rayDirsZ = lh.rayDirsZ;
-          const rayDists = lh.rayDists;
-
-          let sumDist = 0;
-          for (let r = 0; r <= N; r++) {
-              const frac = (r / N) * 2.0 - 1.0; // -1 .. +1
+          // 1. Sample 64 rays across the searchlight cone
+          for (let r = 0; r < N; r++) {
+              const frac = (r / (N - 1)) * 2.0 - 1.0; // -1 .. +1
               const rayAngle = lh.angle + frac * halfCone;
               const rdx = Math.sin(rayAngle);
               const rdz = Math.cos(rayAngle);
-              rayDirsX[r] = rdx;
-              rayDirsZ[r] = rdz;
-              const hitDist = this.getSearchlightWallDistance(ox, oz, rdx, rdz, maxRange, lh.group);
-              rayDists[r] = hitDist;
-              sumDist += hitDist;
+              rawDists[r] = this.getSearchlightWallDistance(ox, oz, rdx, rdz, maxRange, lh.group);
           }
 
-          // Update Ground Projected Light Fan (y = 0.08) & Soft Volumetric Air Beam (from lantern y = 7.75 to ground y = 0.14)
+          // 2. Apply a 5-tap spatial smoothing filter across the 64 samples so shadow edges are organic and never jagged
+          let centerSum = 0;
+          let centerCount = 0;
           for (let r = 0; r < N; r++) {
-              const vIdx = r * 9;
-              const dx0 = rayDirsX[r];
-              const dz0 = rayDirsZ[r];
-              const d0 = rayDists[r];
-
-              const dx1 = rayDirsX[r + 1];
-              const dz1 = rayDirsZ[r + 1];
-              const d1 = rayDists[r + 1];
-
-              // Floor Triangle r: starts just outside lighthouse base and stops exactly at the wall impact!
-              floorPos[vIdx]     = dx0 * minDeadzone;
-              floorPos[vIdx + 1] = 0.08;
-              floorPos[vIdx + 2] = dz0 * minDeadzone;
-
-              floorPos[vIdx + 3] = dx0 * d0;
-              floorPos[vIdx + 4] = 0.08;
-              floorPos[vIdx + 5] = dz0 * d0;
-
-              floorPos[vIdx + 6] = dx1 * d1;
-              floorPos[vIdx + 7] = 0.08;
-              floorPos[vIdx + 8] = dz1 * d1;
-
-              // Volumetric Air Beam Triangle r: slopes from lantern lens (y = 7.75) down to the occluded ground edge (y = 0.14)
-              airPos[vIdx]     = dx0 * 1.15;
-              airPos[vIdx + 1] = 7.75;
-              airPos[vIdx + 2] = dz0 * 1.15;
-
-              airPos[vIdx + 3] = dx0 * d0;
-              airPos[vIdx + 4] = 0.14;
-              airPos[vIdx + 5] = dz0 * d0;
-
-              airPos[vIdx + 6] = dx1 * d1;
-              airPos[vIdx + 7] = 0.14;
-              airPos[vIdx + 8] = dz1 * d1;
+              const d_2 = rawDists[Math.max(0, r - 2)];
+              const d_1 = rawDists[Math.max(0, r - 1)];
+              const d_0 = rawDists[r];
+              const d1  = rawDists[Math.min(N - 1, r + 1)];
+              const d2  = rawDists[Math.min(N - 1, r + 2)];
+              smoothDists[r] = d_2 * 0.12 + d_1 * 0.24 + d_0 * 0.28 + d1 * 0.24 + d2 * 0.12;
+              if (r >= 24 && r <= 39) {
+                  centerSum += smoothDists[r];
+                  centerCount++;
+              }
           }
 
-          lh.floorFanGeo.attributes.position.needsUpdate = true;
-          lh.airBeamGeo.attributes.position.needsUpdate = true;
+          const centerDist = centerCount > 0 ? (centerSum / centerCount) : maxRange;
 
-          // Position the efficient no-shadow PointLight along the center of the occluded ground light pool so nearby walls & tanks receive real 3D illumination
-          const avgDist = sumDist / (N + 1);
-          const centerX = Math.sin(lh.angle) * Math.min(avgDist * 0.58, 16.0);
-          const centerZ = Math.cos(lh.angle) * Math.min(avgDist * 0.58, 16.0);
+          // 3. Dynamically scale the upper volumetric cone so it connects the top lantern lens (y = 7.65) to the ground pool or stops at a nearby wall
+          if (lh.upperConeMesh) {
+              const coneReach = Math.max(4.5, Math.min(centerDist * 0.78, 19.0));
+              lh.upperConeMesh.scale.set(1.0, 1.0, coneReach / 18.0);
+          }
+
+          // 4. Update Ground Searchlight Shader uniforms
+          if (lh.groundMat && lh.groundMat.uniforms) {
+              lh.groundMat.uniforms.uAngle.value = lh.angle;
+          }
+
+          // 5. Move the efficient no-shadow PointLight to the illuminated ground spot
+          const lightDist = Math.max(5.5, Math.min(centerDist * 0.58, 15.5));
           if (lh.groundPointLight) {
-              lh.groundPointLight.position.set(centerX, 3.2, centerZ);
+              lh.groundPointLight.position.set(
+                  Math.sin(lh.angle) * lightDist,
+                  3.0,
+                  Math.cos(lh.angle) * lightDist
+              );
           }
 
-          // Check if the player tank is inside this lighthouse's unblocked beam
+          // 6. Check if the player tank is inside this lighthouse's unblocked ground beam
           let spottingPlayer = false;
           if (playerPos) {
               const px = playerPos.x - ox;
               const pz = playerPos.z - oz;
               const pDist = Math.hypot(px, pz);
-              if (pDist > minDeadzone + 0.4 && pDist < maxRange + 1.0) {
+              // Matches the ground shader's illuminated zone (dist >= 4.8 up to maxRange)
+              if (pDist >= 4.8 && pDist <= maxRange) {
                   const pAngle = Math.atan2(px, pz);
                   let angleDiff = pAngle - lh.angle;
                   while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
                   while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-                  if (Math.abs(angleDiff) <= halfCone + 0.06) {
-                      // Check wall occlusion along the exact ray from lighthouse to player
+                  if (Math.abs(angleDiff) <= halfCone * 0.92) {
                       const dirX = px / pDist;
                       const dirZ = pz / pDist;
                       const wallDist = this.getSearchlightWallDistance(ox, oz, dirX, dirZ, maxRange, lh.group);
-                      if (pDist <= wallDist + 1.15) {
+                      if (pDist <= wallDist + 1.0) {
                           spottingPlayer = true;
                           playerIlluminatedByAnyLighthouse = true;
                       }
@@ -3150,27 +3491,35 @@ export class GameEngine {
               }
           }
 
-          // Visual feedback on the lighthouse beam: Crimson Alert when spotting the player, Warm Searchlight Gold otherwise
+          // 7. Update Lighthouse Beam Colors (Warm Searchlight Gold vs High-Alert Crimson)
           const isNight = this.isNightStealthActive();
           if (spottingPlayer) {
-              lh.floorFanMat.color.setHex(0xff1744);
-              lh.floorFanMat.opacity = isNight ? 0.62 : 0.46;
-              lh.airBeamMat.color.setHex(0xff1744);
-              lh.airBeamMat.opacity = isNight ? 0.34 : 0.24;
+              if (lh.groundMat) {
+                  lh.groundMat.uniforms.uColor.value.setHex(0xff1744);
+                  lh.groundMat.uniforms.uOpacity.value = isNight ? 0.72 : 0.45;
+              }
+              if (lh.upperConeMat) {
+                  lh.upperConeMat.uniforms.uColor.value.setHex(0xff1744);
+                  lh.upperConeMat.uniforms.uOpacity.value = isNight ? 0.42 : 0.25;
+              }
               if (lh.bulbMat) lh.bulbMat.color.setHex(0xff1744);
               if (lh.groundPointLight) {
                   lh.groundPointLight.color.setHex(0xff1744);
-                  lh.groundPointLight.intensity = isNight ? 5.2 : 3.6;
+                  lh.groundPointLight.intensity = isNight ? 6.2 : 3.4;
               }
           } else {
-              lh.floorFanMat.color.setHex(isNight ? 0xffe57f : 0xffd54f);
-              lh.floorFanMat.opacity = isNight ? 0.48 : 0.32;
-              lh.airBeamMat.color.setHex(isNight ? 0xfff59d : 0xffe082);
-              lh.airBeamMat.opacity = isNight ? 0.24 : 0.15;
+              if (lh.groundMat) {
+                  lh.groundMat.uniforms.uColor.value.setHex(isNight ? 0xffe57f : 0xffd54f);
+                  lh.groundMat.uniforms.uOpacity.value = isNight ? 0.58 : 0.30;
+              }
+              if (lh.upperConeMat) {
+                  lh.upperConeMat.uniforms.uColor.value.setHex(isNight ? 0xfff59d : 0xffe082);
+                  lh.upperConeMat.uniforms.uOpacity.value = isNight ? 0.32 : 0.16;
+              }
               if (lh.bulbMat) lh.bulbMat.color.setHex(0xffffcc);
               if (lh.groundPointLight) {
                   lh.groundPointLight.color.setHex(0xffd54f);
-                  lh.groundPointLight.intensity = isNight ? 4.2 : 2.6;
+                  lh.groundPointLight.intensity = isNight ? 4.8 : 2.4;
               }
           }
       }
@@ -3243,9 +3592,6 @@ export class GameEngine {
     this.currentBiome = biome;
     this.stats.biome = biome;
 
-    // Apply Biome lighting and background
-    this.applyBiomeLighting(biome);
-
     const cellSize = 8; 
     
     const mapW = map[0].length * cellSize;
@@ -3263,7 +3609,11 @@ export class GameEngine {
     // Biome-specific High-Contrast 3D Materials
     this.floorTex = this.createBiomeFloorTexture(biome);
     const floorMat = new THREE.MeshStandardMaterial({ map: this.floorTex, roughness: 0.72 });
+    this.floorMat = floorMat;
     const floorGeo = new THREE.BoxGeometry(cellSize, 1, cellSize); 
+
+    // Apply Biome lighting and smooth nocturnal dimming after floorMat & landscapeMat exist
+    this.applyBiomeLighting(biome, true);
     
     let woodMat, brickMat, borderMat, capMat, foliagePrimaryColor, foliageSecondaryColor;
     if (biome === 'workshop') {
@@ -3317,13 +3667,13 @@ export class GameEngine {
         foliagePrimaryColor = 0xff80ab;
         foliageSecondaryColor = 0xf8bbd0;
     } else if (biome === 'tropical_island') {
-        // Warm Tropical Bamboo, Tiki Hardwood & Coral Limestone
-        woodMat = new THREE.MeshStandardMaterial({ color: 0xd99b26, roughness: 0.45 });
-        capMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, roughness: 0.28 });
-        brickMat = new THREE.MeshStandardMaterial({ color: 0xf5d799, map: this.createBrickTexture(), roughness: 0.55 });
-        borderMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.5 });
-        foliagePrimaryColor = 0x10b981;
-        foliageSecondaryColor = 0x34d399;
+        // Warm Toasted Sand, Terracotta Amber & Tropical Teak Hardwood ("tono arena, naranjita, no tan iluminado de blanco")
+        woodMat = new THREE.MeshStandardMaterial({ color: 0xc87225, roughness: 0.48 });
+        capMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35 });
+        brickMat = new THREE.MeshStandardMaterial({ color: 0xd98032, map: this.createBrickTexture(), roughness: 0.58 });
+        borderMat = new THREE.MeshStandardMaterial({ color: 0x7c3f16, roughness: 0.52 });
+        foliagePrimaryColor = 0x15803d;
+        foliageSecondaryColor = 0x22c55e;
     } else if (biome === 'night_stealth') {
         // Moonlit Tactical Stealth Operations: High-contrast steel-indigo walls with luminous cyan bevel caps so all 3D shapes are clearly visible at night!
         woodMat = new THREE.MeshStandardMaterial({ color: 0x2b3d59, metalness: 0.45, roughness: 0.32, emissive: 0x0f1f38, emissiveIntensity: 0.35 });
@@ -3469,6 +3819,12 @@ export class GameEngine {
            this.player = new PlayerTank(this.scene, x, z, this.input, this.playerSkin, this.playerPerk);
            this.player.mesh.rotation.y = Math.PI;
            this.entities.push(this.player);
+
+           // Subtle nocturnal tactical aura light that smoothly fades in as ambient light dims at night
+           this.playerNightLight = new THREE.PointLight(0x38bdf8, 0, 15, 1.45);
+           this.playerNightLight.position.set(x, 3.2, z);
+           this.playerNightLight.castShadow = false;
+           this.scene.add(this.playerNightLight);
         } else if (type === 'W') {
             const m = new THREE.Mesh(blockGeo, woodMat);
             m.position.set(x, 2, z);
@@ -3542,7 +3898,7 @@ export class GameEngine {
             };
             this.scene.add(m);
             this.walls.push(m);
-        } else if (type === 'L') { // Realistic Scenario-Adaptive Lighthouse / Searchlight Tower
+        } else if (type === 'L') { // Realistic Single-Origin GLSL Lighthouse Searchlight Tower
             const grp = new THREE.Group();
             grp.position.set(x, 0, z);
             
@@ -3571,82 +3927,49 @@ export class GameEngine {
             roof.castShadow = true;
             grp.add(roof);
 
-            // Rotating Searchlight Head housing & glowing lens
+            // Rotating Searchlight Head housing & glowing lens (strictly at the top lantern y = 7.65)
             const headGroup = new THREE.Group();
-            headGroup.position.y = 7.75;
+            headGroup.position.y = 7.65;
             grp.add(headGroup);
 
             const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
-            const bulb = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 1.2, 12), bulbMat);
+            const bulb = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.1, 16), bulbMat);
             bulb.rotation.x = Math.PI / 2;
-            bulb.position.z = 0.65;
+            bulb.position.z = 0.7;
             bulb.userData = { isEffect: true };
             bulb.raycast = () => {};
             headGroup.add(bulb);
 
-            // Dynamic Wall-Occluded Ground Light Sector + Volumetric Air Beam
-            const N_RAYS = 24;
-            const beamTex = this.createSearchlightBeamTexture();
-            const floorPositions = new Float32Array(N_RAYS * 9);
-            const airPositions = new Float32Array(N_RAYS * 9);
-            const beamUVs = new Float32Array(N_RAYS * 6);
+            // 1. Upper Volumetric Cone (originates ONLY at the top lantern y = 7.65, tilted downward toward the floor pool)
+            const coneLen = 18.0;
+            const upperConeGeo = new THREE.CylinderGeometry(0.65, 5.2, coneLen, 36, 1, true);
+            upperConeGeo.rotateX(-Math.PI / 2);
+            upperConeGeo.translate(0, 0, coneLen / 2);
+            const upperConeMat = this.createUpperBeamMaterial();
+            const upperConeMesh = new THREE.Mesh(upperConeGeo, upperConeMat);
+            upperConeMesh.position.set(0, 0, 1.0);
+            upperConeMesh.rotation.x = 0.36; // Angles downward from the top lantern to the ground pool
+            upperConeMesh.frustumCulled = false;
+            upperConeMesh.userData = { isEffect: true };
+            upperConeMesh.raycast = () => {};
+            headGroup.add(upperConeMesh);
 
-            for (let r = 0; r < N_RAYS; r++) {
-                const u0 = r / N_RAYS;
-                const u1 = (r + 1) / N_RAYS;
-                const uvIdx = r * 6;
-                // Vertex 0: near origin (v = 0)
-                beamUVs[uvIdx]     = 0.5;
-                beamUVs[uvIdx + 1] = 0.0;
-                // Vertex 1: outer ray r (v = 1)
-                beamUVs[uvIdx + 2] = u0;
-                beamUVs[uvIdx + 3] = 1.0;
-                // Vertex 2: outer ray r+1 (v = 1)
-                beamUVs[uvIdx + 4] = u1;
-                beamUVs[uvIdx + 5] = 1.0;
-            }
+            // 2. Per-Pixel Ground Searchlight Projection Shader on the Floor (y = 0.05)
+            const halfCone = 0.42;
+            const maxRange = 32.0;
+            const groundGeo = new THREE.PlaneGeometry(maxRange * 2.1, maxRange * 2.1);
+            groundGeo.rotateX(-Math.PI / 2);
+            const groundMat = this.createGroundSearchlightMaterial(x, z, halfCone, maxRange);
+            const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+            groundMesh.position.set(0, 0.05, 0);
+            groundMesh.frustumCulled = false;
+            groundMesh.userData = { isEffect: true };
+            groundMesh.raycast = () => {};
+            grp.add(groundMesh);
 
-            const floorFanGeo = new THREE.BufferGeometry();
-            floorFanGeo.setAttribute('position', new THREE.BufferAttribute(floorPositions, 3));
-            floorFanGeo.setAttribute('uv', new THREE.BufferAttribute(beamUVs, 2));
-
-            const floorFanMat = new THREE.MeshBasicMaterial({
-                color: 0xffd54f,
-                map: beamTex,
-                transparent: true,
-                opacity: 0.38,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending
-            });
-            const floorFanMesh = new THREE.Mesh(floorFanGeo, floorFanMat);
-            floorFanMesh.frustumCulled = false;
-            floorFanMesh.userData = { isEffect: true };
-            floorFanMesh.raycast = () => {};
-            grp.add(floorFanMesh);
-
-            const airBeamGeo = new THREE.BufferGeometry();
-            airBeamGeo.setAttribute('position', new THREE.BufferAttribute(airPositions, 3));
-            airBeamGeo.setAttribute('uv', new THREE.BufferAttribute(beamUVs, 2));
-
-            const airBeamMat = new THREE.MeshBasicMaterial({
-                color: 0xffe082,
-                map: beamTex,
-                transparent: true,
-                opacity: 0.18,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending
-            });
-            const airBeamMesh = new THREE.Mesh(airBeamGeo, airBeamMat);
-            airBeamMesh.frustumCulled = false;
-            airBeamMesh.userData = { isEffect: true };
-            airBeamMesh.raycast = () => {};
-            grp.add(airBeamMesh);
-
-            // Single efficient PointLight (castShadow = false) that glides along the illuminated floor zone
-            const groundPointLight = new THREE.PointLight(0xffd54f, 3.2, 28, 1.35);
-            groundPointLight.position.set(0, 3.2, 10);
+            // 3. Single efficient PointLight (castShadow = false) that glides along the illuminated floor zone
+            const groundPointLight = new THREE.PointLight(0xffd54f, 3.0, 26, 1.35);
+            groundPointLight.position.set(0, 3.0, 11);
             groundPointLight.castShadow = false;
             grp.add(groundPointLight);
 
@@ -3654,23 +3977,21 @@ export class GameEngine {
             grp.updateMatrixWorld(true);
 
             const initialAngle = (this.lighthouses.length * 1.57) % (Math.PI * 2);
+            const smoothDists = groundMat.uniforms.uWallDist.value;
             this.lighthouses.push({
                 group: grp,
                 headGroup,
                 bulbMat,
-                floorFanGeo,
-                floorFanMat,
-                airBeamGeo,
-                airBeamMat,
+                upperConeMesh,
+                upperConeMat,
+                groundMat,
                 groundPointLight,
                 angle: initialAngle,
-                speed: 0.95,
-                numRays: N_RAYS,
-                halfCone: 0.43,
-                maxRange: 34.0,
-                rayDirsX: new Float32Array(N_RAYS + 1),
-                rayDirsZ: new Float32Array(N_RAYS + 1),
-                rayDists: new Float32Array(N_RAYS + 1)
+                speed: 0.9,
+                halfCone,
+                maxRange,
+                rawDists: new Float32Array(64),
+                smoothDists
             });
 
             grp.userData = { bounds: new THREE.Box3().setFromObject(base), collisionRadius: 2.95, type: 'lighthouse' };
@@ -3880,6 +4201,7 @@ export class GameEngine {
     this.stats.isNightMode = this.isNightStealthActive();
     this.muzzleRevealTimer = 0;
     this.isSpottedByLighthouse = false;
+    this.applySceneEnvIntensity(this.currentEnvIntensity !== undefined ? this.currentEnvIntensity : 0.72);
     this.updateLighthousesAndStealth(0.016);
     this.missionStartTime = performance.now();
     this.missionDamageTaken = 0;
@@ -4421,23 +4743,8 @@ export class GameEngine {
         }
     });
 
-    // Dynamic Stage Illumination Fade
-    if (this.stageLightBoost > 0) {
-        this.stageLightBoost -= dt;
-        if (this.stageLightBoost < 0) this.stageLightBoost = 0;
-        const boostRatio = this.stageLightBoost / 5.0;
-        if (this.ambientLight && this.baseAmbientIntensity !== undefined) {
-            this.ambientLight.intensity = this.baseAmbientIntensity + (boostRatio * 0.85);
-        }
-        if (this.dirLight && this.baseDirIntensity !== undefined) {
-            this.dirLight.intensity = this.baseDirIntensity + (boostRatio * 0.6);
-        }
-    } else if (this.ambientLight && this.baseAmbientIntensity !== undefined) {
-        this.ambientLight.intensity = this.baseAmbientIntensity;
-        if (this.dirLight && this.baseDirIntensity !== undefined) {
-            this.dirLight.intensity = this.baseDirIntensity;
-        }
-    }
+    // Smooth Progressive Ambient & Nocturnal Lighting Transition
+    this.updateLightingTransition(dt);
 
     // 3. Speed Boost Pads
     this.boostPads.forEach(pad => {
