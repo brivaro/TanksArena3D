@@ -1,6 +1,6 @@
 export class AudioManager {
   constructor() {
-    // Clean up any previous AudioManager instance or stray <audio> tags so orphan BGM can never keep playing
+    // Clean up any previous AudioManager instance so orphan BGM can never keep playing
     if (typeof window !== 'undefined') {
       if (window.__TANKS_ACTIVE_AUDIO__ && window.__TANKS_ACTIVE_AUDIO__ !== this) {
         try {
@@ -9,7 +9,7 @@ export class AudioManager {
       }
       window.__TANKS_ACTIVE_AUDIO__ = this;
       try {
-        document.querySelectorAll('audio').forEach(a => {
+        document.querySelectorAll('audio[data-tanks-bgm="true"]').forEach(a => {
           try {
             a.pause();
             a.src = '';
@@ -21,28 +21,24 @@ export class AudioManager {
 
     this.ctx = null;
     this.masterGain = null;
-    this.musicGain = null;
     this.masterGainConnected = false;
-    this.musicGainConnected = false;
+    this.musicGain = null;
     this.noiseBuffer = null;
     this.initialized = false;
+    this.unlockedOnMobile = false;
     this.disposed = false;
     this.isMuted = false;
     this.isMusicMuted = false;
-    this.savedVolume = 0.32;
-    this.musicVolume = 0.36;
+    this.savedVolume = 0.34;
+    this.musicVolume = 0.48;
     this.lastPlayed = {};
 
-    // WebAudio Segmented Soundtrack State (35 fast 470KB 60s chunks of 0001_game_music_comprimido.mp3)
-    this.totalBgmChunks = 35;
-    this.currentChunkIndex = 0;
-    this.rawChunkCache = new Map();     // index -> ArrayBuffer
-    this.decodedChunkCache = new Map(); // index -> AudioBuffer
-    this.fetchingChunks = new Map();    // index -> Promise<ArrayBuffer>
-    this.activeBgmSources = new Set();  // Set<AudioBufferSourceNode>
-    this.bgmPlayToken = 0;
+    // WebAudio BGM state (989KB optimized loop -> fast decode on Mobile & PC)
+    this.bgmRawBuffer = null;
+    this.bgmAudioBuffer = null;
+    this.bgmSourceNode = null;
+    this.bgmIsDecoding = false;
     this.bgmPlaying = false;
-    this.bgmStarting = false;
 
     try {
       this.isMuted = localStorage.getItem('tanks_sfx_muted') === 'true';
@@ -50,188 +46,194 @@ export class AudioManager {
     } catch (_) {}
 
     if (typeof window !== 'undefined') {
-      // Pre-fetch first chunk (470 KB) immediately into memory so it starts with zero network delay
-      this.prefetchRawChunk(0);
+      // Pre-fetch the lightweight (<1MB) BGM loop immediately so it's ready in memory
+      this.prefetchBgmData();
 
-      this.handleUserGesture = (e) => {
+      this.handleUserGesture = () => {
         if (this.disposed) return;
-        // Ignore clicks on music/mute toggle buttons so capture-phase doesn't fight the toggle handler
-        if (e && e.target && typeof e.target.closest === 'function') {
-          if (e.target.closest('[data-audio-toggle="true"]')) {
+        this.unlockAudioSynchronously();
+      };
+
+      // Listen to all mobile & desktop user interaction events
+      window.addEventListener('touchstart', this.handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('touchend', this.handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('pointerdown', this.handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('mousedown', this.handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('click', this.handleUserGesture, { capture: true, passive: true });
+      window.addEventListener('keydown', this.handleUserGesture, { capture: true, passive: true });
+
+      // Pause/Resume cleanly when switching tabs or locking phone screen
+      this.handleVisibilityChange = () => {
+        if (this.disposed || !this.ctx) return;
+        if (document.hidden) {
+          if (this.ctx.state === 'running') {
+            this.ctx.suspend().catch(() => {});
+          }
+        } else {
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+          if (!this.isMusicMuted && !this.bgmPlaying) {
+            this.startBgmPlayback();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+  }
+
+  async prefetchBgmData() {
+    if (this.disposed || this.bgmRawBuffer || this.bgmAudioBuffer) return;
+    const urls = ['/music/bgm_loop.mp3', 'music/bgm_loop.mp3', '/music/0001_game_music_comprimido.mp3'];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const arr = await res.arrayBuffer();
+          if (arr && arr.byteLength > 1000) {
+            this.bgmRawBuffer = arr;
+            // If AudioContext already exists, decode and start immediately
+            if (this.ctx) {
+              this.decodeAndStartBgm();
+            }
             return;
           }
         }
-        if (!this.initialized) this.init();
-        if (this.ctx && this.ctx.state === 'suspended') {
-          this.ctx.resume().catch(() => {});
-        }
-        if (!this.isMusicMuted && !this.bgmPlaying && !this.bgmStarting) {
-          this.startBgmPlayback(this.currentChunkIndex);
-        }
-      };
-
-      window.addEventListener('click', this.handleUserGesture, { capture: true, passive: true });
-      window.addEventListener('pointerdown', this.handleUserGesture, { capture: true, passive: true });
-      window.addEventListener('touchstart', this.handleUserGesture, { capture: true, passive: true });
-      window.addEventListener('keydown', this.handleUserGesture, { capture: true, passive: true });
+      } catch (_) {}
     }
   }
 
-  prefetchRawChunk(index) {
-    const idx = ((index % this.totalBgmChunks) + this.totalBgmChunks) % this.totalBgmChunks;
-    if (this.rawChunkCache.has(idx)) {
-      return Promise.resolve(this.rawChunkCache.get(idx));
+  decodeAndStartBgm() {
+    if (this.disposed || !this.ctx) return;
+    if (this.bgmAudioBuffer) {
+      if (!this.isMusicMuted && !this.bgmPlaying) {
+        this.startBgmNode();
+      }
+      return;
     }
-    if (this.fetchingChunks.has(idx)) {
-      return this.fetchingChunks.get(idx);
-    }
+    if (!this.bgmRawBuffer || this.bgmIsDecoding) return;
 
-    const url = `/music/bgm_${idx}.mp3`;
-    const promise = fetch(url)
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.arrayBuffer();
-      })
-      .then(buf => {
-        if (this.rawChunkCache.size > 4) {
-          const oldestKey = this.rawChunkCache.keys().next().value;
-          if (oldestKey !== idx && oldestKey !== 0) {
-            this.rawChunkCache.delete(oldestKey);
+    this.bgmIsDecoding = true;
+    try {
+      // Clone ArrayBuffer so decodeAudioData never detaches the backup copy
+      const bufferCopy = this.bgmRawBuffer.slice(0);
+      this.ctx.decodeAudioData(
+        bufferCopy,
+        (decoded) => {
+          this.bgmIsDecoding = false;
+          if (this.disposed) return;
+          this.bgmAudioBuffer = decoded;
+          if (!this.isMusicMuted) {
+            this.startBgmNode();
           }
+        },
+        () => {
+          this.bgmIsDecoding = false;
         }
-        this.rawChunkCache.set(idx, buf);
-        this.fetchingChunks.delete(idx);
-        return buf;
-      })
-      .catch(err => {
-        this.fetchingChunks.delete(idx);
-        console.warn('BGM chunk fetch warning:', err);
-        return null;
-      });
-
-    this.fetchingChunks.set(idx, promise);
-    return promise;
-  }
-
-  async decodeChunk(index) {
-    const idx = ((index % this.totalBgmChunks) + this.totalBgmChunks) % this.totalBgmChunks;
-    if (this.decodedChunkCache.has(idx)) {
-      return this.decodedChunkCache.get(idx);
-    }
-    if (!this.ctx) this.init();
-    if (!this.ctx || this.disposed) return null;
-
-    const rawBuf = await this.prefetchRawChunk(idx);
-    if (!rawBuf || !this.ctx || this.disposed) return null;
-
-    try {
-      const copyBuf = rawBuf.slice(0);
-      const audioBuffer = await this.ctx.decodeAudioData(copyBuf);
-      if (this.decodedChunkCache.size > 3) {
-        const oldestKey = this.decodedChunkCache.keys().next().value;
-        if (oldestKey !== idx) {
-          this.decodedChunkCache.delete(oldestKey);
-        }
-      }
-      this.decodedChunkCache.set(idx, audioBuffer);
-      return audioBuffer;
-    } catch (e) {
-      console.warn('BGM decode warning:', e);
-      return null;
+      );
+    } catch (_) {
+      this.bgmIsDecoding = false;
     }
   }
 
-  async startBgmPlayback(chunkIndex = this.currentChunkIndex) {
-    if (this.disposed || this.isMusicMuted) return;
-    if (this.bgmPlaying || this.bgmStarting) return;
-    if (!this.initialized) this.init();
-    if (!this.ctx || !this.musicGain) return;
+  startBgmNode() {
+    if (this.disposed || !this.ctx || !this.musicGain || !this.bgmAudioBuffer) return;
+    if (this.bgmPlaying && this.bgmSourceNode) {
+      // Ensure gain reflects current mute state
+      this.musicGain.gain.setValueAtTime(
+        this.isMusicMuted ? 0 : this.musicVolume,
+        this.ctx.currentTime
+      );
+      return;
+    }
 
-    const myToken = ++this.bgmPlayToken;
-    this.bgmStarting = true;
+    this.stopBgmNode();
 
     try {
-      if (this.ctx.state === 'suspended') {
-        await this.ctx.resume().catch(() => {});
-      }
-
-      if (this.disposed || this.isMusicMuted || myToken !== this.bgmPlayToken) {
-        this.bgmStarting = false;
-        return;
-      }
-
-      const idx = ((chunkIndex % this.totalBgmChunks) + this.totalBgmChunks) % this.totalBgmChunks;
-      const audioBuffer = await this.decodeChunk(idx);
-
-      if (this.disposed || this.isMusicMuted || myToken !== this.bgmPlayToken || !audioBuffer) {
-        this.bgmStarting = false;
-        return;
-      }
-
-      // Stop any previous sources before starting the new one
-      this.stopAllActiveSources();
-
-      // Ensure musicGain is connected and audible
-      if (!this.musicGainConnected && this.ctx) {
-        try {
-          this.musicGain.connect(this.ctx.destination);
-          this.musicGainConnected = true;
-        } catch (_) {}
-      }
-      this.musicGain.gain.cancelScheduledValues(0);
-      this.musicGain.gain.value = this.musicVolume;
-
       const source = this.ctx.createBufferSource();
-      source.buffer = audioBuffer;
+      source.buffer = this.bgmAudioBuffer;
+      source.loop = true;
+      this.musicGain.gain.setValueAtTime(
+        this.isMusicMuted ? 0 : this.musicVolume,
+        this.ctx.currentTime
+      );
       source.connect(this.musicGain);
-
-      this.currentChunkIndex = idx;
-      this.activeBgmSources.add(source);
-      this.bgmStarting = false;
-      this.bgmPlaying = true;
-
-      // Pre-fetch and decode next 60s segment in background for seamless continuation
-      const nextIdx = (idx + 1) % this.totalBgmChunks;
-      this.decodeChunk(nextIdx);
-
       source.onended = () => {
-        this.activeBgmSources.delete(source);
-        try { source.disconnect(); } catch (_) {}
-        if (this.activeBgmSources.size === 0) {
+        if (this.bgmSourceNode === source) {
+          this.bgmSourceNode = null;
           this.bgmPlaying = false;
         }
-        if (!this.disposed && !this.isMusicMuted && myToken === this.bgmPlayToken) {
-          this.currentChunkIndex = nextIdx;
-          this.startBgmPlayback(nextIdx);
-        }
       };
-
       source.start(0);
-    } catch (e) {
-      this.bgmStarting = false;
+      this.bgmSourceNode = source;
+      this.bgmPlaying = true;
+    } catch (_) {
       this.bgmPlaying = false;
-      console.warn('BGM start error:', e);
     }
   }
 
-  stopAllActiveSources() {
-    for (const src of this.activeBgmSources) {
+  stopBgmNode() {
+    this.bgmPlaying = false;
+    if (this.bgmSourceNode) {
       try {
-        src.onended = null;
-        src.stop(0);
+        this.bgmSourceNode.onended = null;
+        this.bgmSourceNode.stop(0);
+        this.bgmSourceNode.disconnect();
       } catch (_) {}
-      try {
-        src.disconnect();
-      } catch (_) {}
+      this.bgmSourceNode = null;
     }
-    this.activeBgmSources.clear();
+  }
+
+  unlockAudioSynchronously() {
+    if (this.disposed) return;
+    if (!this.initialized) this.init();
+
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().then(() => {
+          if (!this.disposed && !this.isMusicMuted) {
+            this.startBgmPlayback();
+          }
+        }).catch(() => {});
+      }
+      if (!this.unlockedOnMobile) {
+        try {
+          const silentBuf = this.ctx.createBuffer(1, 1, 22050);
+          const src = this.ctx.createBufferSource();
+          src.buffer = silentBuf;
+          src.connect(this.ctx.destination);
+          src.start(0);
+          this.unlockedOnMobile = true;
+        } catch (_) {}
+      }
+    }
+
+    if (!this.isMusicMuted) {
+      this.startBgmPlayback();
+    }
+  }
+
+  startBgmPlayback() {
+    if (this.disposed || this.isMusicMuted) return;
+    if (!this.initialized) this.init();
+    if (!this.ctx) return;
+
+    if (this.bgmAudioBuffer) {
+      this.startBgmNode();
+    } else if (this.bgmRawBuffer) {
+      this.decodeAndStartBgm();
+    } else {
+      this.prefetchBgmData();
+    }
   }
 
   stopBgmPlayback() {
-    this.bgmPlayToken++;
-    this.bgmPlaying = false;
-    this.bgmStarting = false;
-    this.stopAllActiveSources();
+    if (this.musicGain && this.ctx) {
+      try {
+        this.musicGain.gain.setValueAtTime(0, this.ctx.currentTime);
+      } catch (_) {}
+    }
+    this.stopBgmNode();
   }
 
   init() {
@@ -241,7 +243,7 @@ export class AudioManager {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioContext();
 
-      // 1. Master Gain for Game Sound Effects
+      // Master Gain for Game Sound Effects
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.isMuted ? 0 : this.savedVolume;
       if (!this.isMuted) {
@@ -249,13 +251,10 @@ export class AudioManager {
         this.masterGainConnected = true;
       }
 
-      // 2. Dedicated Gain for Background Music Soundtrack
+      // Dedicated Gain for Background Music (independent of SFX mute)
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = this.isMusicMuted ? 0 : this.musicVolume;
-      if (!this.isMusicMuted) {
-        this.musicGain.connect(this.ctx.destination);
-        this.musicGainConnected = true;
-      }
+      this.musicGain.connect(this.ctx.destination);
 
       // Pre-allocate shared white noise buffer once
       const bufferSize = Math.floor(this.ctx.sampleRate * 1.2);
@@ -266,6 +265,11 @@ export class AudioManager {
       }
 
       this.initialized = true;
+
+      // Start decoding BGM if prefetch already finished
+      if (this.bgmRawBuffer) {
+        this.decodeAndStartBgm();
+      }
     } catch (e) {
       console.warn('Audio disabled:', e);
     }
@@ -273,44 +277,21 @@ export class AudioManager {
 
   resume() {
     if (this.disposed) return;
-    if (!this.initialized) this.init();
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
+    this.unlockAudioSynchronously();
     this.syncBgmState();
   }
 
   syncBgmState() {
     if (this.disposed) return;
     if (!this.initialized) this.init();
-    if (!this.ctx || !this.musicGain) return;
 
     if (this.isMusicMuted) {
       this.stopBgmPlayback();
-      try {
-        this.musicGain.gain.cancelScheduledValues(0);
-        this.musicGain.gain.value = 0;
-      } catch (_) {}
-      if (this.musicGainConnected) {
-        try {
-          this.musicGain.disconnect();
-        } catch (_) {}
-        this.musicGainConnected = false;
-      }
     } else {
-      if (!this.musicGainConnected) {
-        try {
-          this.musicGain.connect(this.ctx.destination);
-          this.musicGainConnected = true;
-        } catch (_) {}
+      if (this.musicGain && this.ctx) {
+        this.musicGain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
       }
-      try {
-        this.musicGain.gain.cancelScheduledValues(0);
-        this.musicGain.gain.value = this.musicVolume;
-      } catch (_) {}
-      if (!this.bgmPlaying && !this.bgmStarting) {
-        this.startBgmPlayback(this.currentChunkIndex);
-      }
+      this.startBgmPlayback();
     }
   }
 
@@ -373,10 +354,15 @@ export class AudioManager {
     this.disposed = true;
     this.stopBgmPlayback();
     if (typeof window !== 'undefined' && this.handleUserGesture) {
-      window.removeEventListener('click', this.handleUserGesture, { capture: true });
-      window.removeEventListener('pointerdown', this.handleUserGesture, { capture: true });
       window.removeEventListener('touchstart', this.handleUserGesture, { capture: true });
+      window.removeEventListener('touchend', this.handleUserGesture, { capture: true });
+      window.removeEventListener('pointerdown', this.handleUserGesture, { capture: true });
+      window.removeEventListener('mousedown', this.handleUserGesture, { capture: true });
+      window.removeEventListener('click', this.handleUserGesture, { capture: true });
       window.removeEventListener('keydown', this.handleUserGesture, { capture: true });
+    }
+    if (typeof document !== 'undefined' && this.handleVisibilityChange) {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     }
     if (this.musicGain) {
       try { this.musicGain.disconnect(); } catch (_) {}
@@ -397,8 +383,8 @@ export class AudioManager {
     if (this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
-    if (!this.isMusicMuted && !this.bgmPlaying && !this.bgmStarting) {
-      this.startBgmPlayback(this.currentChunkIndex);
+    if (!this.isMusicMuted && !this.bgmPlaying) {
+      this.startBgmPlayback();
     }
     if (this.isMuted || !this.masterGainConnected) return;
 

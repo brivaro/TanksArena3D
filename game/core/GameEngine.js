@@ -33,13 +33,17 @@ export class GameEngine {
     this.tableProps = [];    // Environmental props on the desk outside arena
     this.currentBiome = 'workshop';
 
-    // Load Player Hangar Customization (Skin, Tactical Perk & AI Difficulty)
+    // Load Player Hangar Customization (Skin, Tactical Perk, 3D Hat, Bullet Trail & AI Difficulty)
     this.playerSkin = 'classic';
     this.playerPerk = 'ricochet';
+    this.playerHat = 'none';
+    this.playerTrail = 'cyan';
     this.aiDifficulty = 'normal';
     try {
       this.playerSkin = localStorage.getItem('tanks_player_skin') || 'classic';
       this.playerPerk = localStorage.getItem('tanks_player_perk') || 'ricochet';
+      this.playerHat = localStorage.getItem('tanks_player_hat') || 'none';
+      this.playerTrail = localStorage.getItem('tanks_player_trail') || 'cyan';
       this.aiDifficulty = localStorage.getItem('tanks_ai_difficulty') || 'normal';
     } catch (_) {}
     
@@ -78,6 +82,7 @@ export class GameEngine {
     this.comboStreak = 0;
     this.comboTimer = 0;
     this.winTimeout = null;
+    this.missionOutcome = null; // null | 'VICTORY' | 'DEFEAT'
     this.missionStartTime = 0;
     this.missionDamageTaken = 0;
 
@@ -3131,13 +3136,23 @@ export class GameEngine {
       );
   }
 
-  setPlayerLoadout(skinId, perkId) {
-      this.playerSkin = skinId || 'classic';
-      this.playerPerk = perkId || 'ricochet';
+  setPlayerLoadout(skinId, perkId, hatId, trailId) {
+      this.playerSkin = skinId || this.playerSkin || 'classic';
+      this.playerPerk = perkId || this.playerPerk || 'ricochet';
+      if (hatId !== undefined) this.playerHat = hatId || 'none';
+      if (trailId !== undefined) this.playerTrail = trailId || 'cyan';
       try {
           localStorage.setItem('tanks_player_skin', this.playerSkin);
           localStorage.setItem('tanks_player_perk', this.playerPerk);
+          localStorage.setItem('tanks_player_hat', this.playerHat);
+          localStorage.setItem('tanks_player_trail', this.playerTrail);
       } catch (_) {}
+      if (this.player && this.player.mesh && !this.player.isDead) {
+          this.player.trailId = this.playerTrail;
+          if (typeof this.player.buildTurretHat === 'function') {
+              this.player.buildTurretHat(this.playerHat);
+          }
+      }
   }
 
   setDifficulty(diffId) {
@@ -3816,7 +3831,8 @@ export class GameEngine {
 
         // 2. Object Spawning
         if (type === 'P') {
-           this.player = new PlayerTank(this.scene, x, z, this.input, this.playerSkin, this.playerPerk);
+           this.playerSpawnPos = new THREE.Vector3(x, 0, z);
+           this.player = new PlayerTank(this.scene, x, z, this.input, this.playerSkin, this.playerPerk, this.playerHat, this.playerTrail);
            this.player.mesh.rotation.y = Math.PI;
            this.entities.push(this.player);
 
@@ -4227,6 +4243,7 @@ export class GameEngine {
       this.deathTimeouts = [];
     }
     this.isDying = false;
+    this.missionOutcome = null;
     this.deathFocusPos = null;
     this.bossEntity = null;
     this.stats.bossInfo = null;
@@ -4428,7 +4445,10 @@ export class GameEngine {
   }
 
   damagePlayer(amount = 1) {
+      // Never damage or kill the player if the mission has already been won!
       if (!this.player || !this.player.mesh || !this.isRunning || this.isDying) return;
+      if (this.missionOutcome === 'VICTORY' || this.stats.enemiesLeft <= 0 || this.winTimeout) return;
+
       const hitResult = this.player.triggerHit();
       if (!hitResult) return; // Ignored if invulnerable
       if (hitResult === 'shield_absorbed') {
@@ -4465,6 +4485,13 @@ export class GameEngine {
 
   triggerSpectacularPlayerDeath() {
       if (!this.player || !this.player.mesh || this.isDying) return;
+      if (this.missionOutcome === 'VICTORY' || this.stats.enemiesLeft <= 0) return;
+
+      this.missionOutcome = 'DEFEAT';
+      if (this.winTimeout) {
+          clearTimeout(this.winTimeout);
+          this.winTimeout = null;
+      }
       this.isDying = true;
       if (this.input) this.input.resetInputs();
       this.cursor.setVisible(false);
@@ -4519,6 +4546,67 @@ export class GameEngine {
       }, 1650);
 
       this.deathTimeouts.push(t1, t2, t3);
+  }
+
+  // Instant Tactical Revive (Microtransaction / Gem / Daily Free Revive): Respawns Player Tank in-place with Shield & Shockwave!
+  revivePlayer() {
+      if (this.deathTimeouts && this.deathTimeouts.length > 0) {
+          this.deathTimeouts.forEach(t => clearTimeout(t));
+          this.deathTimeouts = [];
+      }
+      this.isDying = false;
+      this.missionOutcome = null;
+
+      const spawnPos = this.deathFocusPos
+          ? this.deathFocusPos.clone()
+          : (this.playerSpawnPos ? this.playerSpawnPos.clone() : new THREE.Vector3(0, 0, 0));
+
+      // Remove any old player instance
+      if (this.player && this.player.mesh) {
+          this.scene.remove(this.player.mesh);
+      }
+      this.entities = this.entities.filter(e => !(e instanceof PlayerTank));
+
+      // Spawn fresh PlayerTank with full armor + Energy Shield + 3.5s Invulnerability
+      this.player = new PlayerTank(
+          this.scene,
+          spawnPos.x,
+          spawnPos.z,
+          this.input,
+          this.playerSkin,
+          this.playerPerk,
+          this.playerHat,
+          this.playerTrail
+      );
+      this.player.mesh.rotation.y = Math.PI;
+      this.player.applyPowerUp('shield');
+      this.player.invulnerableTimer = 3.5;
+      this.entities.push(this.player);
+
+      // Clear any enemy projectiles within 18 units so player isn't hit immediately
+      for (let i = this.projectiles.length - 1; i >= 0; i--) {
+          const p = this.projectiles[i];
+          if (p.mesh && p.mesh.position.distanceTo(spawnPos) < 18) {
+              this.scene.remove(p.mesh);
+              this.projectiles.splice(i, 1);
+          }
+      }
+
+      this.stats.lives = this.playerPerk === 'heavy_armor' ? 4 : 3;
+      this.stats.activePowerup = '🛡️ ESCUDO DE REANIMACIÓN ACTIVO';
+      this.cameraState.targetZoom = this.cameraState.mode === 'follow' ? 0.05 : 0.9;
+      this.screenShake = 0.85;
+      this.isRunning = true;
+      this.isPaused = false;
+
+      this.audio.play('powerup');
+      this.audio.play('victory');
+      this.vfx.spawnPowerUpBurst(spawnPos, 0xffd700);
+      this.vfx.spawnShockwave(spawnPos, 0x00e5ff, 18.0);
+      this.vfx.spawnFloatingText(spawnPos, '⚡ ¡BLINDAJE REANIMADO AL 100%!', '#fde047', 1.35);
+
+      this.updateUI();
+      return true;
   }
 
   update(dt) {
@@ -4662,22 +4750,26 @@ export class GameEngine {
     this.camera.position.copy(this.cameraState.currentPos).add(shakeOffset);
     this.camera.lookAt(this.cameraState.currentLookAt);
 
-    // Keep input raycaster updated with moving camera
+    // Keep input raycaster or touch aim vector updated with moving camera & tank
     if (this.input) {
-        if (this.input.virtualAimStick && this.input.virtualAimStick.active && this.player && this.player.mesh) {
+        if (this.input.usingTouchControls && this.player && this.player.mesh) {
             const aimDist = 28;
+            const dirX = this.input.lastAimDir ? this.input.lastAimDir.x : 0;
+            const dirZ = this.input.lastAimDir ? this.input.lastAimDir.z : -1;
             this.input.mouseWorldPos.set(
-                this.player.mesh.position.x + (this.input.virtualAimStick.x * aimDist),
+                this.player.mesh.position.x + (dirX * aimDist),
                 0.5,
-                this.player.mesh.position.z + (this.input.virtualAimStick.y * aimDist)
+                this.player.mesh.position.z + (dirZ * aimDist)
             );
-        } else if (!this.input.isTouchDevice) {
+        } else if (!this.input.isTouchDevice && !this.input.usingTouchControls) {
             this.input.updateRaycaster();
         }
     }
     
     if (this.player && this.player.mesh) {
-        const isAiming = !this.input.isTouchDevice || (this.input.virtualAimStick && this.input.virtualAimStick.active);
+        const isTouchAiming = (this.input.virtualAimStick && this.input.virtualAimStick.active && this.input.virtualAimStick.distance >= 0.18) ||
+                              (this.input.bazookaAimStick && this.input.bazookaAimStick.active && this.input.bazookaAimStick.distance >= 0.18);
+        const isAiming = !this.input.usingTouchControls || isTouchAiming;
         this.cursor.setVisible(isAiming);
         if (isAiming) {
             this.cursor.update(this.input.getAimPosition(), this.player.mesh.position, this.walls, this.destructibles);
@@ -4843,6 +4935,7 @@ export class GameEngine {
     // Update Mines & Check Proximity Sensor against Enemy Tanks
     for (let i = this.mines.length - 1; i >= 0; i--) {
         const m = this.mines[i];
+        if (!m || !m.mesh) continue;
         m.update(dt);
         if (m.armed && !m.exploded) {
             for (const entity of this.entities) {
@@ -4858,13 +4951,13 @@ export class GameEngine {
 
     // Bullet vs Bullet Mid-Air Intercept
     for (let i = 0; i < this.projectiles.length; i++) {
-        if (this.projectiles[i].isDead) continue;
+        const p1 = this.projectiles[i];
+        if (!p1 || p1.isDead || !p1.mesh) continue;
         
         for (let j = i + 1; j < this.projectiles.length; j++) {
-            if (this.projectiles[j].isDead) continue;
-
-            const p1 = this.projectiles[i];
             const p2 = this.projectiles[j];
+            if (!p2 || p2.isDead || !p2.mesh) continue;
+
             const dist = p1.mesh.position.distanceTo(p2.mesh.position);
             
             if (dist < 0.85) { 
@@ -4883,9 +4976,10 @@ export class GameEngine {
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
         const p = this.projectiles[i];
+        if (!p) continue;
 
         if (p.isDead) {
-            this.scene.remove(p.mesh);
+            if (p.mesh) this.scene.remove(p.mesh);
             this.projectiles.splice(i, 1);
             continue;
         }
@@ -4894,7 +4988,7 @@ export class GameEngine {
         p.trailTimer = (p.trailTimer || 0) + dt;
         if (p.trailTimer >= (p.isBazooka ? 0.016 : 0.025)) {
             p.trailTimer = 0;
-            this.vfx.spawnBulletTrail(p.mesh.position, p.isPlayerBullet, p.isBazooka);
+            this.vfx.spawnBulletTrail(p.mesh.position, p.isPlayerBullet, p.isBazooka, p.trailId);
         }
 
         // Pass audio bounce callback and check for prism illumination
@@ -5190,7 +5284,28 @@ export class GameEngine {
           });
 
           this.updateUI();
-          if (this.stats.enemiesLeft === 0) {
+          if (this.stats.enemiesLeft <= 0 && !this.isDying && this.missionOutcome !== 'DEFEAT') {
+              this.missionOutcome = 'VICTORY';
+              // Immediately make the player invulnerable and disarm all in-flight projectiles & mines so a stray bullet can NEVER kill the player after winning!
+              if (this.player) {
+                  this.player.invulnerableTimer = 15.0;
+              }
+              for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                  const remP = this.projectiles[i];
+                  if (remP && remP.mesh) {
+                      this.vfx.spawnExplosion(remP.mesh.position, 0x00e5ff, 4, 0.15);
+                      this.scene.remove(remP.mesh);
+                  }
+              }
+              this.projectiles = [];
+              for (let i = this.mines.length - 1; i >= 0; i--) {
+                  const remM = this.mines[i];
+                  if (remM && remM.mesh) {
+                      this.scene.remove(remM.mesh);
+                  }
+              }
+              this.mines = [];
+
               this.audio.play('victory');
               this.vfx.spawnFloatingText(
                   this.player && this.player.mesh ? this.player.mesh.position : pos,
@@ -5200,7 +5315,7 @@ export class GameEngine {
               );
               if (this.winTimeout) clearTimeout(this.winTimeout);
               this.winTimeout = setTimeout(() => {
-                  if (this.isRunning && this.stats.enemiesLeft === 0) {
+                  if (this.isRunning && this.missionOutcome === 'VICTORY') {
                       this.endGame(true);
                   }
               }, 1350);
@@ -5209,7 +5324,22 @@ export class GameEngine {
   }
 
   endGame(won) {
+      if (!this.isRunning && this.missionOutcome === 'ENDED') return;
+      // Enforce locked outcome so Victory and Defeat can never overwrite each other
+      if (this.missionOutcome === 'VICTORY' && !won) return;
+      if (this.missionOutcome === 'DEFEAT' && won) return;
+
       this.isRunning = false;
+      this.missionOutcome = 'ENDED';
+      if (this.winTimeout) {
+          clearTimeout(this.winTimeout);
+          this.winTimeout = null;
+      }
+      if (this.deathTimeouts && this.deathTimeouts.length > 0) {
+          this.deathTimeouts.forEach(t => clearTimeout(t));
+          this.deathTimeouts = [];
+      }
+
       const elapsedSec = Math.round((performance.now() - (this.missionStartTime || performance.now())) / 1000);
       let starsEarned = 0;
       if (won) {
@@ -5333,6 +5463,18 @@ export class GameEngine {
 
   triggerBazooka() {
       if (this.player) {
+          // Ensure turret is aligned with current aim position before spawning rocket
+          if (this.player.mesh && this.player.turret && this.input) {
+              const aimPos = this.input.getAimPosition();
+              if (aimPos) {
+                  const dx = aimPos.x - this.player.mesh.position.x;
+                  const dz = aimPos.z - this.player.mesh.position.z;
+                  if (dx * dx + dz * dz > 0.01) {
+                      const angle = Math.atan2(dx, dz);
+                      this.player.turret.rotation.y = angle - this.player.mesh.rotation.y;
+                  }
+              }
+          }
           const fired = this.player.fireBazooka();
           if (fired && this.player.needsBazooka) {
               this.spawnBazookaProjectile(this.player);
@@ -5347,11 +5489,22 @@ export class GameEngine {
       return false;
   }
 
-  // Brawl Stars Twin-Stick: Move aim stick to aim and auto-shoot
-  setAimStickInput(x, y, active) {
+  // Twin-Stick Cannon Aim & Fire
+  setAimStickInput(x, y, active, shouldAutoFire = true) {
       const playerPos = (this.player && this.player.mesh) ? this.player.mesh.position : null;
       if (this.input) {
-          this.input.setAimStickInput(x, y, active, playerPos);
+          this.input.setAimStickInput(x, y, active, playerPos, shouldAutoFire);
+      }
+  }
+
+  // Dedicated Bazooka Drag-to-Aim & Release-to-Fire Stick
+  setBazookaStickInput(x, y, active, fireOnRelease = false) {
+      const playerPos = (this.player && this.player.mesh) ? this.player.mesh.position : null;
+      if (this.input) {
+          this.input.setBazookaStickInput(x, y, active, playerPos, fireOnRelease);
+          if (!active && fireOnRelease) {
+              this.triggerBazooka();
+          }
       }
   }
 

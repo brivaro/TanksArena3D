@@ -14,9 +14,11 @@ export const PLAYER_SKINS = {
     bodyColor: 0xffd600,
     trimColor: 0x1e293b,
     stripeColor: 0xfffde7,
-    roughness: 0.15,
-    metalness: 0.85,
-    trimMetalness: 0.7
+    roughness: 0.14,
+    metalness: 0.88,
+    trimMetalness: 0.75,
+    emissive: 0x5c4300,
+    emissiveIntensity: 0.28
   },
   camo: {
     bodyColor: 0x4caf50,
@@ -42,16 +44,70 @@ export const PLAYER_SKINS = {
     metalness: 0.4,
     emissive: 0x6a0000,
     emissiveIntensity: 0.4
+  },
+  mecha_prime: {
+    bodyColor: 0xf8fafc,
+    trimColor: 0x9333ea,
+    stripeColor: 0x00e676,
+    roughness: 0.14,
+    metalness: 0.82,
+    trimEmissive: 0xa855f7,
+    trimEmissiveIntensity: 0.85
+  },
+  inferno_dragon: {
+    bodyColor: 0x1c1917,
+    trimColor: 0xff3d00,
+    stripeColor: 0xffea00,
+    roughness: 0.2,
+    metalness: 0.72,
+    emissive: 0x7f1d1d,
+    emissiveIntensity: 0.55,
+    trimEmissive: 0xff3d00,
+    trimEmissiveIntensity: 0.95
+  },
+  galactic_void: {
+    bodyColor: 0x1e1b4b,
+    trimColor: 0x38bdf8,
+    stripeColor: 0xe879f9,
+    roughness: 0.12,
+    metalness: 0.88,
+    emissive: 0x311042,
+    emissiveIntensity: 0.65,
+    trimEmissive: 0x38bdf8,
+    trimEmissiveIntensity: 0.85
+  },
+  sakura_shogun: {
+    bodyColor: 0xbe123c,
+    trimColor: 0xfbbf24,
+    stripeColor: 0xfbcfe8,
+    roughness: 0.18,
+    metalness: 0.68,
+    trimMetalness: 0.9,
+    trimEmissive: 0xd97706,
+    trimEmissiveIntensity: 0.45
+  },
+  diamond_royal: {
+    bodyColor: 0xe0f2fe,
+    trimColor: 0x0284c7,
+    stripeColor: 0x38bdf8,
+    roughness: 0.06,
+    metalness: 0.95,
+    emissive: 0x0369a1,
+    emissiveIntensity: 0.35,
+    trimEmissive: 0x38bdf8,
+    trimEmissiveIntensity: 0.8
   }
 };
 
 export class PlayerTank extends Tank {
-  constructor(scene, x, z, inputManager, skinId = 'classic', perkId = 'ricochet') {
+  constructor(scene, x, z, inputManager, skinId = 'classic', perkId = 'ricochet', hatId = 'none', trailId = 'cyan') {
     const skinCfg = PLAYER_SKINS[skinId] || PLAYER_SKINS.classic;
     super(scene, x, z, skinCfg.bodyColor, skinCfg);
     this.input = inputManager;
     this.skinId = skinId;
     this.perkId = perkId;
+    this.hatId = hatId || 'none';
+    this.trailId = trailId || 'cyan';
 
     // Apply Tactical Module (Perk) stats
     this.speed = perkId === 'overdrive' ? 18.6 : 15.5;
@@ -86,6 +142,10 @@ export class PlayerTank extends Tank {
     const turretStripe = new THREE.Mesh(turretStripeGeo, stripeMat);
     if (this.turret) this.turret.add(turretStripe);
 
+    // Build 3D Cosmetic Turret Hat / Topper if equipped
+    this.hatGroup = null;
+    this.buildTurretHat(this.hatId);
+
     // Visual Shield Bubble (Hexagonal energy dome + inner glow)
     const shieldGeo = new THREE.IcosahedronGeometry(2.65, 2);
     const shieldMat = new THREE.MeshPhysicalMaterial({
@@ -115,6 +175,116 @@ export class PlayerTank extends Tank {
     this.shieldMesh.add(wireMesh);
 
     this.mesh.add(this.shieldMesh);
+  }
+
+  buildTurretHat(hatId) {
+    if (!this.turret) return;
+    if (this.hatGroup) {
+      this.turret.remove(this.hatGroup);
+      this.hatGroup = null;
+    }
+    if (!hatId || hatId === 'none') return;
+
+    const grp = new THREE.Group();
+    grp.position.set(0, 0.55, -0.15);
+
+    if (hatId === 'crown') {
+      // 3D Royal Gold Crown with Gems
+      const goldMat = new THREE.MeshStandardMaterial({
+        color: 0xffd700,
+        metalness: 0.9,
+        roughness: 0.15,
+        emissive: 0xb45309,
+        emissiveIntensity: 0.35
+      });
+      const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.52, 0.28, 12), goldMat);
+      grp.add(baseRing);
+
+      const rubyMat = new THREE.MeshBasicMaterial({ color: 0xff1744 });
+      const cyanMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+      for (let i = 0; i < 6; i++) {
+        const ang = (i / 6) * Math.PI * 2;
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.38, 6), goldMat);
+        spike.position.set(Math.cos(ang) * 0.48, 0.28, Math.sin(ang) * 0.48);
+        grp.add(spike);
+
+        const gem = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 6), i % 2 === 0 ? rubyMat : cyanMat);
+        gem.position.set(Math.cos(ang) * 0.54, 0.02, Math.sin(ang) * 0.54);
+        grp.add(gem);
+      }
+      grp.userData.spinSpeed = 1.4;
+    } else if (hatId === 'halo') {
+      // Floating Celestial Plasma Halo
+      const haloMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+      const torus = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.085, 10, 24), haloMat);
+      torus.rotation.x = Math.PI / 2;
+      torus.position.y = 0.55;
+      grp.add(torus);
+
+      const coreGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshBasicMaterial({ color: 0xfde047 }));
+      coreGem.position.y = 0.55;
+      grp.add(coreGem);
+      grp.userData.spinSpeed = 2.6;
+      grp.userData.floatAnim = true;
+    } else if (hatId === 'viking') {
+      // Valkyrie Titanium Horns on Turret Sides
+      const hornMat = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        metalness: 0.7,
+        roughness: 0.22,
+        emissive: 0x38bdf8,
+        emissiveIntensity: 0.25
+      });
+      const collarMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.2 });
+      [-1, 1].forEach(side => {
+        const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.25, 8), collarMat);
+        mount.rotation.z = side * (Math.PI / 2.4);
+        mount.position.set(side * 0.85, -0.05, 0.1);
+        grp.add(mount);
+
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.95, 8), hornMat);
+        horn.position.set(side * 1.15, 0.32, 0.15);
+        horn.rotation.z = -side * 0.55;
+        horn.rotation.x = 0.25;
+        grp.add(horn);
+      });
+    } else if (hatId === 'cyber_wings') {
+      // Neon Mecha Energy Wings
+      const wingMat = new THREE.MeshBasicMaterial({
+        color: 0xe040fb,
+        side: THREE.DoubleSide
+      });
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.2 });
+      [-1, 1].forEach(side => {
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.75, 1.15), wingMat);
+        fin.position.set(side * 0.82, 0.28, -0.65);
+        fin.rotation.z = -side * 0.48;
+        fin.rotation.x = -0.35;
+        grp.add(fin);
+
+        const strut = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.9), frameMat);
+        strut.position.set(side * 0.72, 0.1, -0.55);
+        grp.add(strut);
+      });
+    } else if (hatId === 'siren') {
+      // Tactical Twin-Strobe Police / Commander Lightbar
+      const barMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
+      const centerBar = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 0.36), barMat);
+      centerBar.position.y = 0.05;
+      grp.add(centerBar);
+
+      const leftLamp = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.32), new THREE.MeshBasicMaterial({ color: 0xff1744 }));
+      leftLamp.position.set(-0.32, 0.12, 0);
+      grp.add(leftLamp);
+
+      const rightLamp = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.32), new THREE.MeshBasicMaterial({ color: 0x00e5ff }));
+      rightLamp.position.set(0.32, 0.12, 0);
+      grp.add(rightLamp);
+      grp.userData.sirenLamps = [leftLamp, rightLamp];
+    }
+
+    this.hatGroup = grp;
+    this.turret.add(grp);
   }
 
   applyPowerUp(type) {
@@ -171,6 +341,22 @@ export class PlayerTank extends Tank {
     if (this.shieldActive && this.shieldMesh) {
       this.shieldMesh.rotation.y += dt * 1.8;
       this.shieldMesh.rotation.x += dt * 0.9;
+    }
+
+    // Animate 3D Turret Hat / Topper
+    if (this.hatGroup) {
+      if (this.hatGroup.userData.spinSpeed) {
+        this.hatGroup.rotation.y += dt * this.hatGroup.userData.spinSpeed;
+      }
+      if (this.hatGroup.userData.floatAnim) {
+        this.hatGroup.position.y = 0.55 + Math.sin(performance.now() * 0.005) * 0.08;
+      }
+      if (this.hatGroup.userData.sirenLamps) {
+        const phase = Math.floor(performance.now() / 140) % 2 === 0;
+        const [lLamp, rLamp] = this.hatGroup.userData.sirenLamps;
+        lLamp.scale.setScalar(phase ? 1.15 : 0.88);
+        rLamp.scale.setScalar(phase ? 0.88 : 1.15);
+      }
     }
 
     if (this.invulnerableTimer > 0) {

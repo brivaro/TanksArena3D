@@ -2,8 +2,21 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GameEngine } from './game/core/GameEngine.js';
 import { LevelLoader } from './game/world/LevelLoader.js';
+import {
+  TANK_SKINS_LIST,
+  TANK_HATS_LIST,
+  BULLET_TRAILS_LIST,
+  BATTLE_PASS_TIERS,
+  STRIPE_PACKS_LIST,
+  StripePack,
+  PurchaseReceipt,
+  BackupPayload,
+  StoreModal,
+  StripeCheckoutModal,
+  ModalCloseButton
+} from './game/store/MonetizationCatalog';
 
-// --- Virtual Touch Controls for Mobile ---
+// --- Virtual Touch Controls for Mobile (Strict Multi-Touch Isolated + Smart Aim & Bazooka System) ---
 
 interface VirtualJoystickProps {
   onMove: (x: number, y: number, active: boolean) => void;
@@ -15,8 +28,8 @@ const VirtualJoystick: React.FC<VirtualJoystickProps> = ({ onMove }) => {
   const [isActive, setIsActive] = useState(false);
   const activeTouchId = useRef<number | null>(null);
 
-  const maxRadius = 45; // Max drag radius in px
-  const deadZone = 12;  // Deadzone in px to prevent unintentional phantom movement
+  const maxRadius = 46; // Max drag radius in px
+  const deadZone = 10;  // Deadzone in px to prevent unintentional phantom movement
 
   const updatePosition = (clientX: number, clientY: number) => {
     if (!containerRef.current) return;
@@ -41,7 +54,6 @@ const VirtualJoystick: React.FC<VirtualJoystickProps> = ({ onMove }) => {
     const posY = Math.sin(angle) * clampedDist;
 
     setStickPos({ x: posX, y: posY });
-    // Normalize to [-1, 1]
     const normX = posX / maxRadius;
     const normY = posY / maxRadius;
     onMove(normX, normY, true);
@@ -50,16 +62,16 @@ const VirtualJoystick: React.FC<VirtualJoystickProps> = ({ onMove }) => {
   const handleTouchStart = (e: React.TouchEvent) => {
     e.stopPropagation();
     if (activeTouchId.current !== null) return;
-    const touch = e.changedTouches[0];
+    const touch = e.targetTouches[0] || e.changedTouches[0];
+    if (!touch) return;
     activeTouchId.current = touch.identifier;
     setIsActive(true);
-    // When placing finger down, do NOT move yet! Wait for deliberate drag
-    setStickPos({ x: 0, y: 0 });
-    onMove(0, 0, false);
+    updatePosition(touch.clientX, touch.clientY);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     e.stopPropagation();
+    if (activeTouchId.current === null) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (touch.identifier === activeTouchId.current) {
@@ -69,23 +81,21 @@ const VirtualJoystick: React.FC<VirtualJoystickProps> = ({ onMove }) => {
     }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEndOrCancel = (e: React.TouchEvent) => {
     e.stopPropagation();
-    activeTouchId.current = null;
-    setIsActive(false);
-    setStickPos({ x: 0, y: 0 });
-    onMove(0, 0, false);
+    if (activeTouchId.current === null) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === activeTouchId.current) {
+        activeTouchId.current = null;
+        setIsActive(false);
+        setStickPos({ x: 0, y: 0 });
+        onMove(0, 0, false);
+        break;
+      }
+    }
   };
 
-  const handleTouchCancel = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    activeTouchId.current = null;
-    setIsActive(false);
-    setStickPos({ x: 0, y: 0 });
-    onMove(0, 0, false);
-  };
-
-  // Guarantee stopping on unmount
   useEffect(() => {
     return () => {
       onMove(0, 0, false);
@@ -93,62 +103,70 @@ const VirtualJoystick: React.FC<VirtualJoystickProps> = ({ onMove }) => {
   }, [onMove]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div
+      data-ui-element="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}
+    >
       <div
         ref={containerRef}
+        data-ui-element="true"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
+        onTouchEnd={handleTouchEndOrCancel}
+        onTouchCancel={handleTouchEndOrCancel}
         style={{
-          width: '120px',
-          height: '120px',
+          width: '122px',
+          height: '122px',
           borderRadius: '50%',
-          backgroundColor: 'rgba(25, 20, 15, 0.72)',
-          border: '3px solid rgba(255, 255, 255, 0.65)',
+          backgroundColor: isActive ? 'rgba(15, 23, 42, 0.85)' : 'rgba(15, 23, 42, 0.68)',
+          border: isActive ? '3px solid #38bdf8' : '2.5px solid rgba(148, 163, 184, 0.55)',
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           touchAction: 'none',
           pointerEvents: 'auto',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          boxShadow: isActive ? '0 0 22px rgba(56, 189, 248, 0.45)' : '0 8px 24px rgba(0,0,0,0.5)',
           userSelect: 'none'
         }}
       >
-        {/* Subtle cross axes */}
-        <div style={{ position: 'absolute', width: '70%', height: '1px', backgroundColor: 'rgba(255,255,255,0.2)' }} />
-        <div style={{ position: 'absolute', height: '70%', width: '1px', backgroundColor: 'rgba(255,255,255,0.2)' }} />
+        <div style={{ position: 'absolute', width: '70%', height: '1px', backgroundColor: 'rgba(255,255,255,0.16)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', height: '70%', width: '1px', backgroundColor: 'rgba(255,255,255,0.16)', pointerEvents: 'none' }} />
         <div
           style={{
             width: '52px',
             height: '52px',
             borderRadius: '50%',
-            backgroundColor: isActive ? '#ffca28' : 'rgba(255, 255, 255, 0.9)',
-            border: '3px solid #8d6e63',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            transform: `translate(${stickPos.x}px, ${stickPos.y}px)`,
-            transition: isActive ? 'none' : 'transform 0.15s ease-out',
+            backgroundColor: isActive ? '#38bdf8' : 'rgba(248, 250, 252, 0.92)',
+            border: '3px solid #0f172a',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
+            transform: `translate3d(${stickPos.x}px, ${stickPos.y}px, 0)`,
+            transition: isActive ? 'none' : 'transform 0.14s ease-out',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '18px',
-            userSelect: 'none'
+            userSelect: 'none',
+            pointerEvents: 'none'
           }}
         >
           🕹️
         </div>
       </div>
       <div style={{
-        marginTop: '6px',
-        backgroundColor: 'rgba(30, 20, 10, 0.7)',
-        color: '#fff',
-        fontSize: '10px',
-        fontWeight: '900',
-        padding: '2px 8px',
-        borderRadius: '10px',
-        letterSpacing: '1px',
-        userSelect: 'none'
+        marginTop: '5px',
+        backgroundColor: 'rgba(15, 23, 42, 0.82)',
+        border: '1px solid rgba(148, 163, 184, 0.25)',
+        color: '#cbd5e1',
+        fontSize: '9.5px',
+        fontWeight: 900,
+        padding: '2px 9px',
+        borderRadius: '8px',
+        letterSpacing: '0.8px',
+        userSelect: 'none',
+        pointerEvents: 'none'
       }}>
         MOVER
       </div>
@@ -156,21 +174,39 @@ const VirtualJoystick: React.FC<VirtualJoystickProps> = ({ onMove }) => {
   );
 };
 
-// --- Brawl Stars Style Aim & Shoot Virtual Crosshair Joystick ---
+// --- Smart Dual-Stage Aim & Fire Virtual Crosshair Joystick ---
+// Modes:
+// - 'smart' (Default): Dragging aims the laser sight WITHOUT spraying bullets. Releasing fires 1 precise shot (or armed Bazooka)! Pushing to the outer rim (>85%) triggers continuous burst fire!
+// - 'auto': Dragging aims and continuously auto-fires cannon rounds.
 interface VirtualAimJoystickProps {
-  onAim: (x: number, y: number, active: boolean) => void;
+  onAim: (x: number, y: number, active: boolean, shouldAutoFire?: boolean) => void;
   onQuickShoot?: () => void;
+  onFireBazooka?: () => void;
+  bazookaArmed: boolean;
+  onClearBazookaArmed: () => void;
+  fireMode: 'smart' | 'auto';
 }
 
-const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({ onAim }) => {
+const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({
+  onAim,
+  onQuickShoot,
+  onFireBazooka,
+  bazookaArmed,
+  onClearBazookaArmed,
+  fireMode
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
   const [isActive, setIsActive] = useState(false);
-  const [isFiring, setIsFiring] = useState(false);
+  const [isAimingOut, setIsAimingOut] = useState(false);
+  const [isRimBurst, setIsRimBurst] = useState(false);
   const activeTouchId = useRef<number | null>(null);
+  const touchStartTimeRef = useRef<number>(0);
+  const maxDragDistRef = useRef<number>(0);
+  const currentNormRef = useRef<{ x: number; y: number; dist: number }>({ x: 0, y: 0, dist: 0 });
 
-  const maxRadius = 45; // Max drag radius in px
-  const deadZone = 14;  // Deadzone in px: Must deliberately move crosshair to shoot!
+  const maxRadius = 48; // Max drag radius in px
+  const deadZone = 11;  // Deadzone in px: Inside this zone = cancel / quick tap
 
   const updatePosition = (clientX: number, clientY: number) => {
     if (!containerRef.current) return;
@@ -181,12 +217,16 @@ const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({ onAim }) => {
     const dx = clientX - centerX;
     const dy = clientY - centerY;
     const dist = Math.hypot(dx, dy);
+    if (dist > maxDragDistRef.current) {
+      maxDragDistRef.current = dist;
+    }
 
     if (dist < deadZone) {
-      // Inside deadzone: Move handle slightly to follow finger, but DO NOT SHOOT
       setStickPos({ x: dx, y: dy });
-      setIsFiring(false);
-      onAim(0, 0, false);
+      setIsAimingOut(false);
+      setIsRimBurst(false);
+      currentNormRef.current = { x: 0, y: 0, dist: 0 };
+      onAim(0, 0, false, false);
       return;
     }
 
@@ -197,28 +237,38 @@ const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({ onAim }) => {
     const posY = Math.sin(angle) * clampedDist;
 
     setStickPos({ x: posX, y: posY });
-    setIsFiring(true);
+    setIsAimingOut(true);
 
-    // Normalize to [-1, 1]
     const normX = posX / maxRadius;
     const normY = posY / maxRadius;
-    onAim(normX, normY, true);
+    const normDist = clampedDist / maxRadius;
+    currentNormRef.current = { x: normX, y: normY, dist: normDist };
+
+    // If Bazooka is armed on the main stick, never auto-fire normal bullets while aiming!
+    const rimAuto = !bazookaArmed && (fireMode === 'auto' || normDist >= 0.88);
+    setIsRimBurst(rimAuto);
+    onAim(normX, normY, true, rimAuto);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     e.stopPropagation();
     if (activeTouchId.current !== null) return;
-    const touch = e.changedTouches[0];
+    const touch = e.targetTouches[0] || e.changedTouches[0];
+    if (!touch) return;
     activeTouchId.current = touch.identifier;
+    touchStartTimeRef.current = Date.now();
+    maxDragDistRef.current = 0;
+    currentNormRef.current = { x: 0, y: 0, dist: 0 };
     setIsActive(true);
-    setIsFiring(false);
-    // When placing finger down, do NOT fire yet! Keep stick centered until dragged
+    setIsAimingOut(false);
+    setIsRimBurst(false);
     setStickPos({ x: 0, y: 0 });
-    onAim(0, 0, false);
+    onAim(0, 0, false, false);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     e.stopPropagation();
+    if (activeTouchId.current === null) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (touch.identifier === activeTouchId.current) {
@@ -230,14 +280,37 @@ const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({ onAim }) => {
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     e.stopPropagation();
+    if (activeTouchId.current === null) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (touch.identifier === activeTouchId.current) {
+        const finalDist = currentNormRef.current.dist;
+        const wasQuickTap = maxDragDistRef.current < deadZone && (Date.now() - touchStartTimeRef.current) < 320;
+
         activeTouchId.current = null;
         setIsActive(false);
-        setIsFiring(false);
+        setIsAimingOut(false);
+        setIsRimBurst(false);
         setStickPos({ x: 0, y: 0 });
-        onAim(0, 0, false); // Immediately ceases all shooting
+        onAim(0, 0, false, false);
+
+        if (finalDist >= 0.22) {
+          // Released while aiming outside deadzone -> Fire!
+          if (bazookaArmed) {
+            onFireBazooka?.();
+            onClearBazookaArmed();
+          } else if (fireMode === 'smart') {
+            onQuickShoot?.();
+          }
+        } else if (wasQuickTap) {
+          // Quick tap on center -> Auto-aim shot or Bazooka shot
+          if (bazookaArmed) {
+            onFireBazooka?.();
+            onClearBazookaArmed();
+          } else {
+            onQuickShoot?.();
+          }
+        }
         break;
       }
     }
@@ -245,43 +318,84 @@ const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({ onAim }) => {
 
   const handleTouchCancel = (e: React.TouchEvent) => {
     e.stopPropagation();
-    activeTouchId.current = null;
-    setIsActive(false);
-    setIsFiring(false);
-    setStickPos({ x: 0, y: 0 });
-    onAim(0, 0, false);
+    if (activeTouchId.current === null) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === activeTouchId.current) {
+        activeTouchId.current = null;
+        setIsActive(false);
+        setIsAimingOut(false);
+        setIsRimBurst(false);
+        setStickPos({ x: 0, y: 0 });
+        onAim(0, 0, false, false);
+        break;
+      }
+    }
   };
 
+  const borderColor = bazookaArmed
+    ? '#fb923c'
+    : isRimBurst
+    ? '#ef4444'
+    : isAimingOut
+    ? '#fbbf24'
+    : 'rgba(251, 146, 60, 0.72)';
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div
+      data-ui-element="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}
+    >
       <div
         ref={containerRef}
+        data-ui-element="true"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
         style={{
-          width: '120px',
-          height: '120px',
+          width: '124px',
+          height: '124px',
           borderRadius: '50%',
-          backgroundColor: isFiring ? 'rgba(216, 67, 21, 0.55)' : isActive ? 'rgba(255, 112, 67, 0.35)' : 'rgba(40, 15, 10, 0.72)',
-          border: isFiring ? '3px solid #ff5722' : isActive ? '3px solid #ff9800' : '3px solid rgba(255, 112, 67, 0.75)',
+          backgroundColor: bazookaArmed
+            ? 'rgba(154, 52, 18, 0.68)'
+            : isRimBurst
+            ? 'rgba(185, 28, 28, 0.55)'
+            : isAimingOut
+            ? 'rgba(30, 41, 59, 0.85)'
+            : 'rgba(15, 23, 42, 0.72)',
+          border: `3px solid ${borderColor}`,
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           touchAction: 'none',
           pointerEvents: 'auto',
-          boxShadow: isFiring ? '0 0 24px rgba(255,87,34,0.7)' : '0 8px 24px rgba(0,0,0,0.5)',
-          userSelect: 'none',
-          transition: 'box-shadow 0.2s, background-color 0.2s, border-color 0.2s'
+          boxShadow: bazookaArmed
+            ? '0 0 26px rgba(251, 146, 60, 0.8)'
+            : isAimingOut
+            ? '0 0 22px rgba(251, 191, 36, 0.5)'
+            : '0 8px 24px rgba(0,0,0,0.5)',
+          userSelect: 'none'
         }}
       >
+        {/* Inner Precision Aim Ring Indicator */}
+        <div style={{
+          position: 'absolute',
+          width: '78%',
+          height: '78%',
+          borderRadius: '50%',
+          border: '1px dashed rgba(255, 255, 255, 0.22)',
+          pointerEvents: 'none'
+        }} />
+
         {/* Aim Crosshair Reticle Markers */}
-        <div style={{ position: 'absolute', top: '6px', width: '2px', height: '10px', backgroundColor: isFiring ? '#ff3d00' : '#ff7043', borderRadius: '1px' }} />
-        <div style={{ position: 'absolute', bottom: '6px', width: '2px', height: '10px', backgroundColor: isFiring ? '#ff3d00' : '#ff7043', borderRadius: '1px' }} />
-        <div style={{ position: 'absolute', left: '6px', height: '2px', width: '10px', backgroundColor: isFiring ? '#ff3d00' : '#ff7043', borderRadius: '1px' }} />
-        <div style={{ position: 'absolute', right: '6px', height: '2px', width: '10px', backgroundColor: isFiring ? '#ff3d00' : '#ff7043', borderRadius: '1px' }} />
+        <div style={{ position: 'absolute', top: '6px', width: '2px', height: '9px', backgroundColor: borderColor, borderRadius: '1px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '6px', width: '2px', height: '9px', backgroundColor: borderColor, borderRadius: '1px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: '6px', height: '2px', width: '9px', backgroundColor: borderColor, borderRadius: '1px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: '6px', height: '2px', width: '9px', backgroundColor: borderColor, borderRadius: '1px', pointerEvents: 'none' }} />
 
         {/* Joystick Handle */}
         <div
@@ -289,42 +403,241 @@ const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({ onAim }) => {
             width: '54px',
             height: '54px',
             borderRadius: '50%',
-            backgroundColor: isFiring ? '#ff5722' : isActive ? '#ff9800' : '#ffca28',
+            backgroundColor: bazookaArmed
+              ? '#ea580c'
+              : isRimBurst
+              ? '#ef4444'
+              : isAimingOut
+              ? '#fbbf24'
+              : '#f59e0b',
             border: '3px solid #ffffff',
-            boxShadow: isFiring
-              ? '0 0 16px rgba(255,87,34,0.9), inset 0 2px 4px rgba(255,255,255,0.8)'
-              : '0 4px 12px rgba(0,0,0,0.4)',
-            transform: `translate(${stickPos.x}px, ${stickPos.y}px)`,
-            transition: isActive ? 'none' : 'transform 0.15s ease-out',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
+            transform: `translate3d(${stickPos.x}px, ${stickPos.y}px, 0)`,
+            transition: isActive ? 'none' : 'transform 0.14s ease-out',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '22px',
-            userSelect: 'none'
+            fontSize: '21px',
+            userSelect: 'none',
+            pointerEvents: 'none'
           }}
         >
-          🎯
+          {bazookaArmed ? '🚀' : isRimBurst ? '🔥' : '🎯'}
         </div>
       </div>
       <div style={{
-        marginTop: '6px',
-        backgroundColor: isFiring ? 'rgba(216, 67, 21, 0.9)' : isActive ? 'rgba(230, 81, 0, 0.85)' : 'rgba(40, 15, 10, 0.7)',
+        marginTop: '5px',
+        backgroundColor: bazookaArmed ? 'rgba(194, 65, 12, 0.95)' : 'rgba(15, 23, 42, 0.85)',
+        border: `1px solid ${bazookaArmed ? '#fdba74' : 'rgba(148, 163, 184, 0.25)'}`,
         color: '#fff',
-        fontSize: '10px',
-        fontWeight: '900',
-        padding: '2px 8px',
-        borderRadius: '10px',
+        fontSize: '9.5px',
+        fontWeight: 900,
+        padding: '2px 9px',
+        borderRadius: '8px',
         letterSpacing: '0.5px',
-        userSelect: 'none'
+        userSelect: 'none',
+        pointerEvents: 'none',
+        whiteSpace: 'nowrap'
       }}>
-        {isFiring ? '🔥 DISPARANDO...' : isActive ? '🎯 APUNTA MOVIENDO LA MIRA' : 'CRUCETA: MUEVE PARA DISPARAR'}
+        {bazookaArmed
+          ? '🚀 APUNTA Y SUELTA BAZOCA'
+          : isRimBurst
+          ? '🔥 RÁFAGA CONTINUA'
+          : isAimingOut
+          ? '🎯 SUELTA PARA DISPARAR'
+          : fireMode === 'smart'
+          ? 'MIRA: APUNTA Y SUELTA'
+          : 'MIRA: AUTO-FUEGO'}
+      </div>
+    </div>
+  );
+};
+
+// --- Dedicated Bazooka Smart Button / Drag-to-Aim Mini Stick ---
+// Tap = Arm Bazooka on main stick (or fire immediately if already aiming/armed)
+// Drag = Aim Bazooka trajectory directly without shooting bullets & release to launch rocket!
+interface BazookaSmartStickButtonProps {
+  bazookaReady: boolean;
+  bazookaCooldownProgress: number;
+  bazookaArmed: boolean;
+  onTapBazooka: () => void;
+  onBazookaStick: (x: number, y: number, active: boolean, fireOnRelease: boolean) => void;
+}
+
+const BazookaSmartStickButton: React.FC<BazookaSmartStickButtonProps> = ({
+  bazookaReady,
+  bazookaCooldownProgress,
+  bazookaArmed,
+  onTapBazooka,
+  onBazookaStick
+}) => {
+  const btnRef = useRef<HTMLDivElement | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const activeTouchId = useRef<number | null>(null);
+  const maxDistRef = useRef(0);
+  const currentNormRef = useRef({ x: 0, y: 0, dist: 0 });
+
+  const maxRadius = 36;
+  const dragThreshold = 10;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (activeTouchId.current !== null) return;
+    const touch = e.targetTouches[0] || e.changedTouches[0];
+    if (!touch) return;
+    activeTouchId.current = touch.identifier;
+    maxDistRef.current = 0;
+    currentNormRef.current = { x: 0, y: 0, dist: 0 };
+    setIsDragging(true);
+    setDragOffset({ x: 0, y: 0 });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (activeTouchId.current === null || !btnRef.current) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === activeTouchId.current) {
+        const rect = btnRef.current.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = touch.clientX - cx;
+        const dy = touch.clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxDistRef.current) maxDistRef.current = dist;
+
+        const clamped = Math.min(dist, maxRadius);
+        const angle = Math.atan2(dy, dx);
+        const px = Math.cos(angle) * clamped;
+        const py = Math.sin(angle) * clamped;
+        setDragOffset({ x: px, y: py });
+
+        const nx = px / maxRadius;
+        const ny = py / maxRadius;
+        const nd = clamped / maxRadius;
+        currentNormRef.current = { x: nx, y: ny, dist: nd };
+
+        if (dist >= dragThreshold) {
+          onBazookaStick(nx, ny, true, false);
+        } else {
+          onBazookaStick(0, 0, false, false);
+        }
+        break;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (activeTouchId.current === null) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === activeTouchId.current) {
+        const wasDragged = maxDistRef.current >= dragThreshold;
+        const finalDist = currentNormRef.current.dist;
+        const nx = currentNormRef.current.x;
+        const ny = currentNormRef.current.y;
+
+        activeTouchId.current = null;
+        setIsDragging(false);
+        setDragOffset({ x: 0, y: 0 });
+
+        if ('vibrate' in navigator) {
+          try { navigator.vibrate(35); } catch (_) {}
+        }
+
+        if (wasDragged) {
+          // If dragged and released outside deadzone -> fire Bazooka in that exact dragged angle!
+          // If returned to center before release -> cancel without wasting rocket!
+          onBazookaStick(nx, ny, false, finalDist >= 0.28);
+        } else {
+          onBazookaStick(0, 0, false, false);
+          onTapBazooka();
+        }
+        break;
+      }
+    }
+  };
+
+  const handleTouchCancel = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (activeTouchId.current === null) return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      if (touch.identifier === activeTouchId.current) {
+        activeTouchId.current = null;
+        setIsDragging(false);
+        setDragOffset({ x: 0, y: 0 });
+        onBazookaStick(0, 0, false, false);
+        break;
+      }
+    }
+  };
+
+  return (
+    <div
+      ref={btnRef}
+      data-ui-element="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
+      style={{
+        width: '66px',
+        height: '66px',
+        borderRadius: '50%',
+        backgroundColor: bazookaReady
+          ? (bazookaArmed || isDragging ? '#c2410c' : '#ea580c')
+          : 'rgba(30, 41, 59, 0.88)',
+        border: bazookaArmed || isDragging
+          ? '3px solid #fde047'
+          : bazookaReady
+          ? '2.5px solid rgba(255, 255, 255, 0.92)'
+          : '2px solid rgba(148, 163, 184, 0.4)',
+        boxShadow: bazookaArmed || isDragging
+          ? '0 0 24px rgba(251, 191, 36, 0.85)'
+          : bazookaReady
+          ? '0 6px 18px rgba(234, 88, 12, 0.7)'
+          : '0 4px 10px rgba(0,0,0,0.4)',
+        color: '#fff',
+        cursor: 'pointer',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        touchAction: 'none',
+        pointerEvents: 'auto',
+        userSelect: 'none'
+      }}
+      title="Toca para armar/disparar Bazoca o arrastra este botón para apuntar el cohete"
+    >
+      <div
+        style={{
+          transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`,
+          transition: isDragging ? 'none' : 'transform 0.14s ease-out',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none'
+        }}
+      >
+        <span style={{ fontSize: '21px', lineHeight: 1 }}>🚀</span>
+        <span style={{ fontSize: '8px', fontWeight: 900, marginTop: '2px', letterSpacing: '0.3px', color: bazookaReady ? '#fff' : '#94a3b8' }}>
+          {bazookaArmed ? 'ARMADO' : bazookaReady ? 'BAZOCA' : `${Math.round(bazookaCooldownProgress * 100)}%`}
+        </span>
       </div>
     </div>
   );
 };
 
 interface MobileControlsClusterProps {
-  onAim: (x: number, y: number, active: boolean) => void;
+  onAim: (x: number, y: number, active: boolean, shouldAutoFire?: boolean) => void;
+  onBazookaStick: (x: number, y: number, active: boolean, fireOnRelease: boolean) => void;
   onQuickShoot?: () => void;
   onMine: () => void;
   onBazooka: () => void;
@@ -333,182 +646,234 @@ interface MobileControlsClusterProps {
   onZoomOut: () => void;
   cameraMode?: 'overview' | 'follow';
   mineReady: boolean;
+  mineCooldownProgress?: number;
   bazookaReady: boolean;
+  bazookaCooldownProgress?: number;
 }
 
 const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
   onAim,
+  onBazookaStick,
+  onQuickShoot,
   onMine,
   onBazooka,
   onToggleCamera,
   cameraMode,
   mineReady,
-  bazookaReady
+  mineCooldownProgress = 1,
+  bazookaReady,
+  bazookaCooldownProgress = 1
 }) => {
   const [minePressed, setMinePressed] = useState(false);
-  const [bazookaPressed, setBazookaPressed] = useState(false);
-  const [camPressed, setCamPressed] = useState(false);
-  const lastCameraTapRef = useRef(0);
+  const [bazookaArmed, setBazookaArmed] = useState(false);
+  const [fireMode, setFireMode] = useState<'smart' | 'auto'>(() => {
+    try {
+      return (localStorage.getItem('tanks_mobile_aim_mode') as 'smart' | 'auto') || 'smart';
+    } catch {
+      return 'smart';
+    }
+  });
   const lastMineTapRef = useRef(0);
-  const lastBazookaTapRef = useRef(0);
+  const lastCamTapRef = useRef(0);
 
-  // Bulletproof anti-duplicate camera toggle
+  // Automatically disarm if bazooka goes on cooldown
+  useEffect(() => {
+    if (!bazookaReady && bazookaArmed) {
+      setBazookaArmed(false);
+    }
+  }, [bazookaReady, bazookaArmed]);
+
+  const toggleFireMode = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = fireMode === 'smart' ? 'auto' : 'smart';
+    setFireMode(next);
+    try { localStorage.setItem('tanks_mobile_aim_mode', next); } catch (_) {}
+  };
+
   const handleCameraTrigger = (e: React.TouchEvent | React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const now = Date.now();
-    if (now - lastCameraTapRef.current < 350) return;
-    lastCameraTapRef.current = now;
-
-    setCamPressed(true);
-    setTimeout(() => setCamPressed(false), 200);
-
+    if (now - lastCamTapRef.current < 320) return;
+    lastCamTapRef.current = now;
     if ('vibrate' in navigator) {
-      try { navigator.vibrate(25); } catch (_) {}
+      try { navigator.vibrate(20); } catch (_) {}
     }
     onToggleCamera();
   };
 
-  const handleMineTrigger = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleMineTrigger = (e: React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const now = Date.now();
-    if (now - lastMineTapRef.current < 300) return;
+    if (now - lastMineTapRef.current < 260) return;
     lastMineTapRef.current = now;
 
     setMinePressed(true);
-    setTimeout(() => setMinePressed(false), 200);
+    setTimeout(() => setMinePressed(false), 180);
     if ('vibrate' in navigator) {
       try { navigator.vibrate(30); } catch (_) {}
     }
     onMine();
   };
 
-  const handleBazookaTrigger = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const now = Date.now();
-    if (now - lastBazookaTapRef.current < 300) return;
-    lastBazookaTapRef.current = now;
-
-    setBazookaPressed(true);
-    setTimeout(() => setBazookaPressed(false), 200);
-    if ('vibrate' in navigator) {
-      try { navigator.vibrate(40); } catch (_) {}
+  const handleTapBazooka = () => {
+    if (!bazookaReady) {
+      onBazooka();
+      return;
     }
-    onBazooka();
+    // If Bazooka is already armed on the main stick, tapping again fires immediately!
+    // Otherwise, arm Bazooka on the main stick so the player can calmly aim with the big stick and release to fire!
+    if (bazookaArmed) {
+      setBazookaArmed(false);
+      onBazooka();
+    } else {
+      setBazookaArmed(true);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-end', pointerEvents: 'auto' }}>
-      {/* Side Utility Controls (Camera Mode, Bazooka & Mine Buttons) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-        {/* Dynamic Camera Quick Toggle */}
+    <div
+      data-ui-element="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      style={{
+        position: 'relative',
+        width: '236px',
+        height: '204px',
+        pointerEvents: 'none',
+        userSelect: 'none'
+      }}
+    >
+      {/* Top Tactical Mode Pills: Fire Mode Toggle & Camera View Toggle */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          display: 'flex',
+          gap: '6px',
+          alignItems: 'center',
+          pointerEvents: 'auto'
+        }}
+      >
         <button
           type="button"
+          data-ui-element="true"
+          onTouchStart={toggleFireMode}
+          onClick={toggleFireMode}
+          style={{
+            backgroundColor: fireMode === 'smart' ? 'rgba(14, 116, 144, 0.9)' : 'rgba(185, 28, 28, 0.9)',
+            border: fireMode === 'smart' ? '1.5px solid #38bdf8' : '1.5px solid #f87171',
+            color: '#f8fafc',
+            borderRadius: '10px',
+            padding: '5px 9px',
+            fontSize: '9.5px',
+            fontWeight: 900,
+            cursor: 'pointer',
+            touchAction: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+          }}
+          title="Alternar entre Apuntar y Soltar (Precisión) o Auto-Disparo continuo"
+        >
+          {fireMode === 'smart' ? '🎯 TIRO: AL SOLTAR' : '🔥 TIRO: AUTO'}
+        </button>
+
+        <button
+          type="button"
+          data-ui-element="true"
           onTouchStart={handleCameraTrigger}
           onClick={handleCameraTrigger}
           style={{
-            width: '50px',
-            height: '50px',
-            borderRadius: '50%',
-            backgroundColor: cameraMode === 'follow' ? '#e1f5fe' : 'rgba(255, 255, 255, 0.95)',
-            border: cameraMode === 'follow' ? '3px solid #0288d1' : '3px solid #8d6e63',
-            boxShadow: cameraMode === 'follow'
-              ? '0 0 16px rgba(2, 136, 209, 0.8), inset 0 2px 4px rgba(255,255,255,0.9)'
-              : '0 4px 12px rgba(0,0,0,0.3)',
-            color: cameraMode === 'follow' ? '#01579b' : '#3e2723',
-            fontSize: '17px',
+            backgroundColor: cameraMode === 'follow' ? 'rgba(14, 116, 144, 0.92)' : 'rgba(15, 23, 42, 0.9)',
+            border: cameraMode === 'follow' ? '1.5px solid #38bdf8' : '1.5px solid rgba(251, 191, 36, 0.6)',
+            color: cameraMode === 'follow' ? '#7dd3fc' : '#fbbf24',
+            borderRadius: '10px',
+            padding: '5px 9px',
+            fontSize: '9.5px',
+            fontWeight: 900,
             cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
             touchAction: 'none',
-            userSelect: 'none',
-            outline: 'none',
-            transform: camPressed ? 'scale(0.88)' : 'scale(1)',
-            transition: 'transform 0.1s ease-out, background-color 0.2s, border-color 0.2s'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
           }}
-          title={cameraMode === 'overview' ? 'Vista de cerca: Seguir al tanque' : 'Vista general: Ver todo el mapa'}
         >
-          {cameraMode === 'overview' ? '🎯' : '🗺️'}
-          <span style={{ fontSize: '7.5px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.5px' }}>
-            {cameraMode === 'overview' ? 'TANQUE' : 'MAPA'}
-          </span>
+          {cameraMode === 'overview' ? '🎯 TANQUE' : '🗺️ MAPA'}
         </button>
-
-        {/* Heavy Demolition Bazooka Button */}
-        <div
-          data-ui-element="true"
-          onTouchStart={handleBazookaTrigger}
-          onMouseDown={handleBazookaTrigger}
-          style={{
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            backgroundColor: bazookaReady ? '#ea580c' : '#616161',
-            border: '3px solid rgba(255, 255, 255, 0.92)',
-            boxShadow: bazookaReady
-              ? '0 6px 18px rgba(234,88,12,0.75), inset 0 2px 4px rgba(255,255,255,0.45)'
-              : '0 2px 6px rgba(0,0,0,0.4)',
-            color: '#fff',
-            fontSize: '21px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'none',
-            userSelect: 'none',
-            transform: bazookaPressed ? 'scale(0.88)' : 'scale(1)',
-            transition: 'transform 0.1s ease-out, background-color 0.2s',
-            opacity: bazookaReady ? 1.0 : 0.7
-          }}
-        >
-          🚀
-          <span style={{ fontSize: '8.5px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.4px' }}>
-            {bazookaReady ? 'BAZOCA' : 'CARGA'}
-          </span>
-        </div>
-
-        {/* Instant Responsive Mine Button */}
-        <div
-          data-ui-element="true"
-          onTouchStart={handleMineTrigger}
-          onMouseDown={handleMineTrigger}
-          style={{
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            backgroundColor: mineReady ? '#d32f2f' : '#616161',
-            border: '3px solid rgba(255, 255, 255, 0.9)',
-            boxShadow: mineReady
-              ? '0 6px 18px rgba(211,47,47,0.7), inset 0 2px 4px rgba(255,255,255,0.4)'
-              : '0 2px 6px rgba(0,0,0,0.4)',
-            color: '#fff',
-            fontSize: '21px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'none',
-            userSelect: 'none',
-            transform: minePressed ? 'scale(0.88)' : 'scale(1)',
-            transition: 'transform 0.1s ease-out, background-color 0.2s',
-            opacity: mineReady ? 1.0 : 0.7
-          }}
-        >
-          💣
-          <span style={{ fontSize: '8.5px', fontWeight: '900', marginTop: '1px', letterSpacing: '0.4px' }}>
-            {mineReady ? 'MINA' : 'RECARGA'}
-          </span>
-        </div>
       </div>
 
-      {/* Aim & Shoot Virtual Crosshair Joystick */}
-      <VirtualAimJoystick onAim={onAim} />
+      {/* Upper-Left Radial Arc: 🚀 Bazooka Smart Button (Tap to Arm/Fire OR Drag to Aim & Release!) */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '10px',
+          top: '44px',
+          pointerEvents: 'auto'
+        }}
+      >
+        <BazookaSmartStickButton
+          bazookaReady={bazookaReady}
+          bazookaCooldownProgress={bazookaCooldownProgress}
+          bazookaArmed={bazookaArmed}
+          onTapBazooka={handleTapBazooka}
+          onBazookaStick={(x, y, active, fireOnRelease) => {
+            if (active && bazookaArmed) setBazookaArmed(false);
+            onBazookaStick(x, y, active, fireOnRelease);
+          }}
+        />
+      </div>
+
+      {/* Lower-Left Radial Arc: 💣 Instant Mine Button (Well separated from Aim Stick!) */}
+      <div
+        data-ui-element="true"
+        onTouchStart={handleMineTrigger}
+        style={{
+          position: 'absolute',
+          left: '4px',
+          bottom: '16px',
+          width: '62px',
+          height: '62px',
+          borderRadius: '50%',
+          backgroundColor: mineReady ? '#15803d' : 'rgba(30, 41, 59, 0.88)',
+          border: mineReady ? '2.5px solid #4ade80' : '2px solid rgba(148, 163, 184, 0.4)',
+          boxShadow: mineReady ? '0 6px 18px rgba(22, 163, 74, 0.65)' : '0 4px 10px rgba(0,0,0,0.4)',
+          color: '#fff',
+          cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          touchAction: 'none',
+          pointerEvents: 'auto',
+          userSelect: 'none',
+          transform: minePressed ? 'scale(0.88)' : 'scale(1)',
+          transition: 'transform 0.1s ease-out'
+        }}
+      >
+        <span style={{ fontSize: '20px', lineHeight: 1, pointerEvents: 'none' }}>💣</span>
+        <span style={{ fontSize: '8px', fontWeight: 900, marginTop: '2px', letterSpacing: '0.3px', color: mineReady ? '#bbf7d0' : '#94a3b8', pointerEvents: 'none' }}>
+          {mineReady ? 'MINA' : `${Math.round(mineCooldownProgress * 100)}%`}
+        </span>
+      </div>
+
+      {/* Bottom-Right Anchor: Main 🎯 Aim & Fire Crosshair Stick */}
+      <div
+        style={{
+          position: 'absolute',
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'auto'
+        }}
+      >
+        <VirtualAimJoystick
+          onAim={onAim}
+          onQuickShoot={onQuickShoot}
+          onFireBazooka={onBazooka}
+          bazookaArmed={bazookaArmed}
+          onClearBazookaArmed={() => setBazookaArmed(false)}
+          fireMode={fireMode}
+        />
+      </div>
     </div>
   );
 };
@@ -529,13 +894,7 @@ const BIOMES_LIST = [
   { id: 'night_stealth', label: 'Sigilo Nocturno (73-80)', icon: '🌙', range: [73, 80], color: '#818cf8', accent: 'rgba(129, 140, 248, 0.22)' }
 ];
 
-const TANK_SKINS_LIST = [
-  { id: 'classic', name: 'Azul Comando', desc: 'Esmalte azul táctico clásico con franja blanca', color: '#0074D9', accent: '#38bdf8' },
-  { id: 'gold', name: 'Oro Imperial', desc: 'Chasis bañado en oro de 24k de alto brillo', color: '#ffca28', accent: '#fde047' },
-  { id: 'camo', name: 'Camuflaje Ranger', desc: 'Pintura militar verde oliva mate de operaciones', color: '#4b6043', accent: '#86efac' },
-  { id: 'cyber', name: 'Cyber Matrix', desc: 'Aleación obsidiana con circuitos de neón cian', color: '#00e5ff', accent: '#22d3ee' },
-  { id: 'crimson', name: 'Guardia Carmesí', desc: 'Blindaje pesado rojo imperial con núcleo ígneo', color: '#ef4444', accent: '#f87171' }
-];
+// TANK_SKINS_LIST, TANK_HATS_LIST, BULLET_TRAILS_LIST imported from ./game/store/MonetizationCatalog
 
 const TACTICAL_PERKS_LIST = [
   { id: 'ricochet', icon: '🎯', name: 'Cañón de Rebote +1', desc: '+1 rebote adicional en muros y +18% velocidad de proyectil', color: '#38bdf8' },
@@ -565,62 +924,64 @@ const WOOD_BLOCK_PALETTE = [
 interface WoodenBlockRowProps {
   word: string;
   startIndex: number;
-  size?: 'large' | 'compact';
   animateDrop?: boolean;
+  dropCycleKey?: number;
 }
+
+const WOOD_LOGO_BASE_WIDTH = 476;
+const WOOD_LOGO_BASE_HEIGHT = 124;
 
 const WoodenBlockRow: React.FC<WoodenBlockRowProps> = ({
   word,
   startIndex,
-  size = 'large',
-  animateDrop = false
+  animateDrop = false,
+  dropCycleKey = 0
 }) => {
-  const isLarge = size === 'large';
-  const blockSize = isLarge ? 66 : 42;
-  const fontSize = isLarge ? 35 : 22;
-  const borderWidth = isLarge ? 6 : 4;
-  const depthBottom = isLarge ? 8 : 5;
+  const blockSize = 56;
+  const fontSize = 30;
+  const borderWidth = 4.5;
+  const depthBottom = 7;
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: isLarge ? '10px' : '6px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'nowrap' }}>
       {word.split('').map((ch, idx) => {
         if (ch === ' ') {
-          return <div key={idx} style={{ width: isLarge ? '18px' : '10px' }} />;
+          return <div key={idx} style={{ width: '12px' }} />;
         }
         const globalIdx = startIndex + idx;
         const pal = WOOD_BLOCK_PALETTE[globalIdx % WOOD_BLOCK_PALETTE.length];
-        const rotDeg = ((globalIdx % 2 === 0 ? 1 : -1) * (1.8 + (globalIdx % 3) * 0.9)).toFixed(1);
-        const startRotDeg = ((globalIdx % 2 === 0 ? -1 : 1) * 22).toFixed(1);
-        const delaySec = (globalIdx * 0.085).toFixed(3);
+        const rotDeg = ((globalIdx % 2 === 0 ? 1 : -1) * (1.5 + (globalIdx % 3) * 0.7)).toFixed(1);
+        const startRotDeg = ((globalIdx % 2 === 0 ? -1 : 1) * 20).toFixed(1);
+        const delaySec = (globalIdx * 0.075).toFixed(3);
 
         return (
           <div
-            key={idx}
+            key={`${dropCycleKey}-${idx}`}
             style={{
               width: `${blockSize}px`,
               height: `${blockSize}px`,
-              borderRadius: isLarge ? '13px' : '9px',
+              borderRadius: '12px',
               background: 'linear-gradient(145deg, #fff3d6 0%, #f5d399 55%, #e2b46d 100%)',
               border: `${borderWidth}px solid ${pal.border}`,
-              boxShadow: `0 ${depthBottom}px 0 ${pal.shadow}, 0 ${depthBottom + 10}px 22px rgba(0,0,0,0.55), inset 0 2px 3px rgba(255,255,255,0.85), inset 0 -3px 6px rgba(139, 90, 43, 0.35)`,
+              boxShadow: `0 ${depthBottom}px 0 ${pal.shadow}, 0 ${depthBottom + 7}px 16px rgba(0,0,0,0.48), inset 0 2px 3px rgba(255,255,255,0.85), inset 0 -2px 5px rgba(139, 90, 43, 0.35)`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               position: 'relative',
               userSelect: 'none',
+              flexShrink: 0,
               ['--block-rot' as any]: `${rotDeg}deg`,
               ['--block-rot-start' as any]: `${startRotDeg}deg`,
               transform: `rotate(${rotDeg}deg)`,
               animation: animateDrop
-                ? `toyBlockDrop 0.68s cubic-bezier(0.22, 1, 0.36, 1) ${delaySec}s both`
+                ? `toyBlockDrop 0.62s cubic-bezier(0.22, 1, 0.36, 1) ${delaySec}s both`
                 : `toyBlockHeaderFloat 3.6s ease-in-out ${delaySec}s infinite`
             }}
           >
-            {/* Subtle carved wood-grain inner groove */}
             <div style={{
               position: 'absolute',
-              inset: isLarge ? '4px' : '2px',
-              borderRadius: isLarge ? '6px' : '4px',
+              inset: '3.5px',
+              borderRadius: '6px',
               border: '1px solid rgba(160, 105, 50, 0.28)',
               pointerEvents: 'none'
             }} />
@@ -641,105 +1002,268 @@ const WoodenBlockRow: React.FC<WoodenBlockRowProps> = ({
   );
 };
 
-interface ToyBlockIntroSplashProps {
-  onFinish: () => void;
-  onPlayBlockSound?: (index: number) => void;
+interface TankAnatomyBlueprintProps {
+  skin: typeof TANK_SKINS_LIST[0];
+  hat: typeof TANK_HATS_LIST[0];
+  trail: typeof BULLET_TRAILS_LIST[0];
+  perk: typeof TACTICAL_PERKS_LIST[0];
+  onOpenHangar: () => void;
 }
 
-const ToyBlockIntroSplash: React.FC<ToyBlockIntroSplashProps> = ({ onFinish, onPlayBlockSound }) => {
-  const [fadingOut, setFadingOut] = useState(false);
-
-  useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    // Trigger subtle wooden block pop cues as blocks land
-    for (let i = 0; i < 12; i++) {
-      const t = setTimeout(() => {
-        if (onPlayBlockSound) onPlayBlockSound(i);
-      }, i * 85 + 320);
-      timers.push(t);
-    }
-
-    const fadeTimer = setTimeout(() => {
-      setFadingOut(true);
-    }, 2400);
-    const doneTimer = setTimeout(() => {
-      onFinish();
-    }, 2850);
-
-    timers.push(fadeTimer, doneTimer);
-    return () => timers.forEach(t => clearTimeout(t));
-  }, [onFinish, onPlayBlockSound]);
-
-  const handleSkip = () => {
-    setFadingOut(true);
-    setTimeout(onFinish, 220);
-  };
-
+const TankAnatomyBlueprint: React.FC<TankAnatomyBlueprintProps> = ({
+  skin,
+  hat,
+  trail,
+  perk,
+  onOpenHangar
+}) => {
   return (
     <div
-      onClick={handleSkip}
       style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 200,
+        position: 'relative',
+        width: '100%',
+        background: 'radial-gradient(circle at 50% 48%, rgba(15, 23, 42, 0.62) 0%, rgba(9, 14, 26, 0.36) 72%, rgba(9, 14, 26, 0.15) 100%)',
+        border: '1px solid rgba(56, 189, 248, 0.25)',
+        borderRadius: '20px',
+        padding: '18px 20px',
+        backdropFilter: 'blur(8px)',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.38), inset 0 0 40px rgba(56, 189, 248, 0.05)',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'radial-gradient(circle at center, rgba(30, 41, 59, 0.72) 0%, rgba(9, 13, 24, 0.94) 100%)',
-        backdropFilter: 'blur(14px)',
-        cursor: 'pointer',
-        opacity: fadingOut ? 0 : 1,
-        transition: 'opacity 0.42s ease-out',
-        padding: '24px'
+        justifyContent: 'space-between',
+        overflow: 'hidden'
       }}
     >
-      {/* Studio Emblem Pill */}
-      <div style={{
-        backgroundColor: 'rgba(251, 191, 36, 0.16)',
-        border: '1.5px solid rgba(251, 191, 36, 0.55)',
-        color: '#fde047',
-        fontSize: '11px',
-        fontWeight: 900,
-        padding: '6px 16px',
-        borderRadius: '20px',
-        letterSpacing: '2.2px',
-        marginBottom: '24px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
-      }}>
-        ★ TOYBOX TACTICAL STUDIOS PRESENTA ★
+      {/* Blueprint Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', zIndex: 2 }}>
+        <div>
+          <div style={{ fontSize: '9.5px', fontWeight: 900, color: '#38bdf8', letterSpacing: '1.8px' }}>
+            ESQUEMA TÉCNICO TÁCTICO • ESCALA 1:12
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 900, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif' }}>
+            ANATOMÍA DEL TANQUE: <span style={{ color: skin.accent }}>{skin.name.toUpperCase()}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenHangar}
+          style={{
+            backgroundColor: 'rgba(56, 189, 248, 0.16)',
+            border: '1px solid rgba(56, 189, 248, 0.5)',
+            color: '#38bdf8',
+            borderRadius: '9px',
+            padding: '6px 12px',
+            fontSize: '10.5px',
+            fontWeight: 900,
+            cursor: 'pointer',
+            fontFamily: '"Chakra Petch", sans-serif',
+            letterSpacing: '0.6px'
+          }}
+        >
+          🔧 PERSONALIZAR →
+        </button>
       </div>
 
-      {/* 3D Wooden Alphabet Toy Blocks Spelling TANKS ARENA 3D */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-        <WoodenBlockRow word="TANKS" startIndex={0} size="large" animateDrop={true} />
-        <WoodenBlockRow word="ARENA 3D" startIndex={5} size="large" animateDrop={true} />
+      {/* Minimalist Technical SVG Blueprint + Interactive Callouts */}
+      <div style={{ position: 'relative', width: '100%', padding: '6px 0' }}>
+        <svg
+          viewBox="0 0 560 280"
+          style={{ width: '100%', height: 'auto', maxHeight: '250px', display: 'block', filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.45))' }}
+        >
+          <defs>
+            <pattern id="blueprintGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+              <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(56, 189, 248, 0.08)" strokeWidth="1" />
+            </pattern>
+            <linearGradient id="hullGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={skin.color} stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#0f172a" stopOpacity="0.95" />
+            </linearGradient>
+          </defs>
+
+          {/* Subtle Technical Grid Background */}
+          <rect x="8" y="8" width="544" height="264" rx="14" fill="url(#blueprintGrid)" />
+
+          {/* Crosshair & Radar Rings */}
+          <circle cx="245" cy="155" r="98" fill="none" stroke="rgba(56, 189, 248, 0.14)" strokeWidth="1" strokeDasharray="5 5" />
+          <circle cx="245" cy="155" r="126" fill="none" stroke="rgba(56, 189, 248, 0.08)" strokeWidth="1" />
+          <line x1="90" y1="155" x2="430" y2="155" stroke="rgba(56, 189, 248, 0.12)" strokeWidth="1" />
+          <line x1="245" y1="25" x2="245" y2="260" stroke="rgba(56, 189, 248, 0.12)" strokeWidth="1" />
+
+          {/* Tank Tracks / Caterpillar Treads */}
+          <rect x="128" y="192" width="234" height="44" rx="22" fill="#0f172a" stroke={skin.accent} strokeWidth="2.5" />
+          <rect x="136" y="198" width="218" height="32" rx="16" fill="rgba(15, 23, 42, 0.9)" stroke="rgba(148, 163, 184, 0.35)" strokeWidth="1.2" strokeDasharray="8 4" />
+          {[156, 192, 228, 264, 300, 334].map((cx, i) => (
+            <g key={i}>
+              <circle cx={cx} cy="214" r="12" fill="#1e293b" stroke={skin.accent} strokeWidth="2" />
+              <circle cx={cx} cy="214" r="4" fill={skin.accent} />
+            </g>
+          ))}
+
+          {/* Armored Hull / Toy Wooden-Alloy Chassis */}
+          <polygon
+            points="118,192 146,144 344,144 372,192"
+            fill="url(#hullGrad)"
+            stroke={skin.accent}
+            strokeWidth="2.5"
+          />
+          <line x1="154" y1="168" x2="336" y2="168" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" strokeDasharray="10 5" />
+
+          {/* Main Cannon Barrel + Muzzle Brake */}
+          <rect x="304" y="110" width="128" height="16" rx="4" fill="#1e293b" stroke={trail.color} strokeWidth="2.2" />
+          <rect x="424" y="106" width="20" height="24" rx="4" fill={trail.color} opacity="0.9" />
+          {/* Laser Trajectory Line */}
+          <line x1="446" y1="118" x2="532" y2="118" stroke={trail.color} strokeWidth="2.5" strokeDasharray="6 6" />
+          <circle cx="536" cy="118" r="5" fill={trail.color} />
+
+          {/* 360° Rotating Turret Dome */}
+          <path
+            d="M 182 144 C 186 94, 304 94, 308 144 Z"
+            fill="url(#hullGrad)"
+            stroke={skin.accent}
+            strokeWidth="2.5"
+          />
+          <circle cx="245" cy="124" r="10" fill="rgba(15,23,42,0.8)" stroke={skin.accent} strokeWidth="1.8" />
+
+          {/* Turret Topper / Hat Blueprint Node */}
+          <rect x="215" y="56" width="60" height="34" rx="9" fill="rgba(15, 23, 42, 0.88)" stroke={hat.color || '#38bdf8'} strokeWidth="1.8" strokeDasharray="4 2" />
+          <text x="245" y="79" textAnchor="middle" fontSize="20">
+            {hat.id === 'none' ? '🎯' : hat.icon}
+          </text>
+
+          {/* Technical Callout Lines & Dots */}
+          {/* 1. Top-Left: Turret Hat */}
+          <circle cx="215" cy="73" r="4" fill={hat.color || '#e879f9'} />
+          <polyline points="215,73 165,46 115,46" fill="none" stroke={hat.color || '#e879f9'} strokeWidth="1.5" />
+
+          {/* 2. Top-Right: Cannon & Tracer */}
+          <circle cx="385" cy="110" r="4" fill={trail.color} />
+          <polyline points="385,110 420,62 465,62" fill="none" stroke={trail.color} strokeWidth="1.5" />
+
+          {/* 3. Bottom-Left: Chassis & Skin */}
+          <circle cx="152" cy="172" r="4" fill={skin.accent} />
+          <polyline points="152,172 112,235 72,235" fill="none" stroke={skin.accent} strokeWidth="1.5" />
+
+          {/* 4. Bottom-Right: Tactical Module & Treads */}
+          <circle cx="334" cy="214" r="4" fill={perk.color} />
+          <polyline points="334,214 390,242 448,242" fill="none" stroke={perk.color} strokeWidth="1.5" />
+        </svg>
+
+        {/* Interactive Callout Pills Overlaid on Corners */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+            marginTop: '6px'
+          }}
+        >
+          <button
+            type="button"
+            onClick={onOpenHangar}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.78)',
+              border: `1px solid ${skin.accent}66`,
+              borderLeft: `3px solid ${skin.accent}`,
+              borderRadius: '9px',
+              padding: '7px 10px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              color: '#f8fafc'
+            }}
+          >
+            <div style={{ fontSize: '9px', fontWeight: 900, color: skin.accent, letterSpacing: '0.8px' }}>
+              01 • BLINDAJE Y CHASIS 3D
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 800, marginTop: '1px' }}>
+              {skin.badge} {skin.name}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenHangar}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.78)',
+              border: `1px solid ${trail.color}66`,
+              borderLeft: `3px solid ${trail.color}`,
+              borderRadius: '9px',
+              padding: '7px 10px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              color: '#f8fafc'
+            }}
+          >
+            <div style={{ fontSize: '9px', fontWeight: 900, color: trail.color, letterSpacing: '0.8px' }}>
+              02 • CAÑÓN Y TRAZADORA
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 800, marginTop: '1px' }}>
+              {trail.icon} {trail.name}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenHangar}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.78)',
+              border: `1px solid ${hat.color || '#e879f9'}66`,
+              borderLeft: `3px solid ${hat.color || '#e879f9'}`,
+              borderRadius: '9px',
+              padding: '7px 10px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              color: '#f8fafc'
+            }}
+          >
+            <div style={{ fontSize: '9px', fontWeight: 900, color: hat.color || '#e879f9', letterSpacing: '0.8px' }}>
+              03 • TORRETA 360° (CASCO)
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 800, marginTop: '1px' }}>
+              {hat.icon} {hat.name}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenHangar}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.78)',
+              border: `1px solid ${perk.color}66`,
+              borderLeft: `3px solid ${perk.color}`,
+              borderRadius: '9px',
+              padding: '7px 10px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              color: '#f8fafc'
+            }}
+          >
+            <div style={{ fontSize: '9px', fontWeight: 900, color: perk.color, letterSpacing: '0.8px' }}>
+              04 • MÓDULO TÁCTICO
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 800, marginTop: '1px' }}>
+              {perk.icon} {perk.name}
+            </div>
+          </button>
+        </div>
       </div>
 
-      {/* Toy Story Inspired Wooden Train / Tank Track Divider */}
+      {/* Minimalist Keybind Strip */}
       <div style={{
-        marginTop: '28px',
-        padding: '10px 24px',
-        borderRadius: '12px',
-        backgroundColor: 'rgba(15, 23, 42, 0.85)',
-        border: '1px solid rgba(148, 163, 184, 0.28)',
-        color: '#e2e8f0',
-        fontSize: '13px',
-        fontWeight: 800,
-        letterSpacing: '1px',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '6px',
+        paddingTop: '10px',
+        marginTop: '8px',
+        borderTop: '1px solid rgba(148, 163, 184, 0.16)',
+        fontSize: '10.5px',
+        color: '#cbd5e1'
       }}>
-        🪵 EDICIÓN COLECCIONISTA DE BATALLA DE JUGUETES 3D
-      </div>
-
-      <div style={{
-        marginTop: '18px',
-        fontSize: '11px',
-        fontWeight: 700,
-        color: '#94a3b8',
-        letterSpacing: '1.2px'
-      }}>
-        Haz clic en cualquier lugar para entrar al Centro de Mando
+        <span>🕹️ <kbd style={styles.kbd}>WASD</kbd> + <kbd style={styles.kbd}>Clic</kbd></span>
+        <span>🚀 Bazoca <kbd style={styles.kbd}>Q</kbd>/<kbd style={styles.kbd}>Shift</kbd></span>
+        <span>💣 Mina <kbd style={styles.kbd}>Espacio</kbd></span>
+        <span>🔍 Cámara <kbd style={styles.kbd}>C</kbd> • <kbd style={styles.kbd}>Z/X</kbd></span>
       </div>
     </div>
   );
@@ -751,7 +1275,10 @@ interface MainMenuProps {
   onLevelSelect: () => void;
   onOpenIntel: () => void;
   onOpenHangar: () => void;
+  onOpenStore: (initialTab?: 'featured' | 'battlepass' | 'crate' | 'gems') => void;
+  onQuickBuyStarterPack: () => void;
   onOpenSettings: () => void;
+  onReplayIntro?: () => void;
   unlockedLevel: number;
   totalLevels: number;
   totalStars: number;
@@ -761,6 +1288,17 @@ interface MainMenuProps {
   onToggleMusic: () => void;
   selectedSkin: string;
   selectedPerk: string;
+  selectedHat: string;
+  selectedTrail?: string;
+  coins: number;
+  gems: number;
+  bpXp: number;
+  vipPassActive: boolean;
+  supporterBadge: boolean;
+  starterPackOwned: boolean;
+  showIntroSplash?: boolean;
+  onFinishIntro?: () => void;
+  onPlayBlockSound?: (index: number) => void;
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({
@@ -769,7 +1307,13 @@ const MainMenu: React.FC<MainMenuProps> = ({
   onLevelSelect,
   onOpenIntel,
   onOpenHangar,
+  onOpenStore,
+  onQuickBuyStarterPack,
   onOpenSettings,
+  onReplayIntro,
+  showIntroSplash = false,
+  onFinishIntro,
+  onPlayBlockSound,
   unlockedLevel,
   totalLevels,
   totalStars,
@@ -778,416 +1322,757 @@ const MainMenu: React.FC<MainMenuProps> = ({
   isMusicMuted,
   onToggleMusic,
   selectedSkin,
-  selectedPerk
+  selectedPerk,
+  selectedHat,
+  selectedTrail = 'standard',
+  coins,
+  gems,
+  bpXp,
+  vipPassActive,
+  supporterBadge,
+  starterPackOwned
 }) => {
   const currentMission = Math.min(unlockedLevel, totalLevels);
   const currentBiomeId = LevelLoader.getBiome(currentMission);
   const currentBiome = BIOMES_LIST.find(b => b.id === currentBiomeId) || BIOMES_LIST[1];
   const progressPct = Math.min(100, Math.round(((unlockedLevel - 1) / totalLevels) * 100));
-  const activeDiff = AI_DIFFICULTIES_LIST.find(d => d.id === aiDifficulty) || AI_DIFFICULTIES_LIST[1];
   const activeSkinObj = TANK_SKINS_LIST.find(s => s.id === selectedSkin) || TANK_SKINS_LIST[0];
   const activePerkObj = TACTICAL_PERKS_LIST.find(p => p.id === selectedPerk) || TACTICAL_PERKS_LIST[0];
+  const activeHatObj = TANK_HATS_LIST.find(h => h.id === selectedHat) || TANK_HATS_LIST[0];
+  const activeTrailObj = BULLET_TRAILS_LIST.find(t => t.id === selectedTrail) || BULLET_TRAILS_LIST[0];
+  const bpLevel = Math.min(10, Math.floor(bpXp / 100) + 1);
+
+  // Seamless FLIP Wooden Block Title Intro -> Top-Left Slot State
+  const logoSlotRef = useRef<HTMLDivElement | null>(null);
+  const [introPhase, setIntroPhase] = useState<'center' | 'docking' | 'docked'>(() =>
+    showIntroSplash ? 'center' : 'docked'
+  );
+  const [dropCycleKey, setDropCycleKey] = useState(0);
+  const [viewport, setViewport] = useState({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    h: typeof window !== 'undefined' ? window.innerHeight : 800
+  });
+  const [centerOffset, setCenterOffset] = useState({ x: 240, y: 180, scale: 0.9 });
+
+  const isMobileScreen = viewport.w < 680;
+  const dockScale = isMobileScreen ? 0.36 : 0.44;
+  const slotWidth = Math.round(WOOD_LOGO_BASE_WIDTH * dockScale);
+  const slotHeight = Math.round(WOOD_LOGO_BASE_HEIGHT * dockScale);
+
+  const measureCenterOffset = useCallback(() => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setViewport({ w: vw, h: vh });
+
+    // Responsive scale so "ARENA 3D" (476px base width) NEVER cuts off on mobile screens
+    const cScale = Math.min(1.06, (vw - 26) / WOOD_LOGO_BASE_WIDTH, (vh * 0.44) / WOOD_LOGO_BASE_HEIGHT);
+    const targetCenterX = (vw - WOOD_LOGO_BASE_WIDTH * cScale) / 2;
+    const targetCenterY = (vh - WOOD_LOGO_BASE_HEIGHT * cScale) / 2 - 18;
+
+    if (logoSlotRef.current) {
+      const rect = logoSlotRef.current.getBoundingClientRect();
+      setCenterOffset({
+        x: Math.round(targetCenterX - rect.left),
+        y: Math.round(targetCenterY - rect.top),
+        scale: Number(cScale.toFixed(4))
+      });
+    } else {
+      setCenterOffset({
+        x: Math.round(targetCenterX - 24),
+        y: Math.round(targetCenterY - 20),
+        scale: Number(cScale.toFixed(4))
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    measureCenterOffset();
+    window.addEventListener('resize', measureCenterOffset);
+    return () => window.removeEventListener('resize', measureCenterOffset);
+  }, [measureCenterOffset]);
+
+  // Trigger or replay the center wooden block drop & smooth corner glide
+  useEffect(() => {
+    if (!showIntroSplash) return;
+    measureCenterOffset();
+    setIntroPhase('center');
+    setDropCycleKey(k => k + 1);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 0; i < 12; i++) {
+      timers.push(
+        setTimeout(() => {
+          onPlayBlockSound?.(i);
+        }, i * 75 + 240)
+      );
+    }
+
+    // Hold the completed title in the center up to 2.95s so the player can admire it,
+    // then glide smoothly over 1.25s directly into its top-left slot with ZERO DOM swap!
+    timers.push(
+      setTimeout(() => {
+        measureCenterOffset();
+        setIntroPhase('docking');
+      }, 2950)
+    );
+    timers.push(
+      setTimeout(() => {
+        setIntroPhase('docked');
+        onFinishIntro?.();
+      }, 4200)
+    );
+
+    return () => timers.forEach(t => clearTimeout(t));
+  }, [showIntroSplash, measureCenterOffset, onFinishIntro, onPlayBlockSound]);
+
+  const handleSkipIntro = () => {
+    if (introPhase === 'center') {
+      measureCenterOffset();
+      setIntroPhase('docking');
+      setTimeout(() => {
+        setIntroPhase('docked');
+        onFinishIntro?.();
+      }, 1150);
+    }
+  };
+
+  const isCenterPhase = introPhase === 'center';
+  const menuRevealed = introPhase !== 'center';
 
   return (
-    <div style={styles.overlay}>
-      <div style={{
-        ...styles.menuBox,
-        maxWidth: '940px',
-        padding: '28px 34px',
-        textAlign: 'left'
-      }}>
-        {/* Top Studio Bar & Wooden Toy Block Logo Header */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          paddingBottom: '20px',
-          marginBottom: '22px',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.2)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <span style={styles.toyBadge}>TOYBOX TACTICAL STUDIOS • EDICIÓN 3D</span>
-            <span style={{
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
-              border: '1px solid rgba(56, 189, 248, 0.45)',
-              color: '#38bdf8',
-              fontSize: '10px',
-              fontWeight: 800,
-              padding: '4px 10px',
-              borderRadius: '6px',
-              letterSpacing: '1px'
-            }}>
-              10 BIOMAS • 80 MISIONES
-            </span>
-            <span style={{
-              backgroundColor: 'rgba(251, 191, 36, 0.16)',
-              border: '1px solid rgba(251, 191, 36, 0.45)',
-              color: '#fbbf24',
-              fontSize: '10px',
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: 'clamp(12px, 2.2vw, 20px) clamp(14px, 2.8vw, 26px)',
+        boxSizing: 'border-box',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        background: isCenterPhase
+          ? 'radial-gradient(circle at 50% 45%, rgba(30, 41, 59, 0.72) 0%, rgba(7, 11, 20, 0.94) 100%)'
+          : 'radial-gradient(circle at 55% 45%, rgba(15, 23, 42, 0.25) 0%, rgba(6, 10, 19, 0.78) 100%)',
+        backdropFilter: isCenterPhase ? 'blur(12px)' : 'blur(6px)',
+        transition: 'background 0.95s ease, backdrop-filter 0.95s ease',
+        pointerEvents: 'auto'
+      }}
+    >
+      {/* Click-Anywhere Overlay during Center Showcase Phase to glide immediately */}
+      {isCenterPhase && (
+        <div
+          onClick={handleSkipIntro}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 250,
+            cursor: 'pointer'
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '12%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              textAlign: 'center',
+              width: '90%',
+              maxWidth: '380px',
+              pointerEvents: 'none'
+            }}
+          >
+            <div style={{
+              display: 'inline-block',
+              padding: '8px 18px',
+              borderRadius: '20px',
+              backgroundColor: 'rgba(15, 23, 42, 0.88)',
+              border: '1px solid rgba(251, 191, 36, 0.5)',
+              color: '#fde047',
+              fontSize: 'clamp(10px, 2.8vw, 11.5px)',
               fontWeight: 900,
-              padding: '4px 10px',
-              borderRadius: '6px',
-              letterSpacing: '0.8px'
+              letterSpacing: '1.3px',
+              boxShadow: '0 10px 28px rgba(0,0,0,0.5)'
             }}>
-              ★ {totalStars} / {totalLevels * 3} ESTRELLAS
+              ★ TOYBOX TACTICAL STUDIOS • TOCA PARA CONTINUAR ★
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOP BAR: Left Docked Wooden Blocks Title + Right Floating Economy Wallet */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '1260px',
+          margin: '0 auto',
+          position: 'relative',
+          zIndex: isCenterPhase ? 260 : 10
+        }}
+      >
+        {/* Top-Left: Persistent 3D Wooden Blocks Logo Slot (Zero-Jerk FLIP Anchor) + Star Count */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Reserved Slot Box: The Wooden Blocks live inside this exact box and transition from (centerOffset.x, centerOffset.y, centerScale) -> (0, 0, dockScale)! */}
+          <div
+            ref={logoSlotRef}
+            onClick={() => {
+              if (introPhase === 'docked' && onReplayIntro) {
+                onReplayIntro();
+              } else if (isCenterPhase) {
+                handleSkipIntro();
+              }
+            }}
+            title="Haz clic para repetir la animación de bloques de madera"
+            style={{
+              position: 'relative',
+              width: `${slotWidth}px`,
+              height: `${slotHeight}px`,
+              cursor: 'pointer',
+              flexShrink: 0,
+              zIndex: 260
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${WOOD_LOGO_BASE_WIDTH}px`,
+                height: `${WOOD_LOGO_BASE_HEIGHT}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transformOrigin: '0 0',
+                willChange: 'transform',
+                transform: isCenterPhase
+                  ? `translate3d(${centerOffset.x}px, ${centerOffset.y}px, 0) scale(${centerOffset.scale})`
+                  : `translate3d(0px, 0px, 0) scale(${dockScale})`,
+                transition: introPhase === 'docking'
+                  ? 'transform 1.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                  : 'none',
+                pointerEvents: 'none'
+              }}
+            >
+              <WoodenBlockRow
+                word="TANKS"
+                startIndex={0}
+                animateDrop={isCenterPhase}
+                dropCycleKey={dropCycleKey}
+              />
+              <WoodenBlockRow
+                word="ARENA 3D"
+                startIndex={5}
+                animateDrop={isCenterPhase}
+                dropCycleKey={dropCycleKey}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              opacity: menuRevealed ? 1 : 0,
+              transform: menuRevealed ? 'translateY(0)' : 'translateY(-6px)',
+              transition: 'opacity 0.75s ease 0.15s, transform 0.75s ease 0.15s',
+              pointerEvents: menuRevealed ? 'auto' : 'none'
+            }}
+          >
+            <span style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(251, 191, 36, 0.5)',
+              color: '#fbbf24',
+              fontSize: '11px',
+              fontWeight: 900,
+              padding: '5px 10px',
+              borderRadius: '8px',
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              ★ {totalStars}/{totalLevels * 3}
             </span>
+            {vipPassActive && (
+              <span style={{
+                backgroundColor: 'rgba(168, 85, 247, 0.25)',
+                border: '1px solid rgba(192, 132, 252, 0.65)',
+                color: '#e879f9',
+                fontSize: '10px',
+                fontWeight: 900,
+                padding: '5px 9px',
+                borderRadius: '8px'
+              }}>
+                👑 VIP
+              </span>
+            )}
+            {supporterBadge && (
+              <span style={{
+                backgroundColor: 'rgba(74, 222, 128, 0.2)',
+                border: '1px solid rgba(74, 222, 128, 0.5)',
+                color: '#4ade80',
+                fontSize: '10px',
+                fontWeight: 900,
+                padding: '5px 9px',
+                borderRadius: '8px'
+              }}>
+                ☕ MECENAS
+              </span>
+            )}
           </div>
-
-          {/* Toy Story Wooden Blocks Header Logo */}
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', margin: '4px 0 10px 0' }}>
-            <WoodenBlockRow word="TANKS" startIndex={0} size="compact" animateDrop={false} />
-            <WoodenBlockRow word="ARENA 3D" startIndex={5} size="compact" animateDrop={false} />
-          </div>
-
-          <p style={{ ...styles.subtitle, margin: '2px 0 0 0', fontSize: '13px' }}>
-            Combate táctico de blindados con balística de rebote, sigilo nocturno, faros dinámicos y bazoca demoledor
-          </p>
         </div>
 
-        {/* Wide 2-Column Studio Layout: Left Navigation Menu + Right Command Telemetry */}
-        <div style={{
+        {/* Top-Right: Floating Currency Wallet & Audio Pill */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            opacity: menuRevealed ? 1 : 0,
+            transform: menuRevealed ? 'translateY(0)' : 'translateY(-6px)',
+            transition: 'opacity 0.75s ease 0.15s, transform 0.75s ease 0.15s',
+            pointerEvents: menuRevealed ? 'auto' : 'none'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => onOpenStore('battlepass')}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.88)',
+              border: '1.5px solid rgba(192, 132, 252, 0.6)',
+              borderRadius: '10px',
+              padding: '7px 11px',
+              color: '#e879f9',
+              fontSize: '11.5px',
+              fontWeight: 900,
+              cursor: 'pointer'
+            }}
+          >
+            🎖️ PASE NV.{bpLevel}
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenHangar}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.88)',
+              border: '1.5px solid rgba(251, 191, 36, 0.6)',
+              borderRadius: '10px',
+              padding: '7px 11px',
+              color: '#fbbf24',
+              fontSize: '12px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              fontVariantNumeric: 'tabular-nums'
+            }}
+          >
+            🪙 {coins.toLocaleString()}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenStore('gems')}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.88)',
+              border: '1.5px solid rgba(56, 189, 248, 0.7)',
+              borderRadius: '10px',
+              padding: '7px 11px',
+              color: '#38bdf8',
+              fontSize: '12px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontVariantNumeric: 'tabular-nums'
+            }}
+          >
+            <span>💎 {gems.toLocaleString()}</span>
+            <span style={{
+              backgroundColor: '#38bdf8',
+              color: '#0f172a',
+              borderRadius: '4px',
+              padding: '0 5px',
+              fontSize: '10px',
+              fontWeight: 900
+            }}>+</span>
+          </button>
+
+          <button
+            type="button"
+            data-audio-toggle="true"
+            onClick={onToggleMusic}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.88)',
+              border: isMusicMuted ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(74, 222, 128, 0.55)',
+              color: isMusicMuted ? '#94a3b8' : '#4ade80',
+              fontSize: '11.5px',
+              fontWeight: 800,
+              padding: '7px 11px',
+              borderRadius: '10px',
+              cursor: 'pointer'
+            }}
+            title="Activar / Silenciar Música"
+          >
+            {isMusicMuted ? '🔇' : '🎵'}
+          </button>
+        </div>
+      </div>
+
+      {/* CENTER WORKSPACE: Frameless Floating Left Navigation + Right Tank Anatomy Blueprint */}
+      <div
+        style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: '22px',
-          alignItems: 'stretch'
-        }}>
-          {/* LEFT COLUMN: Classic AAA Studio Menu Navigation */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'space-between' }}>
-            {/* 1. CONTINUAR / DESPLEGAR */}
-            <button
-              className="tactical-btn-primary"
-              onClick={onStart}
-              style={{
-                ...styles.primaryButton,
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                textAlign: 'left',
-                borderRadius: '12px'
-              }}
-            >
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+          gap: 'clamp(16px, 2.5vw, 26px)',
+          alignItems: 'center',
+          width: '100%',
+          maxWidth: '1260px',
+          margin: 'auto',
+          padding: '12px 0',
+          opacity: menuRevealed ? 1 : 0,
+          transform: menuRevealed ? 'translateY(0)' : 'translateY(14px)',
+          transition: 'opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.18s, transform 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.18s',
+          pointerEvents: menuRevealed ? 'auto' : 'none'
+        }}
+      >
+        {/* LEFT SIDE: Floating Action Menu + Integrated Campaign Expediente */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+          {/* 1. Primary Play Campaign CTA */}
+          <button
+            className="tactical-btn-primary"
+            onClick={onStart}
+            style={{
+              ...styles.primaryButton,
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              textAlign: 'left',
+              borderRadius: '14px',
+              boxShadow: '0 12px 32px rgba(245, 158, 11, 0.38)'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: 900, color: '#451a03', letterSpacing: '1.2px' }}>
+                {currentBiome.icon} {currentBiome.label.toUpperCase()} • {LevelLoader.getLevelName(currentMission).toUpperCase()}
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                ▶ JUGAR MISIÓN #{currentMission}
+              </div>
+            </div>
+            <span style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.18)',
+              padding: '7px 12px',
+              borderRadius: '9px',
+              fontSize: '12px',
+              fontWeight: 900,
+              color: '#0f172a'
+            }}>
+              DESPLEGAR →
+            </span>
+          </button>
+
+          {/* 2. Prominent Store & VIP Battle Pass Button */}
+          <button
+            className="studio-menu-item"
+            onClick={() => onOpenStore('featured')}
+            style={{
+              ...styles.studioMenuBtn,
+              padding: '14px 18px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, rgba(88, 28, 135, 0.65) 0%, rgba(15, 23, 42, 0.85) 100%)',
+              border: '1.5px solid rgba(232, 121, 249, 0.6)',
+              borderLeft: '5px solid #e879f9',
+              boxShadow: '0 10px 28px rgba(168, 85, 247, 0.25)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ ...styles.studioMenuIcon, backgroundColor: 'rgba(168, 85, 247, 0.3)', borderColor: 'rgba(232, 121, 249, 0.55)' }}>💎</span>
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 900, color: '#451a03', letterSpacing: '1.2px' }}>
-                  OPERACIÓN EN CURSO • {currentBiome.icon} {currentBiome.label.split(' ')[0].toUpperCase()}
-                </div>
-                <div style={{ fontSize: '17px', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
-                  ▶ CONTINUAR CAMPAÑA (M-{currentMission})
-                </div>
+                <div style={{ ...styles.studioMenuTitle, color: '#f5d0fe', fontSize: '14.5px' }}>TIENDA, PASE VIP Y COFRES</div>
+                <div style={styles.studioMenuSub}>Skins Míticas • Caja Misteriosa • Regalo Diario Gratis</div>
               </div>
-              <span style={{
-                backgroundColor: 'rgba(15, 23, 42, 0.16)',
-                padding: '6px 10px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 900,
-                color: '#0f172a'
-              }}>
-                JUGAR →
-              </span>
-            </button>
+            </div>
+            <span style={{
+              background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 100%)',
+              padding: '4px 9px',
+              borderRadius: '7px',
+              fontSize: '10px',
+              fontWeight: 900,
+              color: '#fff'
+            }}>
+              ¡OFERTAS!
+            </span>
+          </button>
 
-            {/* 2. SELECCIONAR MISIÓN */}
-            <button
-              className="studio-menu-item"
-              onClick={onLevelSelect}
-              style={{
-                ...styles.studioMenuBtn,
-                borderLeft: '4px solid #fbbf24'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={styles.studioMenuIcon}>🗺️</span>
-                <div>
-                  <div style={styles.studioMenuTitle}>SELECCIONAR MISIÓN</div>
-                  <div style={styles.studioMenuSub}>{totalLevels} operaciones tácticas en 10 biomas</div>
-                </div>
-              </div>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24' }}>★ {totalStars}/{totalLevels * 3}</span>
-            </button>
-
-            {/* 3. HANGAR 3D */}
+          {/* 3. Hangar 3D & Mission Select in Clean 2-Column Floating Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               className="studio-menu-item"
               onClick={onOpenHangar}
               style={{
                 ...styles.studioMenuBtn,
-                borderLeft: '4px solid #38bdf8'
+                padding: '13px 14px',
+                borderRadius: '13px',
+                borderLeft: '4px solid #38bdf8',
+                backgroundColor: 'rgba(9, 14, 26, 0.72)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={styles.studioMenuIcon}>🔧</span>
                 <div>
-                  <div style={styles.studioMenuTitle}>HANGAR 3D Y ARMAMENTO</div>
-                  <div style={styles.studioMenuSub}>{activeSkinObj.name} • {activePerkObj.name}</div>
+                  <div style={styles.studioMenuTitle}>HANGAR 3D</div>
+                  <div style={styles.studioMenuSub}>Skins y Prueba Gratis</div>
                 </div>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: '#38bdf8' }}>EQUIPAR</span>
             </button>
 
-            {/* 4. AJUSTES */}
+            <button
+              className="studio-menu-item"
+              onClick={onLevelSelect}
+              style={{
+                ...styles.studioMenuBtn,
+                padding: '13px 14px',
+                borderRadius: '13px',
+                borderLeft: '4px solid #fbbf24',
+                backgroundColor: 'rgba(9, 14, 26, 0.72)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={styles.studioMenuIcon}>🗺️</span>
+                <div>
+                  <div style={styles.studioMenuTitle}>80 MISIONES</div>
+                  <div style={styles.studioMenuSub}>10 Biomas Tácticos</div>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* 4. Compact Campaign Expediente & Quick Biome / AI Bar */}
+          <div style={{
+            backgroundColor: 'rgba(9, 14, 26, 0.68)',
+            border: '1px solid rgba(148, 163, 184, 0.22)',
+            borderRadius: '14px',
+            padding: '12px 15px',
+            backdropFilter: 'blur(8px)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', letterSpacing: '1px' }}>
+                EXPEDIENTE DE CAMPAÑA ({Math.min(unlockedLevel - 1, totalLevels)}/{totalLevels})
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 900, color: '#fde047' }}>
+                ACCESO RÁPIDO BIOMAS
+              </span>
+            </div>
+
+            <div style={{ height: '6px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
+              <div style={{
+                width: `${Math.max(5, progressPct)}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
+                borderRadius: '4px'
+              }} />
+            </div>
+
+            {/* 4 Featured Biomes Direct Launch */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '10px' }}>
+              <button
+                type="button"
+                onClick={() => onQuickStartLevel(49)}
+                style={{
+                  backgroundColor: 'rgba(255, 138, 101, 0.16)',
+                  border: '1px solid rgba(255, 138, 101, 0.45)',
+                  color: '#ffab91',
+                  borderRadius: '7px',
+                  padding: '5px 4px',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                🌇 M49
+              </button>
+              <button
+                type="button"
+                onClick={() => onQuickStartLevel(57)}
+                style={{
+                  backgroundColor: 'rgba(244, 114, 182, 0.16)',
+                  border: '1px solid rgba(244, 114, 182, 0.45)',
+                  color: '#f9a8d4',
+                  borderRadius: '7px',
+                  padding: '5px 4px',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                🏮 M57
+              </button>
+              <button
+                type="button"
+                onClick={() => onQuickStartLevel(65)}
+                style={{
+                  backgroundColor: 'rgba(45, 212, 191, 0.16)',
+                  border: '1px solid rgba(45, 212, 191, 0.45)',
+                  color: '#5eead4',
+                  borderRadius: '7px',
+                  padding: '5px 4px',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                🏝️ M65
+              </button>
+              <button
+                type="button"
+                onClick={() => onQuickStartLevel(73)}
+                style={{
+                  backgroundColor: 'rgba(129, 140, 248, 0.2)',
+                  border: '1px solid rgba(129, 140, 248, 0.55)',
+                  color: '#c7d2fe',
+                  borderRadius: '7px',
+                  padding: '5px 4px',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                🌙 M73
+              </button>
+            </div>
+
+            {/* AI Difficulty Selector */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
+              {AI_DIFFICULTIES_LIST.map(d => {
+                const active = aiDifficulty === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => onSelectDifficulty(d.id)}
+                    style={{
+                      backgroundColor: active ? `${d.color}24` : 'rgba(30, 41, 59, 0.65)',
+                      border: active ? `1.5px solid ${d.color}` : '1px solid rgba(148, 163, 184, 0.2)',
+                      color: active ? d.color : '#94a3b8',
+                      borderRadius: '7px',
+                      padding: '5px 4px',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {d.icon} {d.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 5. Settings & Tactical Manual Compact Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               className="studio-menu-item"
               onClick={onOpenSettings}
               style={{
                 ...styles.studioMenuBtn,
-                borderLeft: '4px solid #a855f7'
+                padding: '10px 14px',
+                borderRadius: '12px',
+                borderLeft: '3px solid #a855f7',
+                backgroundColor: 'rgba(9, 14, 26, 0.68)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={styles.studioMenuIcon}>⚙️</span>
-                <div>
-                  <div style={styles.studioMenuTitle}>AJUSTES Y AUDIO</div>
-                  <div style={styles.studioMenuSub}>IA: {activeDiff.label} • Música: {isMusicMuted ? 'OFF' : 'ON'} • Controles</div>
-                </div>
-              </div>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: '#c084fc' }}>CONFIGURAR</span>
+              <span style={{ fontSize: '12px', fontWeight: 900 }}>⚙️ AJUSTES</span>
+              <span style={{ fontSize: '10px', color: '#94a3b8' }}>Audio / Cámara</span>
             </button>
 
-            {/* 5. MANUAL / ENCICLOPEDIA */}
             <button
               className="studio-menu-item"
               onClick={onOpenIntel}
               style={{
                 ...styles.studioMenuBtn,
-                borderLeft: '4px solid #4ade80'
+                padding: '10px 14px',
+                borderRadius: '12px',
+                borderLeft: '3px solid #4ade80',
+                backgroundColor: 'rgba(9, 14, 26, 0.68)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={styles.studioMenuIcon}>📖</span>
-                <div>
-                  <div style={styles.studioMenuTitle}>MANUAL DE COMBATE</div>
-                  <div style={styles.studioMenuSub}>Guía de Bazoca, Minas, Biomas y Controles</div>
-                </div>
-              </div>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: '#4ade80' }}>VER GUÍA</span>
+              <span style={{ fontSize: '12px', fontWeight: 900 }}>📖 MANUAL</span>
+              <span style={{ fontSize: '10px', color: '#94a3b8' }}>Guía Táctica</span>
             </button>
           </div>
+        </div>
 
-          {/* RIGHT COLUMN: Command Center Status, Quick AI Difficulty & Arsenal Summary */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'space-between' }}>
-            {/* Active Campaign Operation Card */}
-            <div style={{
-              backgroundColor: 'rgba(9, 14, 26, 0.78)',
-              border: '1px solid rgba(148, 163, 184, 0.22)',
-              borderRadius: '12px',
-              padding: '14px 16px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', letterSpacing: '1.2px' }}>
-                  EXPEDIENTE DE CAMPAÑA
-                </span>
-                <span style={{
-                  backgroundColor: currentBiome.accent,
-                  border: `1px solid ${currentBiome.color}66`,
-                  color: currentBiome.color,
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  fontSize: '10.5px',
-                  fontWeight: 800
-                }}>
-                  {currentBiome.icon} {currentBiome.label.split(' ')[0].toUpperCase()}
-                </span>
-              </div>
+        {/* RIGHT SIDE: Minimalist Tank Anatomy Blueprint + Starter Offer */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <TankAnatomyBlueprint
+            skin={activeSkinObj}
+            hat={activeHatObj}
+            trail={activeTrailObj}
+            perk={activePerkObj}
+            onOpenHangar={onOpenHangar}
+          />
 
-              <div style={{ fontSize: '16px', fontWeight: 900, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif' }}>
-                MISIÓN #{currentMission}: {LevelLoader.getLevelName(currentMission).toUpperCase()}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-                <div style={{ flex: 1, height: '7px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{
-                    width: `${Math.max(4, progressPct)}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
-                    borderRadius: '4px'
-                  }} />
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
-                  {Math.min(unlockedLevel - 1, totalLevels)}/{totalLevels}
-                </span>
-              </div>
-
-              {/* Quick Direct Launch for the 4 Featured Biomes */}
-              <div style={{ marginTop: '10px', paddingTop: '9px', borderTop: '1px solid rgba(148, 163, 184, 0.16)' }}>
-                <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#fde047', letterSpacing: '0.8px', marginBottom: '6px' }}>
-                  ✨ NUEVOS BIOMAS Y SIGILO NOCTURNO (ACCESO RÁPIDO):
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
-                  <button
-                    type="button"
-                    onClick={() => onQuickStartLevel(49)}
-                    style={{
-                      backgroundColor: 'rgba(255, 138, 101, 0.16)',
-                      border: '1px solid rgba(255, 138, 101, 0.5)',
-                      color: '#ffab91',
-                      borderRadius: '7px',
-                      padding: '6px 3px',
-                      fontSize: '9.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                    title="Jugar Misión #49: Ciudad Crepúsculo / Atardecer-Noche"
-                  >
-                    🌇 Ciudad (M49)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onQuickStartLevel(57)}
-                    style={{
-                      backgroundColor: 'rgba(244, 114, 182, 0.16)',
-                      border: '1px solid rgba(244, 114, 182, 0.5)',
-                      color: '#f9a8d4',
-                      borderRadius: '7px',
-                      padding: '6px 3px',
-                      fontSize: '9.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                    title="Jugar Misión #57: Festival Japonés con Luces entre Farolas"
-                  >
-                    🏮 Festival (M57)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onQuickStartLevel(65)}
-                    style={{
-                      backgroundColor: 'rgba(45, 212, 191, 0.16)',
-                      border: '1px solid rgba(45, 212, 191, 0.5)',
-                      color: '#5eead4',
-                      borderRadius: '7px',
-                      padding: '6px 3px',
-                      fontSize: '9.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                    title="Jugar Misión #65: Isla Tropical Paradisíaca"
-                  >
-                    🏝️ Isla (M65)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onQuickStartLevel(73)}
-                    style={{
-                      backgroundColor: 'rgba(129, 140, 248, 0.22)',
-                      border: '1px solid rgba(129, 140, 248, 0.65)',
-                      color: '#c7d2fe',
-                      borderRadius: '7px',
-                      padding: '6px 3px',
-                      fontSize: '9.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                    title="Jugar Misión #73: Operaciones de Sigilo Nocturno con Faros"
-                  >
-                    🌙 Sigilo (M73)
-                  </button>
+          {!starterPackOwned && (
+            <div
+              onClick={onQuickBuyStarterPack}
+              style={{
+                background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.3) 0%, rgba(15, 23, 42, 0.85) 100%)',
+                border: '1.5px solid rgba(251, 191, 36, 0.65)',
+                borderRadius: '14px',
+                padding: '11px 16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                backdropFilter: 'blur(8px)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '24px' }}>🐉</span>
+                <div>
+                  <div style={{ fontSize: '9.5px', fontWeight: 900, color: '#fde047', letterSpacing: '1px' }}>
+                    PACK DE INICIO (-70% DTO)
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 900, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif' }}>
+                    Skin Dragón + 300 💎 + 2.500 🪙
+                  </div>
                 </div>
               </div>
+              <span style={{
+                background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                color: '#0f172a',
+                fontWeight: 900,
+                fontSize: '12px',
+                padding: '7px 12px',
+                borderRadius: '8px',
+                whiteSpace: 'nowrap'
+              }}>
+                1,99 € →
+              </span>
             </div>
-
-            {/* Quick AI Difficulty & Music Selector Card */}
-            <div style={{
-              backgroundColor: 'rgba(9, 14, 26, 0.78)',
-              border: '1px solid rgba(148, 163, 184, 0.22)',
-              borderRadius: '12px',
-              padding: '12px 16px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#cbd5e1', letterSpacing: '0.8px' }}>
-                  🤖 DIFICULTAD IA: <span style={{ color: activeDiff.color }}>{activeDiff.label} ({activeDiff.rank})</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={onToggleMusic}
-                  style={{
-                    backgroundColor: isMusicMuted ? 'rgba(30, 41, 59, 0.9)' : 'rgba(16, 185, 129, 0.2)',
-                    border: isMusicMuted ? '1px solid rgba(148, 163, 184, 0.35)' : '1px solid rgba(74, 222, 128, 0.55)',
-                    color: isMusicMuted ? '#94a3b8' : '#4ade80',
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {isMusicMuted ? '🎵 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                {AI_DIFFICULTIES_LIST.map(d => {
-                  const active = aiDifficulty === d.id;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => onSelectDifficulty(d.id)}
-                      title={d.desc}
-                      style={{
-                        backgroundColor: active ? `${d.color}24` : 'rgba(30, 41, 59, 0.7)',
-                        border: active ? `1.5px solid ${d.color}` : '1px solid rgba(148, 163, 184, 0.22)',
-                        color: active ? d.color : '#94a3b8',
-                        borderRadius: '8px',
-                        padding: '7px 4px',
-                        fontSize: '10.5px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {d.icon} {d.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '6px' }}>
-                {activeDiff.desc}
-              </div>
-            </div>
-
-            {/* Compact Arsenal & Keybinds Summary */}
-            <div style={{
-              backgroundColor: 'rgba(9, 14, 26, 0.78)',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
-              borderRadius: '12px',
-              padding: '12px 16px'
-            }}>
-              <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
-                ⚡ CONTROLES DE COMBATE Y DEMOLICIÓN
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', color: '#cbd5e1' }}>
-                <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.55)', padding: '6px 9px', borderRadius: '7px' }}>
-                  <strong style={{ color: '#f8fafc' }}>🕹️ Mover / Cañón</strong>
-                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                    <kbd style={styles.kbd}>WASD</kbd> + <kbd style={styles.kbd}>Clic Izq</kbd>
-                  </div>
-                </div>
-                <div style={{ backgroundColor: 'rgba(234, 88, 12, 0.16)', border: '1px solid rgba(251, 146, 60, 0.35)', padding: '6px 9px', borderRadius: '7px' }}>
-                  <strong style={{ color: '#fdba74' }}>🚀 Cohete Bazoca</strong>
-                  <div style={{ fontSize: '10px', color: '#fed7aa', marginTop: '2px' }}>
-                    <kbd style={styles.kbd}>Q</kbd> / <kbd style={styles.kbd}>F</kbd> / <kbd style={styles.kbd}>Shift</kbd> (Rompe muros)
-                  </div>
-                </div>
-                <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.55)', padding: '6px 9px', borderRadius: '7px' }}>
-                  <strong style={{ color: '#4ade80' }}>💣 Poner Mina</strong>
-                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                    <kbd style={styles.kbd}>Espacio</kbd> / <kbd style={styles.kbd}>E</kbd> / <kbd style={styles.kbd}>Clic Der</kbd>
-                  </div>
-                </div>
-                <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.55)', padding: '6px 9px', borderRadius: '7px' }}>
-                  <strong style={{ color: '#38bdf8' }}>🔍 Cámara 3D</strong>
-                  <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                    <kbd style={styles.kbd}>C</kbd> Vista • <kbd style={styles.kbd}>Z</kbd>/<kbd style={styles.kbd}>X</kbd> Zoom
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
+
+      <div style={{ height: '4px' }} />
     </div>
   );
 };
@@ -1221,27 +2106,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onReplayIntro,
   onClose
 }) => {
-  const activeDiff = AI_DIFFICULTIES_LIST.find(d => d.id === aiDifficulty) || AI_DIFFICULTIES_LIST[1];
-
   return (
-    <div style={styles.overlay}>
-      <div style={{ ...styles.menuBox, maxWidth: '640px', textAlign: 'left', padding: '26px 30px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.22)', paddingBottom: '12px', marginBottom: '16px' }}>
+    <div
+      style={styles.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div style={{ ...styles.menuBox, maxWidth: '560px', textAlign: 'left', padding: '22px 26px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '12px', marginBottom: '16px' }}>
           <div>
-            <div style={{ fontSize: '10px', fontWeight: 800, color: '#c084fc', letterSpacing: '1.5px' }}>CONFIGURACIÓN DEL SISTEMA</div>
-            <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>⚙️ AJUSTES DEL JUEGO</h2>
+            <div style={{ fontSize: '10px', fontWeight: 800, color: '#c084fc', letterSpacing: '1.5px' }}>SISTEMA</div>
+            <h2 style={{ ...styles.title, fontSize: '21px', margin: 0 }}>⚙️ AJUSTES</h2>
           </div>
-          <button className="tactical-btn-secondary" onClick={onClose} style={{ ...styles.secondaryButton, width: 'auto', padding: '6px 14px' }}>✕</button>
+          <ModalCloseButton onClick={onClose} />
         </div>
 
-        {/* 1. Audio & Soundtrack Settings */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
-            🔊 AUDIO Y BANDA SONORA
+        {/* 1. Audio */}
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '7px' }}>
+            🔊 SONIDO
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <button
               type="button"
+              data-audio-toggle="true"
               onClick={onToggleMusic}
               style={{
                 ...styles.secondaryButton,
@@ -1250,10 +2139,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 color: isMusicMuted ? '#94a3b8' : '#4ade80'
               }}
             >
-              {isMusicMuted ? '🎵 MÚSICA DE FONDO: OFF' : '🎵 MÚSICA DE FONDO: ON'}
+              {isMusicMuted ? '🎵 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
             </button>
             <button
               type="button"
+              data-audio-toggle="true"
               onClick={onToggleMute}
               style={{
                 ...styles.secondaryButton,
@@ -1262,17 +2152,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 color: isMuted ? '#94a3b8' : '#38bdf8'
               }}
             >
-              {isMuted ? '🔇 EFECTOS SFX: OFF' : '🔊 EFECTOS SFX: ON'}
+              {isMuted ? '🔇 EFECTOS: OFF' : '🔊 EFECTOS: ON'}
             </button>
           </div>
         </div>
 
-        {/* 2. AI Difficulty Selector */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px', marginBottom: '8px' }}>
-            🤖 NIVEL DE DIFICULTAD DE LA IA ENEMIGA
+        {/* 2. AI Difficulty */}
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px', marginBottom: '7px' }}>
+            🤖 DIFICULTAD IA
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
             {AI_DIFFICULTIES_LIST.map(d => {
               const active = aiDifficulty === d.id;
               return (
@@ -1284,43 +2174,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     backgroundColor: active ? `${d.color}24` : 'rgba(15, 23, 42, 0.8)',
                     border: active ? `2px solid ${d.color}` : '1px solid rgba(148, 163, 184, 0.25)',
                     color: active ? d.color : '#cbd5e1',
-                    borderRadius: '10px',
-                    padding: '10px 6px',
-                    fontSize: '11.5px',
+                    borderRadius: '9px',
+                    padding: '9px 6px',
+                    fontSize: '11px',
                     fontWeight: 800,
                     cursor: 'pointer'
                   }}
                 >
-                  <div>{d.icon} {d.label}</div>
-                  <div style={{ fontSize: '9.5px', opacity: 0.8, marginTop: '2px' }}>{d.rank}</div>
+                  {d.icon} {d.label}
                 </button>
               );
             })}
           </div>
-          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
-            {activeDiff.desc}
-          </div>
         </div>
 
-        {/* 3. Interface, Camera & Intro Replay */}
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#4ade80', letterSpacing: '0.8px', marginBottom: '8px' }}>
-            🎮 INTERFAZ, CÁMARA Y ANIMACIÓN
+        {/* 3. Controls & Intro */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#4ade80', letterSpacing: '0.8px', marginBottom: '7px' }}>
+            🎮 CONTROLES Y CÁMARA
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={onToggleTouchControls}
-              style={styles.secondaryButton}
-            >
-              📱 CONTROLES TÁCTILES: {touchControlsEnabled ? 'ON' : 'OFF'}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <button type="button" onClick={onToggleTouchControls} style={styles.secondaryButton}>
+              📱 TÁCTIL: {touchControlsEnabled ? 'ON' : 'OFF'}
             </button>
-            <button
-              type="button"
-              onClick={onToggleCamera}
-              style={styles.secondaryButton}
-            >
-              🔍 CÁMARA: {cameraMode === 'overview' ? 'MAPA COMPLETO' : 'SEGUIR TANQUE'}
+            <button type="button" onClick={onToggleCamera} style={styles.secondaryButton}>
+              🔍 CÁMARA: {cameraMode === 'overview' ? 'MAPA' : 'TANQUE'}
             </button>
           </div>
           <button
@@ -1328,18 +2206,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={onReplayIntro}
             style={{
               ...styles.tertiaryButton,
-              marginTop: '10px',
+              marginTop: '8px',
               borderColor: 'rgba(251, 191, 36, 0.4)',
               color: '#fde047',
               fontWeight: 800
             }}
           >
-            🧱 REPRODUCIR ANIMACIÓN DE BLOQUES DE MADERA (INTRO)
+            🧱 VER INTRO DE BLOQUES DE MADERA
           </button>
         </div>
 
         <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onClose}>
-          ✓ GUARDAR Y VOLVER AL MENÚ PRINCIPAL
+          ✓ LISTO
         </button>
       </div>
     </div>
@@ -1377,7 +2255,12 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
   });
 
   return (
-    <div style={styles.overlay}>
+    <div
+      style={styles.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onBack();
+      }}
+    >
       <div style={{
         ...styles.menuBox,
         maxWidth: '920px',
@@ -1385,23 +2268,23 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        padding: '22px 26px'
+        padding: '20px 24px'
       }}>
         {/* Header Bar */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '14px',
+          marginBottom: '12px',
           flexWrap: 'wrap',
           gap: '10px',
           flexShrink: 0
         }}>
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: '10px', fontWeight: 800, color: '#fbbf24', letterSpacing: '1.5px' }}>
-              CENTRO DE OPERACIONES TÁCTICAS • ★ {totalStars}/{totalLevels * 3} ESTRELLAS
+              CAMPAÑA • ★ {totalStars}/{totalLevels * 3}
             </div>
-            <h2 style={{ ...styles.title, fontSize: '23px', margin: '2px 0 0 0' }}>SELECCIONAR MISIÓN</h2>
+            <h2 style={{ ...styles.title, fontSize: '22px', margin: '2px 0 0 0' }}>🗺️ MISIONES</h2>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -1411,19 +2294,15 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                 backgroundColor: 'rgba(56, 189, 248, 0.16)',
                 color: '#38bdf8',
                 border: '1px solid rgba(56, 189, 248, 0.5)',
-                height: '34px',
-                padding: '0 14px',
-                borderRadius: '8px',
+                height: '36px',
+                padding: '0 13px',
+                borderRadius: '9px',
                 cursor: 'pointer',
                 fontSize: '11px',
-                fontWeight: 800,
-                letterSpacing: '0.5px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
+                fontWeight: 800
               }}
             >
-              🔧 HANGAR Y MEJORAS
+              🔧 HANGAR
             </button>
             <button
               onClick={onToggleUnlockAll}
@@ -1431,46 +2310,28 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                 backgroundColor: unlockAll ? 'rgba(34, 197, 94, 0.18)' : 'rgba(148, 163, 184, 0.14)',
                 color: unlockAll ? '#4ade80' : '#cbd5e1',
                 border: unlockAll ? '1px solid rgba(74, 222, 128, 0.5)' : '1px solid rgba(148, 163, 184, 0.3)',
-                height: '34px',
-                padding: '0 14px',
-                borderRadius: '8px',
+                height: '36px',
+                padding: '0 13px',
+                borderRadius: '9px',
                 cursor: 'pointer',
                 fontSize: '11px',
-                fontWeight: 800,
-                letterSpacing: '0.5px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
+                fontWeight: 800
               }}
             >
-              {unlockAll ? `🔓 ACCESO TOTAL (${totalLevels}/${totalLevels})` : '🔒 MODO PROGRESIÓN'}
+              {unlockAll ? `🔓 TODAS (${totalLevels})` : '🔒 PROGRESIÓN'}
             </button>
-            <button
-              className="tactical-btn-secondary"
-              onClick={onBack}
-              style={{
-                ...styles.secondaryButton,
-                width: 'auto',
-                height: '34px',
-                padding: '0 14px',
-                fontSize: '11px',
-                display: 'inline-flex',
-                alignItems: 'center'
-              }}
-            >
-              ✕ CERRAR
-            </button>
+            <ModalCloseButton onClick={onBack} />
           </div>
         </div>
 
-        {/* Biome Filter Tabs (Wrapped cleanly with fixed height and flexShrink: 0) */}
+        {/* Biome Filter Tabs */}
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '7px',
+          gap: '6px',
           flexShrink: 0,
-          paddingBottom: '12px',
-          marginBottom: '12px',
+          paddingBottom: '10px',
+          marginBottom: '10px',
           borderBottom: '1px solid rgba(148, 163, 184, 0.18)'
         }}>
           {BIOMES_LIST.map(b => {
@@ -1483,24 +2344,21 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                   flexShrink: 0,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  height: '34px',
-                  padding: '0 13px',
+                  gap: '5px',
+                  height: '32px',
+                  padding: '0 11px',
                   border: active ? `1.5px solid ${b.color}` : '1px solid rgba(148, 163, 184, 0.24)',
                   borderRadius: '8px',
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: 800,
-                  lineHeight: 1,
                   cursor: 'pointer',
                   backgroundColor: active ? b.accent : 'rgba(15, 23, 42, 0.75)',
                   color: active ? b.color : '#cbd5e1',
-                  boxShadow: active ? `0 0 14px ${b.accent}` : 'none',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease'
+                  whiteSpace: 'nowrap'
                 }}
               >
                 <span>{b.icon}</span>
-                <span>{b.label}</span>
+                <span>{b.label.split(' ')[0]}</span>
               </button>
             );
           })}
@@ -1589,8 +2447,7 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                       padding: '2px 7px',
                       borderRadius: '4px',
                       backgroundColor: isUnlocked ? biomeMeta.accent : 'rgba(255,255,255,0.03)',
-                      color: isUnlocked ? biomeMeta.color : '#475569',
-                      letterSpacing: '0.4px'
+                      color: isUnlocked ? biomeMeta.color : '#475569'
                     }}>
                       {biomeMeta.label.split(' ')[0].toUpperCase()}
                     </div>
@@ -1613,10 +2470,6 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
             })}
           </div>
         </div>
-
-        <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, marginTop: '14px', flexShrink: 0 }} onClick={onBack}>
-          ← VOLVER AL CENTRO DE MANDO
-        </button>
       </div>
     </div>
   );
@@ -1723,15 +2576,30 @@ const HUD: React.FC<HUDProps> = ({
       <div style={{ ...styles.hudTop, position: 'relative' }}>
         {/* Left Controls Stacked into 2 Compact Rows so Center Mission/Boss Header Never Shifts Off-Center */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', zIndex: 3 }}>
-          {/* Row 1: Pause, SFX Mute, Music Toggle, Mission Select */}
+          {/* Row 1: Top-Left Menu Box Button (Opens Pause Modal to Return to Main Menu), SFX Mute, Music Toggle */}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={styles.hudPanel}>
-              <button onClick={onPause} style={styles.hudButton} title="Pausar juego [Esc / P]">
-                ⏸️
+            <div style={{
+              ...styles.hudPanel,
+              borderColor: 'rgba(251, 191, 36, 0.55)',
+              backgroundColor: 'rgba(15, 23, 42, 0.94)'
+            }}>
+              <button
+                onClick={onPause}
+                style={{
+                  ...styles.hudButton,
+                  color: '#fbbf24',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Abrir menú de pausa o volver al Menú Principal [Esc / P]"
+              >
+                <span>☰ MENÚ</span>
               </button>
             </div>
             <div style={styles.hudPanel}>
-              <button onClick={onToggleMute} style={styles.hudButton} title="Silenciar / Activar efectos de sonido [M]">
+              <button data-audio-toggle="true" onClick={onToggleMute} style={styles.hudButton} title="Silenciar / Activar efectos de sonido [M]">
                 {isMuted ? '🔇' : '🔊'}
               </button>
             </div>
@@ -1740,6 +2608,7 @@ const HUD: React.FC<HUDProps> = ({
               borderColor: !isMusicMuted ? 'rgba(74, 222, 128, 0.45)' : 'rgba(148, 163, 184, 0.25)'
             }}>
               <button
+                data-audio-toggle="true"
                 onClick={onToggleMusic}
                 style={{
                   ...styles.hudButton,
@@ -1749,11 +2618,6 @@ const HUD: React.FC<HUDProps> = ({
                 title="Activar / Desactivar banda sonora de fondo"
               >
                 🎵 {!isMusicMuted ? 'ON' : 'OFF'}
-              </button>
-            </div>
-            <div style={styles.hudPanel}>
-              <button onClick={onMenu} style={styles.hudButton} title="Selector de Misiones">
-                🗺️ MISIONES
               </button>
             </div>
           </div>
@@ -1924,35 +2788,52 @@ const HUD: React.FC<HUDProps> = ({
           )}
         </div>
 
-        {/* Right Hostiles & Combo Counter */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', zIndex: 3 }}>
-          {combo >= 2 && (
-            <div style={{
-              ...styles.hudPanel,
-              backgroundColor: 'rgba(234, 88, 12, 0.25)',
-              borderColor: '#fb923c',
-              color: '#fdba74',
-              fontWeight: 900,
-              fontSize: '13px',
-              boxShadow: '0 0 16px rgba(249, 115, 22, 0.45)'
-            }}>
-              🔥 RACHA x{combo}
+        {/* Right Hostiles, Armor & Score (In top bar on Mobile so Bottom Thumb Zones are 100% Unobstructed!) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end', zIndex: 3, pointerEvents: 'none' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {combo >= 2 && (
+              <div style={{
+                ...styles.hudPanel,
+                backgroundColor: 'rgba(234, 88, 12, 0.25)',
+                borderColor: '#fb923c',
+                color: '#fdba74',
+                fontWeight: 900,
+                fontSize: '13px',
+                boxShadow: '0 0 16px rgba(249, 115, 22, 0.45)',
+                pointerEvents: 'none'
+              }}>
+                🔥 RACHA x{combo}
+              </div>
+            )}
+            <div style={{ ...styles.hudPanel, pointerEvents: 'none' }}>
+              <span style={{ marginRight: '6px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>HOSTILES:</span>
+              <span style={{ ...styles.highlight, fontSize: '18px', fontVariantNumeric: 'tabular-nums' }}>{enemiesLeft}</span>
+              <span style={{ marginLeft: '5px', fontSize: '16px' }}>🎯</span>
+            </div>
+          </div>
+
+          {touchControlsEnabled && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', pointerEvents: 'none' }}>
+              <div style={{ ...styles.hudPanel, padding: '4px 10px', pointerEvents: 'none' }}>
+                {hearts}
+              </div>
+              <div style={{ ...styles.hudPanel, padding: '4px 10px', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800 }}>PTS</span>
+                <span style={styles.highlight}>{score}</span>
+              </div>
             </div>
           )}
-          <div style={styles.hudPanel}>
-            <span style={{ marginRight: '6px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>HOSTILES:</span>
-            <span style={{ ...styles.highlight, fontSize: '18px', fontVariantNumeric: 'tabular-nums' }}>{enemiesLeft}</span>
-            <span style={{ marginLeft: '5px', fontSize: '16px' }}>🎯</span>
-          </div>
         </div>
       </div>
 
       <div style={{ ...styles.hudBottom, position: 'relative' }}>
-        {/* Left: Armor Hearts */}
-        <div style={{ ...styles.hudPanel, zIndex: 3 }}>
-          <span style={{ marginRight: '8px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>BLINDAJE:</span>
-          {hearts}
-        </div>
+        {/* Left: Armor Hearts (Shown at bottom only when Touch Joysticks are OFF) */}
+        {!touchControlsEnabled ? (
+          <div style={{ ...styles.hudPanel, zIndex: 3, pointerEvents: 'none' }}>
+            <span style={{ marginRight: '8px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>BLINDAJE:</span>
+            {hearts}
+          </div>
+        ) : <div />}
 
         {/* Truly Centered Bottom Action Cluster: Active Power-Up Pill + Mine & Bazooka Buttons */}
         <div style={{
@@ -2087,11 +2968,13 @@ const HUD: React.FC<HUDProps> = ({
           )}
         </div>
 
-        {/* Right: Tactical Score */}
-        <div style={{ ...styles.hudPanel, fontVariantNumeric: 'tabular-nums', zIndex: 3 }}>
-          <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>PUNTOS</span>
-          <span style={styles.highlight}>{score}</span>
-        </div>
+        {/* Right: Tactical Score (Shown at bottom only when Touch Joysticks are OFF) */}
+        {!touchControlsEnabled ? (
+          <div style={{ ...styles.hudPanel, fontVariantNumeric: 'tabular-nums', zIndex: 3, pointerEvents: 'none' }}>
+            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>PUNTOS</span>
+            <span style={styles.highlight}>{score}</span>
+          </div>
+        ) : <div />}
       </div>
     </div>
   );
@@ -2134,33 +3017,61 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
   mission,
   missionName
 }) => (
-  <div style={styles.overlay}>
-    <div style={{ ...styles.menuBox, maxWidth: '475px' }}>
-      <div style={styles.toyBadge}>SISTEMA EN PAUSA TÁCTICA</div>
-      <h2 style={{ ...styles.title, fontSize: '26px' }}>OPERACIÓN DETENIDA</h2>
-      <p style={styles.subtitle}>Misión #{mission} • {missionName || 'En curso'}</p>
+  <div
+    style={styles.overlay}
+    onClick={(e) => {
+      if (e.target === e.currentTarget) onResume();
+    }}
+  >
+    <div style={{ ...styles.menuBox, maxWidth: '450px', padding: '22px 26px', textAlign: 'left' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '12px', marginBottom: '14px' }}>
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: 900, color: '#fbbf24', letterSpacing: '1.2px' }}>
+            MISIÓN #{mission} • {missionName || 'EN CURSO'}
+          </div>
+          <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>⏸️ PAUSA</h2>
+        </div>
+        <ModalCloseButton onClick={onResume} />
+      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', width: '100%', marginTop: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', width: '100%' }}>
         <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onResume}>
-          ▶ REANUDAR COMBATE
-        </button>
-        <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onRestart}>
-          🔄 REINICIAR MISIÓN ACTUAL
-        </button>
-        <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onToggleCamera}>
-          🔍 CÁMARA: {cameraMode === 'overview' ? 'CAMBIAR A SEGUIR TANQUE' : 'CAMBIAR A VISTA GLOBAL'}
+          ▶ CONTINUAR MISIÓN
         </button>
 
-        {/* AI Difficulty Selector in Pause Menu */}
+        {/* Prominent Return to Professional Main Menu Button */}
+        <button
+          className="tactical-btn-secondary"
+          onClick={onMenu}
+          style={{
+            ...styles.secondaryButton,
+            backgroundColor: 'rgba(56, 189, 248, 0.16)',
+            borderColor: 'rgba(56, 189, 248, 0.55)',
+            color: '#bae6fd',
+            fontWeight: 900
+          }}
+        >
+          🏠 SALIR AL MENÚ PRINCIPAL
+        </button>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onRestart}>
+            🔄 REINICIAR
+          </button>
+          <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onSelectLevel}>
+            🗺️ MISIONES
+          </button>
+        </div>
+
+        {/* Compact AI Difficulty */}
         <div style={{
           backgroundColor: 'rgba(15, 23, 42, 0.85)',
-          border: '1px solid rgba(148, 163, 184, 0.25)',
+          border: '1px solid rgba(148, 163, 184, 0.22)',
           borderRadius: '10px',
-          padding: '9px 12px',
-          textAlign: 'left'
+          padding: '8px 10px'
         }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#cbd5e1', letterSpacing: '1px', marginBottom: '6px' }}>
-            🤖 DIFICULTAD DE LA IA ENEMIGA
+          <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#94a3b8', letterSpacing: '1px', marginBottom: '5px' }}>
+            🤖 DIFICULTAD IA
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
             {AI_DIFFICULTIES_LIST.map(d => {
@@ -2188,23 +3099,19 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '10px 8px', fontSize: '11px' }} onClick={onToggleTouchControls}>
-            📱 TÁCTIL: {touchControlsEnabled ? 'ON' : 'OFF'}
+        {/* Quick Toggles Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '8px 4px', fontSize: '10px' }} onClick={onToggleCamera}>
+            🔍 {cameraMode === 'overview' ? 'MAPA' : 'TANQUE'}
           </button>
-          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '10px 8px', fontSize: '11px' }} onClick={onToggleMute}>
-            {isMuted ? '🔇 EFECTOS: OFF' : '🔊 EFECTOS: ON'}
+          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '8px 4px', fontSize: '10px' }} onClick={onToggleTouchControls}>
+            📱 {touchControlsEnabled ? 'ON' : 'OFF'}
           </button>
-          <button className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '10px 8px', fontSize: '11px' }} onClick={onToggleMusic}>
-            {isMusicMuted ? '🎵 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
+          <button data-audio-toggle="true" className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '8px 4px', fontSize: '10px' }} onClick={onToggleMute}>
+            {isMuted ? '🔇 SFX' : '🔊 SFX'}
           </button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '9px', marginTop: '4px' }}>
-          <button className="tactical-btn-secondary" style={styles.tertiaryButton} onClick={onSelectLevel}>
-            🗺️ MISIONES
-          </button>
-          <button className="tactical-btn-secondary" style={styles.tertiaryButton} onClick={onMenu}>
-            🏠 MENÚ PRINCIPAL
+          <button data-audio-toggle="true" className="tactical-btn-secondary" style={{ ...styles.secondaryButton, padding: '8px 4px', fontSize: '10px' }} onClick={onToggleMusic}>
+            {isMusicMuted ? '🔇 BGM' : '🎵 BGM'}
           </button>
         </div>
       </div>
@@ -2222,6 +3129,12 @@ interface GameOverScreenProps {
   starsEarned?: number;
   elapsedSec?: number;
   damageTaken?: number;
+  coinsEarned?: number;
+  xpEarned?: number;
+  gems: number;
+  freeReviveAvailable: boolean;
+  onRevive: () => void;
+  onOpenStoreGems: () => void;
   onNext: () => void;
   onRestart: () => void;
   onLevelSelect: () => void;
@@ -2238,6 +3151,12 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
   starsEarned = 0,
   elapsedSec = 0,
   damageTaken = 0,
+  coinsEarned = 0,
+  xpEarned = 0,
+  gems,
+  freeReviveAvailable,
+  onRevive,
+  onOpenStoreGems,
   onNext,
   onRestart,
   onLevelSelect,
@@ -2255,7 +3174,7 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
     }}>
       <div style={{
         ...styles.menuBox,
-        maxWidth: '490px',
+        maxWidth: '510px',
         borderColor: won ? 'rgba(74, 222, 128, 0.45)' : 'rgba(248, 113, 113, 0.45)',
         boxShadow: won
           ? '0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(34, 197, 94, 0.2)'
@@ -2264,14 +3183,14 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
       }}>
         {/* Status Emblem */}
         <div style={{
-          width: '68px',
-          height: '68px',
+          width: '64px',
+          height: '64px',
           borderRadius: '50%',
-          margin: '0 auto 12px auto',
+          margin: '0 auto 10px auto',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '34px',
+          fontSize: '32px',
           backgroundColor: won ? 'rgba(34, 197, 94, 0.16)' : 'rgba(239, 68, 68, 0.18)',
           border: won ? '2px solid rgba(74, 222, 128, 0.55)' : '2px solid rgba(248, 113, 113, 0.55)',
           boxShadow: won ? '0 0 24px rgba(74, 222, 128, 0.35)' : '0 0 24px rgba(239, 68, 68, 0.4)'
@@ -2290,14 +3209,14 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
 
         <h1 style={{
           ...styles.title,
-          fontSize: '28px',
+          fontSize: '26px',
           color: won ? '#4ade80' : '#f87171',
           marginTop: '6px'
         }}>
           {isCampaignComplete ? '¡CAMPAÑA CONQUISTADA!' : won ? '¡MISIÓN CUMPLIDA!' : 'TANQUE DESTRUIDO'}
         </h1>
 
-        <p style={{ ...styles.subtitle, marginBottom: '12px' }}>
+        <p style={{ ...styles.subtitle, marginBottom: '10px' }}>
           Misión #{mission} {missionName ? `• ${missionName}` : ''}
         </p>
 
@@ -2326,31 +3245,91 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
           </div>
         )}
 
-        {/* Battle Telemetry Report Card */}
+        {/* Battle Telemetry + Coins & Battle Pass XP Earned */}
         <div style={{
           backgroundColor: 'rgba(15, 23, 42, 0.85)',
           border: '1px solid rgba(148, 163, 184, 0.2)',
           borderRadius: '12px',
-          padding: '14px 18px',
-          marginBottom: '18px',
+          padding: '12px 16px',
+          marginBottom: '14px',
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '12px',
-          textAlign: 'left'
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '10px',
+          textAlign: 'center'
         }}>
           <div>
-            <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', letterSpacing: '1px' }}>PUNTUACIÓN TÁCTICA</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#fbbf24', fontFamily: '"Chakra Petch", sans-serif', fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#64748b', letterSpacing: '0.8px' }}>PUNTUACIÓN</div>
+            <div style={{ fontSize: '16px', fontWeight: 900, color: '#fbbf24', fontFamily: '"Chakra Petch", sans-serif', fontVariantNumeric: 'tabular-nums' }}>
               {score} PTS
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', letterSpacing: '1px' }}>SECTOR / BIOMA</div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: biomeMeta.color, marginTop: '4px' }}>
-              {biomeMeta.icon} {biomeMeta.label.split(' ')[0].toUpperCase()}
+            <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#64748b', letterSpacing: '0.8px' }}>RECOMPENSA ORO</div>
+            <div style={{ fontSize: '16px', fontWeight: 900, color: '#fde047', fontFamily: '"Chakra Petch", sans-serif', fontVariantNumeric: 'tabular-nums' }}>
+              +{coinsEarned} 🪙
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#64748b', letterSpacing: '0.8px' }}>PASE BATALLA</div>
+            <div style={{ fontSize: '16px', fontWeight: 900, color: '#e879f9', fontFamily: '"Chakra Petch", sans-serif', fontVariantNumeric: 'tabular-nums' }}>
+              +{xpEarned} XP
             </div>
           </div>
         </div>
+
+        {/* High-Conversion Second Chance Live Revive Card on Defeat */}
+        {!won && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.22) 0%, rgba(30, 41, 59, 0.95) 100%)',
+            border: '2px solid #38bdf8',
+            borderRadius: '14px',
+            padding: '14px 16px',
+            marginBottom: '14px',
+            boxShadow: '0 0 28px rgba(56, 189, 248, 0.28)',
+            textAlign: 'left'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10.5px', fontWeight: 900, color: '#38bdf8', letterSpacing: '1px' }}>
+                ⚡ SEGUNDA OPORTUNIDAD • NO PIERDAS LA PARTIDA
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#cbd5e1', fontVariantNumeric: 'tabular-nums' }}>
+                Tienes: {gems} 💎
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#e2e8f0', marginBottom: '10px', lineHeight: 1.4 }}>
+              Reanima tu tanque <strong>en este mismo instante</strong> con <strong>100% de Blindaje + Escudo de Plasma 🛡️ + Onda Expansiva</strong> que barre proyectiles enemigos.
+            </div>
+            {freeReviveAvailable || gems >= 25 ? (
+              <button
+                onClick={onRevive}
+                style={{
+                  ...styles.primaryButton,
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #38bdf8 100%)',
+                  color: '#0f172a',
+                  padding: '12px 16px',
+                  fontSize: '13.5px'
+                }}
+              >
+                {freeReviveAvailable
+                  ? '🛡️ REANIMAR TANQUE AHORA (¡1ª VEZ DEL DÍA GRATIS!)'
+                  : '🛡️ REANIMAR TANQUE CON ESCUDO DE PLASMA (25 💎)'}
+              </button>
+            ) : (
+              <button
+                onClick={onOpenStoreGems}
+                style={{
+                  ...styles.primaryButton,
+                  background: 'linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)',
+                  color: '#fff',
+                  padding: '12px 16px',
+                  fontSize: '13px'
+                }}
+              >
+                💎 CONSEGUIR GEMAS PARA REANIMAR (NECESITAS 25 💎)
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
           {isCampaignComplete ? (
@@ -2363,7 +3342,7 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
             </button>
           ) : (
             <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onRestart}>
-              🔄 REINTENTAR OPERACIÓN INMEDIATAMENTE
+              🔄 REINICIAR MISIÓN DESDE EL PRINCIPIO
             </button>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -2383,235 +3362,603 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
 interface HangarModalProps {
   selectedSkin: string;
   selectedPerk: string;
+  selectedHat: string;
+  selectedTrail: string;
+  ownedSkins: string[];
+  ownedHats: string[];
+  ownedTrails: string[];
+  coins: number;
+  gems: number;
+  trialLoadout: { skin?: string; hat?: string; trail?: string } | null;
   onSelectSkin: (skinId: string) => void;
   onSelectPerk: (perkId: string) => void;
+  onSelectHat: (hatId: string) => void;
+  onSelectTrail: (trailId: string) => void;
+  onUnlockCosmetic: (category: 'skin' | 'hat' | 'trail', id: string, coinCost: number, gemCost: number) => void;
+  onTryCosmeticFree: (category: 'skin' | 'hat' | 'trail', id: string, name: string) => void;
+  onOpenStore: () => void;
   onClose: () => void;
 }
 
 const HangarModal: React.FC<HangarModalProps> = ({
   selectedSkin,
   selectedPerk,
+  selectedHat,
+  selectedTrail,
+  ownedSkins,
+  ownedHats,
+  ownedTrails,
+  coins,
+  gems,
+  trialLoadout,
   onSelectSkin,
   onSelectPerk,
+  onSelectHat,
+  onSelectTrail,
+  onUnlockCosmetic,
+  onTryCosmeticFree,
+  onOpenStore,
   onClose
-}) => (
-  <div style={styles.overlay}>
-    <div style={{ ...styles.menuBox, maxWidth: '720px', maxHeight: '88vh', overflowY: 'auto', textAlign: 'left', padding: '24px 28px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.22)', paddingBottom: '12px' }}>
-        <div>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#38bdf8', letterSpacing: '1.5px' }}>INGENIERÍA Y ARMAMENTO</div>
-          <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>🔧 HANGAR DE PERSONALIZACIÓN 3D</h2>
-        </div>
-        <button className="tactical-btn-secondary" onClick={onClose} style={{ ...styles.secondaryButton, width: 'auto', padding: '6px 14px' }}>✕</button>
-      </div>
+}) => {
+  const [activeTab, setActiveTab] = useState<'skins' | 'hats' | 'trails' | 'perks'>('skins');
 
-      {/* Section 1: 3D Tank Chassis Skins */}
-      <div style={{ marginTop: '14px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
-          🎨 1. PINTURA Y BLINDAJE DEL CHASIS 3D
+  return (
+    <div
+      style={styles.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div style={{ ...styles.menuBox, maxWidth: '860px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'left', padding: '20px 24px' }}>
+        {/* Header + Currency Bar */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+          paddingBottom: '12px',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 800, color: '#38bdf8', letterSpacing: '1.5px' }}>
+              ARMERÍA Y PRUEBA GRATIS
+            </div>
+            <h2 style={{ ...styles.title, fontSize: '21px', margin: 0 }}>🔧 HANGAR 3D</h2>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              border: '1px solid rgba(251, 191, 36, 0.45)',
+              borderRadius: '8px',
+              padding: '5px 10px',
+              fontSize: '12px',
+              fontWeight: 900,
+              color: '#fbbf24',
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              🪙 {coins.toLocaleString()}
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              border: '1px solid rgba(56, 189, 248, 0.45)',
+              borderRadius: '8px',
+              padding: '5px 10px',
+              fontSize: '12px',
+              fontWeight: 900,
+              color: '#38bdf8',
+              fontVariantNumeric: 'tabular-nums'
+            }}>
+              💎 {gems.toLocaleString()}
+            </div>
+            <button
+              onClick={onOpenStore}
+              style={{
+                background: 'linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)',
+                border: 'none',
+                borderRadius: '9px',
+                padding: '7px 12px',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 900,
+                cursor: 'pointer'
+              }}
+            >
+              + TIENDA
+            </button>
+            <ModalCloseButton onClick={onClose} />
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: '9px' }}>
-          {TANK_SKINS_LIST.map(s => {
-            const active = selectedSkin === s.id;
+
+        {/* Free Trial Active Notice */}
+        {(trialLoadout?.skin || trialLoadout?.hat || trialLoadout?.trail) && (
+          <div style={{
+            marginTop: '10px',
+            backgroundColor: 'rgba(56, 189, 248, 0.16)',
+            border: '1px solid rgba(56, 189, 248, 0.55)',
+            borderRadius: '9px',
+            padding: '7px 12px',
+            fontSize: '11px',
+            color: '#bae6fd',
+            fontWeight: 700
+          }}>
+            🎮 <strong>PRUEBA ACTIVA:</strong> Cosmético equipado gratis para tu próxima misión.
+          </div>
+        )}
+
+        {/* Category Tabs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px', marginTop: '12px', marginBottom: '12px' }}>
+          {[
+            { id: 'skins', label: `🎨 CHASIS (${ownedSkins.length}/${TANK_SKINS_LIST.length})`, color: '#fbbf24' },
+            { id: 'hats', label: `👑 CASCOS (${ownedHats.length}/${TANK_HATS_LIST.length})`, color: '#e879f9' },
+            { id: 'trails', label: `⚡ LÁSER (${ownedTrails.length}/${BULLET_TRAILS_LIST.length})`, color: '#38bdf8' },
+            { id: 'perks', label: '🛡️ MÓDULOS', color: '#4ade80' }
+          ].map(t => {
+            const active = activeTab === t.id;
             return (
               <button
-                key={s.id}
-                onClick={() => onSelectSkin(s.id)}
+                key={t.id}
+                onClick={() => setActiveTab(t.id as any)}
                 style={{
-                  backgroundColor: active ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.75)',
-                  border: active ? `2px solid ${s.accent}` : '1px solid rgba(148, 163, 184, 0.22)',
+                  backgroundColor: active ? 'rgba(30, 41, 59, 0.98)' : 'rgba(15, 23, 42, 0.7)',
+                  border: active ? `2px solid ${t.color}` : '1px solid rgba(148, 163, 184, 0.22)',
+                  color: active ? t.color : '#94a3b8',
                   borderRadius: '10px',
-                  padding: '10px 12px',
-                  textAlign: 'left',
+                  padding: '9px 8px',
+                  fontSize: '11px',
+                  fontWeight: 900,
                   cursor: 'pointer',
-                  boxShadow: active ? `0 0 16px ${s.accent}33` : 'none',
-                  transition: 'all 0.15s ease'
+                  fontFamily: '"Chakra Petch", sans-serif'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      backgroundColor: s.color,
-                      border: '2px solid #fff',
-                      display: 'inline-block'
-                    }} />
-                    <span style={{ fontSize: '12.5px', fontWeight: 800, color: active ? '#f8fafc' : '#cbd5e1' }}>
-                      {s.name}
-                    </span>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* TAB 1: 3D Tank Chassis Skins */}
+        {activeTab === 'skins' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+            {TANK_SKINS_LIST.map(s => {
+              const owned = ownedSkins.includes(s.id);
+              const active = selectedSkin === s.id;
+              const isTrial = trialLoadout?.skin === s.id;
+              return (
+                <div
+                  key={s.id}
+                  style={{
+                    backgroundColor: active || isTrial ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.78)',
+                    border: active ? `2px solid ${s.accent}` : isTrial ? '2px dashed #38bdf8' : '1px solid rgba(148, 163, 184, 0.22)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          backgroundColor: s.color,
+                          border: `2px solid ${s.accent}`,
+                          display: 'inline-block'
+                        }} />
+                        <span style={{ fontSize: '13px', fontWeight: 900, color: '#f8fafc' }}>
+                          {s.badge} {s.name}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '9.5px', fontWeight: 900, color: s.accent }}>
+                        {s.rarity}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.35 }}>{s.desc}</div>
                   </div>
-                  {active && <span style={{ fontSize: '10px', fontWeight: 900, color: s.accent }}>ACTIVO</span>}
-                </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.35 }}>{s.desc}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* Section 2: Tactical Combat Modules */}
-      <div style={{ marginTop: '18px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px', marginBottom: '8px' }}>
-          ⚡ 2. MÓDULO TÁCTICO DE COMBATE (MEJORA ACTIVA)
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '9px' }}>
-          {TACTICAL_PERKS_LIST.map(p => {
-            const active = selectedPerk === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => onSelectPerk(p.id)}
-                style={{
-                  backgroundColor: active ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.75)',
-                  border: active ? `2px solid ${p.color}` : '1px solid rgba(148, 163, 184, 0.22)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  boxShadow: active ? `0 0 16px ${p.color}33` : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: active ? p.color : '#e2e8f0' }}>
-                    {p.icon} {p.name}
-                  </span>
-                  {active && <span style={{ fontSize: '10px', fontWeight: 900, color: p.color }}>EQUIPADO</span>}
+                  {owned ? (
+                    <button
+                      onClick={() => onSelectSkin(s.id)}
+                      style={{
+                        backgroundColor: active ? 'rgba(74, 222, 128, 0.2)' : 'rgba(56, 189, 248, 0.18)',
+                        border: active ? '1px solid #4ade80' : '1px solid #38bdf8',
+                        color: active ? '#4ade80' : '#38bdf8',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '11px',
+                        fontWeight: 900,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {active ? '✓ EQUIPADO EN TU TANQUE' : 'EQUIPAR CHASIS'}
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: s.coinPrice > 0 ? '1fr 1fr' : '1fr', gap: '5px' }}>
+                        {s.coinPrice > 0 && (
+                          <button
+                            onClick={() => onUnlockCosmetic('skin', s.id, s.coinPrice, 0)}
+                            style={{
+                              backgroundColor: 'rgba(251, 191, 36, 0.18)',
+                              border: '1px solid rgba(251, 191, 36, 0.55)',
+                              color: '#fbbf24',
+                              borderRadius: '7px',
+                              padding: '6px 8px',
+                              fontSize: '10.5px',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              fontVariantNumeric: 'tabular-nums'
+                            }}
+                          >
+                            🪙 {s.coinPrice}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onUnlockCosmetic('skin', s.id, 0, s.gemPrice)}
+                          style={{
+                            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                            border: '1px solid rgba(56, 189, 248, 0.6)',
+                            color: '#38bdf8',
+                            borderRadius: '7px',
+                            padding: '6px 8px',
+                            fontSize: '10.5px',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            fontVariantNumeric: 'tabular-nums'
+                          }}
+                        >
+                          💎 {s.gemPrice} DESBLOQUEAR
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => onTryCosmeticFree('skin', s.id, s.name)}
+                        style={{
+                          backgroundColor: isTrial ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.8)',
+                          border: '1px dashed rgba(148, 163, 184, 0.4)',
+                          color: isTrial ? '#38bdf8' : '#cbd5e1',
+                          borderRadius: '7px',
+                          padding: '5px 8px',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {isTrial ? '🎮 EN PRUEBA PARA LA PRÓXIMA MISIÓN' : '🎮 PROBAR 1 MISIÓN GRATIS'}
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: '11.5px', color: '#94a3b8', lineHeight: 1.4 }}>{p.desc}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+              );
+            })}
+          </div>
+        )}
 
-      <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onClose}>
-        ✓ GUARDAR EQUIPAMIENTO Y VOLVER
-      </button>
+        {/* TAB 2: 3D Turret Toppers / Hats */}
+        {activeTab === 'hats' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+            {TANK_HATS_LIST.map(h => {
+              const owned = ownedHats.includes(h.id);
+              const active = selectedHat === h.id;
+              const isTrial = trialLoadout?.hat === h.id;
+              return (
+                <div
+                  key={h.id}
+                  style={{
+                    backgroundColor: active || isTrial ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.78)',
+                    border: active ? `2px solid ${h.color}` : isTrial ? '2px dashed #38bdf8' : '1px solid rgba(148, 163, 184, 0.22)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 900, color: '#f8fafc' }}>
+                        {h.icon} {h.name}
+                      </span>
+                      <span style={{ fontSize: '9.5px', fontWeight: 900, color: h.color }}>{h.rarity}</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.35 }}>{h.desc}</div>
+                  </div>
+
+                  {owned ? (
+                    <button
+                      onClick={() => onSelectHat(h.id)}
+                      style={{
+                        backgroundColor: active ? 'rgba(74, 222, 128, 0.2)' : 'rgba(56, 189, 248, 0.18)',
+                        border: active ? '1px solid #4ade80' : '1px solid #38bdf8',
+                        color: active ? '#4ade80' : '#38bdf8',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '11px',
+                        fontWeight: 900,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {active ? '✓ MONTADO EN TORRETA 3D' : 'MONTAR EN TORRETA'}
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: h.coinPrice > 0 ? '1fr 1fr' : '1fr', gap: '5px' }}>
+                        {h.coinPrice > 0 && (
+                          <button
+                            onClick={() => onUnlockCosmetic('hat', h.id, h.coinPrice, 0)}
+                            style={{
+                              backgroundColor: 'rgba(251, 191, 36, 0.18)',
+                              border: '1px solid rgba(251, 191, 36, 0.55)',
+                              color: '#fbbf24',
+                              borderRadius: '7px',
+                              padding: '6px 8px',
+                              fontSize: '10.5px',
+                              fontWeight: 900,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🪙 {h.coinPrice}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onUnlockCosmetic('hat', h.id, 0, h.gemPrice)}
+                          style={{
+                            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                            border: '1px solid rgba(56, 189, 248, 0.6)',
+                            color: '#38bdf8',
+                            borderRadius: '7px',
+                            padding: '6px 8px',
+                            fontSize: '10.5px',
+                            fontWeight: 900,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          💎 {h.gemPrice} DESBLOQUEAR
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => onTryCosmeticFree('hat', h.id, h.name)}
+                        style={{
+                          backgroundColor: isTrial ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.8)',
+                          border: '1px dashed rgba(148, 163, 184, 0.4)',
+                          color: isTrial ? '#38bdf8' : '#cbd5e1',
+                          borderRadius: '7px',
+                          padding: '5px 8px',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {isTrial ? '🎮 EN PRUEBA PARA LA PRÓXIMA MISIÓN' : '🎮 PROBAR 1 MISIÓN GRATIS'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB 3: Bullet Tracer Trails */}
+        {activeTab === 'trails' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+            {BULLET_TRAILS_LIST.map(tr => {
+              const owned = ownedTrails.includes(tr.id);
+              const active = selectedTrail === tr.id;
+              const isTrial = trialLoadout?.trail === tr.id;
+              return (
+                <div
+                  key={tr.id}
+                  style={{
+                    backgroundColor: active || isTrial ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.78)',
+                    border: active ? `2px solid ${tr.color}` : isTrial ? '2px dashed #38bdf8' : '1px solid rgba(148, 163, 184, 0.22)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '13.5px', fontWeight: 900, color: tr.color }}>
+                        {tr.icon} {tr.name}
+                      </span>
+                      <span style={{ fontSize: '9.5px', fontWeight: 900, color: tr.color }}>{tr.rarity}</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.35 }}>{tr.desc}</div>
+                  </div>
+
+                  {owned ? (
+                    <button
+                      onClick={() => onSelectTrail(tr.id)}
+                      style={{
+                        backgroundColor: active ? 'rgba(74, 222, 128, 0.2)' : 'rgba(56, 189, 248, 0.18)',
+                        border: active ? '1px solid #4ade80' : '1px solid #38bdf8',
+                        color: active ? '#4ade80' : '#38bdf8',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '11px',
+                        fontWeight: 900,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {active ? '✓ MUNICIÓN EQUIPADA' : 'EQUIPAR TRAZADORA'}
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: tr.coinPrice > 0 ? '1fr 1fr' : '1fr', gap: '5px' }}>
+                        {tr.coinPrice > 0 && (
+                          <button
+                            onClick={() => onUnlockCosmetic('trail', tr.id, tr.coinPrice, 0)}
+                            style={{
+                              backgroundColor: 'rgba(251, 191, 36, 0.18)',
+                              border: '1px solid rgba(251, 191, 36, 0.55)',
+                              color: '#fbbf24',
+                              borderRadius: '7px',
+                              padding: '6px 8px',
+                              fontSize: '10.5px',
+                              fontWeight: 900,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🪙 {tr.coinPrice}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onUnlockCosmetic('trail', tr.id, 0, tr.gemPrice)}
+                          style={{
+                            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                            border: '1px solid rgba(56, 189, 248, 0.6)',
+                            color: '#38bdf8',
+                            borderRadius: '7px',
+                            padding: '6px 8px',
+                            fontSize: '10.5px',
+                            fontWeight: 900,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          💎 {tr.gemPrice} DESBLOQUEAR
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => onTryCosmeticFree('trail', tr.id, tr.name)}
+                        style={{
+                          backgroundColor: isTrial ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.8)',
+                          border: '1px dashed rgba(148, 163, 184, 0.4)',
+                          color: isTrial ? '#38bdf8' : '#cbd5e1',
+                          borderRadius: '7px',
+                          padding: '5px 8px',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {isTrial ? '🎮 EN PRUEBA PARA LA PRÓXIMA MISIÓN' : '🎮 PROBAR 1 MISIÓN GRATIS'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB 4: Tactical Combat Modules (100% Free-to-Play, No Pay-to-Win) */}
+        {activeTab === 'perks' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+            {TACTICAL_PERKS_LIST.map(p => {
+              const active = selectedPerk === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSelectPerk(p.id)}
+                  style={{
+                    backgroundColor: active ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.75)',
+                    border: active ? `2px solid ${p.color}` : '1px solid rgba(148, 163, 184, 0.22)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    boxShadow: active ? `0 0 16px ${p.color}33` : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: active ? p.color : '#e2e8f0' }}>
+                      {p.icon} {p.name}
+                    </span>
+                    {active && <span style={{ fontSize: '10px', fontWeight: 900, color: p.color }}>EQUIPADO</span>}
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#94a3b8', lineHeight: 1.4 }}>{p.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onClose}>
+          ✓ LISTO
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface IntelModalProps {
   onClose: () => void;
 }
 
 const IntelModal: React.FC<IntelModalProps> = ({ onClose }) => (
-  <div style={styles.overlay}>
-    <div style={{ ...styles.menuBox, maxWidth: '780px', maxHeight: '88vh', overflowY: 'auto', textAlign: 'left', padding: '26px 30px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.22)', paddingBottom: '12px' }}>
+  <div
+    style={styles.overlay}
+    onClick={(e) => {
+      if (e.target === e.currentTarget) onClose();
+    }}
+  >
+    <div style={{ ...styles.menuBox, maxWidth: '680px', maxHeight: '88vh', overflowY: 'auto', textAlign: 'left', padding: '22px 26px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '12px' }}>
         <div>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#fbbf24', letterSpacing: '1.5px' }}>DOSSIER DE INTELIGENCIA</div>
-          <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>MANUAL TÁCTICO Y CONTROLES</h2>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#fbbf24', letterSpacing: '1.5px' }}>GUÍA RÁPIDA</div>
+          <h2 style={{ ...styles.title, fontSize: '21px', margin: 0 }}>📖 MANUAL TÁCTICO</h2>
         </div>
-        <button className="tactical-btn-secondary" onClick={onClose} style={{ ...styles.secondaryButton, width: 'auto', padding: '6px 14px' }}>✕</button>
+        <ModalCloseButton onClick={onClose} />
       </div>
 
       <div style={{ marginTop: '14px' }}>
-        <h3 style={{ color: '#fbbf24', margin: '10px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>📱 CONTROLES TÁCTILES EN MÓVIL ( ESTILO BRAWL STARS )</h3>
-        <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.75)', padding: '12px 16px', borderRadius: '10px', border: '1px solid rgba(251, 191, 36, 0.35)', marginBottom: '14px' }}>
-          <ul style={{ margin: '0 0 0 18px', padding: 0, color: '#cbd5e1', lineHeight: '1.6', fontSize: '12.5px' }}>
-            <li><strong style={{ color: '#f8fafc' }}>Cruceta Derecha de Apuntado y Tiro</strong>: desliza la cruceta en 360° para orientar el láser; dispara únicamente cuando arrastras la mira fuera de la zona central.</li>
-            <li><strong style={{ color: '#f8fafc' }}>Botón MINA 💣</strong>: despliega una mina terrestre con sensor de proximidad y temporizador de armado.</li>
-            <li><strong style={{ color: '#f8fafc' }}>Cámara Dinámica</strong>: pulsa <code>MAPA / TANQUE</code> o pellizca con 2 dedos para hacer zoom entre la vista global y el seguimiento cercano.</li>
-          </ul>
+        <div style={{ fontSize: '11px', fontWeight: 900, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
+          🎮 CONTROLES (PC Y MÓVIL)
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '8px', marginBottom: '16px' }}>
+          <div style={styles.intelCard}>
+            <div style={{ fontWeight: 800, color: '#f8fafc', fontSize: '12px' }}>🕹️ Mover y Disparar</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>WASD + Clic Izq o Crucetas Táctiles</div>
+          </div>
+          <div style={styles.intelCard}>
+            <div style={{ fontWeight: 800, color: '#fdba74', fontSize: '12px' }}>🚀 Cohete Bazoca</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>Tecla Q / F / Shift (Demuele muros)</div>
+          </div>
+          <div style={styles.intelCard}>
+            <div style={{ fontWeight: 800, color: '#4ade80', fontSize: '12px' }}>💣 Mina Terrestre</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>Espacio / E / Clic Derecho</div>
+          </div>
+          <div style={styles.intelCard}>
+            <div style={{ fontWeight: 800, color: '#38bdf8', fontSize: '12px' }}>🔍 Cámara y Noche</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>C Vista • Z/X Zoom • N Noche</div>
+          </div>
         </div>
 
-        <h3 style={{ color: '#38bdf8', margin: '14px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>💥 ELEMENTOS TÁCTICOS INTERACTIVOS</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 900, color: '#38bdf8', letterSpacing: '0.8px', marginBottom: '8px' }}>
+          💥 ELEMENTOS DEL ESCENARIO
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: '8px', marginBottom: '14px' }}>
           <div style={{ ...styles.intelCard, borderLeft: '3px solid #ef4444' }}>
-            <div style={{ fontWeight: 800, color: '#f87171', fontSize: '13px' }}>💥 Barril Explosivo TNT (B)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              Detonación en área que pulveriza tanques y cajas de corcho y provoca reacciones en cadena.
-            </div>
+            <div style={{ fontWeight: 800, color: '#f87171', fontSize: '12px' }}>💥 Barril TNT</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Explosión en cadena al dispararle.</div>
           </div>
           <div style={{ ...styles.intelCard, borderLeft: '3px solid #fbbf24' }}>
-            <div style={{ fontWeight: 800, color: '#fbbf24', fontSize: '13px' }}>📦 Caja de Suministros (U)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              Otorga Escudo de Plasma 🛡️, Ráfaga Rápida ⚡, Motor Turbo 🚀 o Blindaje Extra ❤️.
-            </div>
-          </div>
-          <div style={{ ...styles.intelCard, borderLeft: '3px solid #4ade80' }}>
-            <div style={{ fontWeight: 800, color: '#4ade80', fontSize: '13px' }}>🚀 Plataforma Aceleradora (A)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              Impulsa el tanque a velocidad supersónica al pasar sobre sus chevrons luminosos.
-            </div>
+            <div style={{ fontWeight: 800, color: '#fbbf24', fontSize: '12px' }}>📦 Suministros</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Escudo 🛡️, Ráfaga ⚡, Turbo 🚀 o Vida ❤️.</div>
           </div>
           <div style={{ ...styles.intelCard, borderLeft: '3px solid #22d3ee' }}>
-            <div style={{ fontWeight: 800, color: '#22d3ee', fontSize: '13px' }}>💎 Pilar Luminoso Reflector (M)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              Refracta proyectiles e ilumina todo el escenario al ser impactado o tocado.
-            </div>
-          </div>
-          <div style={{ ...styles.intelCard, borderLeft: '3px solid #e040fb' }}>
-            <div style={{ fontWeight: 800, color: '#e040fb', fontSize: '13px' }}>🌀 Portal de Teletransporte (O)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              Conecta dos puntos del mapa: teletransporta tanto tanques como proyectiles en pleno vuelo.
-            </div>
-          </div>
-          <div style={{ ...styles.intelCard, borderLeft: '3px solid #ff1744' }}>
-            <div style={{ fontWeight: 800, color: '#ff5252', fontSize: '13px' }}>⚡ Barrera e Interruptor Láser (G/K)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              Dispara al cristal interruptor para desactivar o activar los campos de fuerza láser.
-            </div>
+            <div style={{ fontWeight: 800, color: '#22d3ee', fontSize: '12px' }}>💎 Pilar y 🌀 Portal</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Rebota balas o teletransporta tanques.</div>
           </div>
           <div style={{ ...styles.intelCard, borderLeft: '3px solid #818cf8' }}>
-            <div style={{ fontWeight: 800, color: '#a5b4fc', fontSize: '13px' }}>🚨 Faro Centinela y Sigilo Nocturno (L)</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>
-              El haz de luz del faro se adapta a los muros en tiempo real. Si te ilumina de noche, revela tu posición a todos los enemigos; si abates enemigos desde las sombras ganas <strong>+150 PTS de Sigilo</strong> y recarga táctica.
-            </div>
-          </div>
-        </div>
-
-        <h3 style={{ color: '#4ade80', margin: '14px 0 6px 0', fontSize: '14px', letterSpacing: '0.8px' }}>🌍 10 BIOMAS DE CAMPAÑA (80 MISIONES)</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '14px' }}>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#fbbf24', fontSize: '12px' }}>🌲 1. Taller de Juguetes (M1-M8)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Parqué de roble, puentes de piedra y estanque con peces Koi.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#fb923c', fontSize: '12px' }}>🏜️ 2. Desierto & Ruinas (M9-M16)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Dunas doradas, sillares de terracota y oasis cristalinos.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#22d3ee', fontSize: '12px' }}>⚡ 3. Cyber Matrix Neón (M17-M24)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Obsidiana digital, canales de datos cian y nodos láser.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#38bdf8', fontSize: '12px' }}>❄️ 4. Glaciar Ártico (M25-M32)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Hielo alpino, fortalezas de zafiro glaciar y aguas árticas.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#f87171', fontSize: '12px' }}>🌋 5. Fundición Volcánica (M33-M40)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Ríos de magma incandescente y bastiones de basalto.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#4ade80', fontSize: '12px' }}>🌴 6. Selva Esmeralda (M41-M48)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Templos de jade y oro de El Dorado en la jungla amazónica.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#ff8a65', fontSize: '12px' }}>🌇 7. Ciudad Atardecer-Noche (M49-M56)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Rascacielos iluminados en crepúsculo, avenidas urbanas y farolas.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#f472b6', fontSize: '12px' }}>🏮 8. Festival Japonés Matsuri (M57-M64)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Guirnaldas de farolillos entre farolas, puertas Torii, pagoda y cerezos Sakura.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#2dd4bf', fontSize: '12px' }}>🏝️ 9. Isla Tropical (M65-M72)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Playa de arena coralina, laguna turquesa, cocoteros, sombrillas y cabañas Tiki.</div>
-          </div>
-          <div style={styles.intelCard}>
-            <span style={{ fontWeight: 800, color: '#818cf8', fontSize: '12px' }}>🌙 10. Sigilo Nocturno (M73-M80)</span>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Infiltración bajo luz de luna legible, faros con oclusión real en muros y bonificación por golpe de sigilo.</div>
+            <div style={{ fontWeight: 800, color: '#a5b4fc', fontSize: '12px' }}>🚨 Faro Nocturno</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Evita su haz de luz para +150 pts de sigilo.</div>
           </div>
         </div>
       </div>
 
-      <button className="tactical-btn-primary" style={{ ...styles.primaryButton, marginTop: '10px' }} onClick={onClose}>
-        ENTENDIDO • VOLVER AL MANDO
+      <button className="tactical-btn-primary" style={{ ...styles.primaryButton, marginTop: '6px' }} onClick={onClose}>
+        ✓ ENTENDIDO
       </button>
     </div>
   </div>
@@ -2626,6 +3973,9 @@ export const App = () => {
   const [showIntroSplash, setShowIntroSplash] = useState(true);
   const [showIntel, setShowIntel] = useState(false);
   const [showHangar, setShowHangar] = useState(false);
+  const [showStore, setShowStore] = useState(false);
+  const [storeInitialTab, setStoreInitialTab] = useState<'featured' | 'battlepass' | 'crate' | 'gems'>('featured');
+  const [activeStripePack, setActiveStripePack] = useState<StripePack | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [unlockAll, setUnlockAll] = useState(true);
   const [isMuted, setIsMuted] = useState<boolean>(() => {
@@ -2644,9 +3994,110 @@ export const App = () => {
   const [playerPerk, setPlayerPerk] = useState<string>(() => {
     try { return localStorage.getItem('tanks_player_perk') || 'ricochet'; } catch { return 'ricochet'; }
   });
+  const [playerHat, setPlayerHat] = useState<string>(() => {
+    try { return localStorage.getItem('tanks_player_hat') || 'none'; } catch { return 'none'; }
+  });
+  const [playerTrail, setPlayerTrail] = useState<string>(() => {
+    try { return localStorage.getItem('tanks_player_trail') || 'cyan'; } catch { return 'cyan'; }
+  });
   const [aiDifficulty, setAiDifficulty] = useState<string>(() => {
     try { return localStorage.getItem('tanks_ai_difficulty') || 'normal'; } catch { return 'normal'; }
   });
+
+  // --- Voluntary Free-to-Play Economy & Cosmetics State ---
+  const [coins, setCoins] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_coins');
+      return saved !== null ? parseInt(saved, 10) : 550;
+    } catch { return 550; }
+  });
+  const [gems, setGems] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_gems');
+      return saved !== null ? parseInt(saved, 10) : 90;
+    } catch { return 90; }
+  });
+  const [bpXp, setBpXp] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_bp_xp');
+      return saved !== null ? parseInt(saved, 10) : 140;
+    } catch { return 140; }
+  });
+  const [vipPassActive, setVipPassActive] = useState<boolean>(() => {
+    try { return localStorage.getItem('tanks_vip_pass') === 'true'; } catch { return false; }
+  });
+  const [supporterBadge, setSupporterBadge] = useState<boolean>(() => {
+    try { return localStorage.getItem('tanks_supporter_badge') === 'true'; } catch { return false; }
+  });
+  const [ownedSkins, setOwnedSkins] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_owned_skins');
+      return saved ? JSON.parse(saved) : ['classic'];
+    } catch { return ['classic']; }
+  });
+  const [ownedHats, setOwnedHats] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_owned_hats');
+      return saved ? JSON.parse(saved) : ['none'];
+    } catch { return ['none']; }
+  });
+  const [ownedTrails, setOwnedTrails] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_owned_trails');
+      return saved ? JSON.parse(saved) : ['cyan'];
+    } catch { return ['cyan']; }
+  });
+  const [claimedFreeTiers, setClaimedFreeTiers] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_claimed_free_tiers');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [claimedVipTiers, setClaimedVipTiers] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_claimed_vip_tiers');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [pityCounter, setPityCounter] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_crate_pity');
+      return saved !== null ? parseInt(saved, 10) : 1;
+    } catch { return 1; }
+  });
+  const [purchaseReceipts, setPurchaseReceipts] = useState<PurchaseReceipt[]>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_purchase_receipts');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const [dailyClaimedToday, setDailyClaimedToday] = useState<boolean>(() => {
+    try { return localStorage.getItem('tanks_daily_gift_date') === todayKey; } catch { return false; }
+  });
+  const [freeReviveUsedToday, setFreeReviveUsedToday] = useState<boolean>(() => {
+    try { return localStorage.getItem('tanks_free_revive_date') === todayKey; } catch { return false; }
+  });
+
+  // Try-Before-You-Buy 1-Mission Free Trial Loadout
+  const [trialLoadout, setTrialLoadout] = useState<{ skin?: string; hat?: string; trail?: string } | null>(null);
+  const vipPassRef = useRef(vipPassActive);
+  useEffect(() => { vipPassRef.current = vipPassActive; }, [vipPassActive]);
+
+  // Persist economy & inventory changes
+  useEffect(() => { try { localStorage.setItem('tanks_coins', coins.toString()); } catch (_) {} }, [coins]);
+  useEffect(() => { try { localStorage.setItem('tanks_gems', gems.toString()); } catch (_) {} }, [gems]);
+  useEffect(() => { try { localStorage.setItem('tanks_bp_xp', bpXp.toString()); } catch (_) {} }, [bpXp]);
+  useEffect(() => { try { localStorage.setItem('tanks_vip_pass', vipPassActive ? 'true' : 'false'); } catch (_) {} }, [vipPassActive]);
+  useEffect(() => { try { localStorage.setItem('tanks_supporter_badge', supporterBadge ? 'true' : 'false'); } catch (_) {} }, [supporterBadge]);
+  useEffect(() => { try { localStorage.setItem('tanks_owned_skins', JSON.stringify(ownedSkins)); } catch (_) {} }, [ownedSkins]);
+  useEffect(() => { try { localStorage.setItem('tanks_owned_hats', JSON.stringify(ownedHats)); } catch (_) {} }, [ownedHats]);
+  useEffect(() => { try { localStorage.setItem('tanks_owned_trails', JSON.stringify(ownedTrails)); } catch (_) {} }, [ownedTrails]);
+  useEffect(() => { try { localStorage.setItem('tanks_claimed_free_tiers', JSON.stringify(claimedFreeTiers)); } catch (_) {} }, [claimedFreeTiers]);
+  useEffect(() => { try { localStorage.setItem('tanks_claimed_vip_tiers', JSON.stringify(claimedVipTiers)); } catch (_) {} }, [claimedVipTiers]);
+  useEffect(() => { try { localStorage.setItem('tanks_crate_pity', pityCounter.toString()); } catch (_) {} }, [pityCounter]);
+  useEffect(() => { try { localStorage.setItem('tanks_purchase_receipts', JSON.stringify(purchaseReceipts)); } catch (_) {} }, [purchaseReceipts]);
 
   // 3-Star Rating per mission persisted in localStorage
   const [missionStars, setMissionStars] = useState<Record<number, number>>(() => {
@@ -2657,10 +4108,18 @@ export const App = () => {
       return {};
     }
   });
-  const [lastResultMeta, setLastResultMeta] = useState<{ starsEarned: number; elapsedSec: number; damageTaken: number }>({
+  const [lastResultMeta, setLastResultMeta] = useState<{
+    starsEarned: number;
+    elapsedSec: number;
+    damageTaken: number;
+    coinsEarned: number;
+    xpEarned: number;
+  }>({
     starsEarned: 0,
     elapsedSec: 0,
-    damageTaken: 0
+    damageTaken: 0,
+    coinsEarned: 0,
+    xpEarned: 0
   });
 
   // Auto-detect mobile / touch capability, but allow user toggle
@@ -2707,6 +4166,16 @@ export const App = () => {
     }
   });
 
+  const showToast = useCallback((text: string, color = '#fbbf24') => {
+    const toastId = Date.now();
+    setPowerupToast({ text, color, id: toastId });
+    setTimeout(() => {
+      setPowerupToast(cur => cur?.id === toastId ? null : cur);
+    }, 3200);
+  }, []);
+
+  const missionEndedRef = useRef<boolean>(false);
+
   const handleGameEvent = useCallback((event: { type: string; data?: any }) => {
     if (event.type === 'STATS_UPDATE' && event.data) {
       setGameStats(prev => ({ ...prev, ...event.data }));
@@ -2727,13 +4196,14 @@ export const App = () => {
         setPowerupToast(cur => cur?.id === toastId ? null : cur);
       }, 2400);
     } else if (event.type === 'PLAYER_DAMAGED') {
+      if (missionEndedRef.current) return;
       setDamageFlash(true);
       if ('vibrate' in navigator) {
         try { navigator.vibrate([50, 30, 60]); } catch (_) {}
       }
       setTimeout(() => setDamageFlash(false), 380);
     } else if (event.type === 'PLAYER_DYING') {
-      // Begin spectacular death cinematic overlay that smoothly cross-fades into the Game Over menu
+      if (missionEndedRef.current) return;
       setIsPlayerDying(true);
       setDamageFlash(true);
       if ('vibrate' in navigator) {
@@ -2743,16 +4213,21 @@ export const App = () => {
     } else if (event.type === 'ENEMY_DESTROYED' && event.data) {
       const hmId = Date.now();
       const { combo, points, method } = event.data;
-      let label = `💥 ¡BLANCO ELIMINADO! +${points}`;
+      const mult = vipPassRef.current ? 1.25 : 1.0;
+      const killCoins = Math.round((15 + Math.min(30, (combo || 1) * 5)) * mult);
+      setCoins(c => c + killCoins);
+      setBpXp(x => x + Math.round(12 * mult));
+
+      let label = `💥 ¡BLANCO ELIMINADO! +${points} (+${killCoins}🪙)`;
       let color = '#ffeb3b';
       if (method === 'STEALTH') {
-        label = `🥷 ¡GOLPE DE SIGILO! +${points} (+RECARGA)`;
+        label = `🥷 ¡GOLPE DE SIGILO! +${points} (+${killCoins}🪙)`;
         color = '#38bdf8';
       } else if (method === 'RICOCHET') {
-        label = `🎯 ¡TIRO DE REBOTE! +${points}`;
+        label = `🎯 ¡TIRO DE REBOTE! +${points} (+${killCoins}🪙)`;
         color = '#00e5ff';
       } else if (combo >= 2) {
-        label = `🔥 ¡RACHA x${combo}! +${points}`;
+        label = `🔥 ¡RACHA x${combo}! +${points} (+${killCoins}🪙)`;
         color = '#ff9100';
       }
       setHitMarker({ label, color, id: hmId });
@@ -2766,13 +4241,30 @@ export const App = () => {
         setPowerupToast(cur => cur?.id === toastId ? null : cur);
       }, 3000);
     } else if (event.type === 'GAME_OVER' && event.data) {
+      if (missionEndedRef.current) return;
+      missionEndedRef.current = true;
       setIsPlayerDying(false);
       setGameState('GAMEOVER');
       setGameStats(prev => ({ ...prev, won: event.data.won }));
+
+      const mult = vipPassRef.current ? 1.25 : 1.0;
+      const earnedStars = event.data.starsEarned || 0;
+      const missionCoins = event.data.won
+        ? Math.round((85 + earnedStars * 35) * mult)
+        : Math.round(25 * mult);
+      const missionXp = event.data.won
+        ? Math.round((65 + earnedStars * 15) * mult)
+        : Math.round(20 * mult);
+
+      setCoins(c => c + missionCoins);
+      setBpXp(x => x + missionXp);
+
       setLastResultMeta({
-        starsEarned: event.data.starsEarned || 0,
+        starsEarned: earnedStars,
         elapsedSec: event.data.elapsedSec || 0,
-        damageTaken: event.data.damageTaken || 0
+        damageTaken: event.data.damageTaken || 0,
+        coinsEarned: missionCoins,
+        xpEarned: missionXp
       });
 
       if (event.data.won) {
@@ -2780,7 +4272,12 @@ export const App = () => {
         const earned = event.data.starsEarned || 1;
         setUnlockedLevel(prev => Math.max(prev, completedMission + 1));
         setMissionStars(prev => {
-          const updated = { ...prev, [completedMission]: Math.max(prev[completedMission] || 0, earned) };
+          const prevStars = prev[completedMission] || 0;
+          // First time getting 3 stars on a mission awards +10 Gems!
+          if (earned === 3 && prevStars < 3) {
+            setGems(g => g + 10);
+          }
+          const updated = { ...prev, [completedMission]: Math.max(prevStars, earned) };
           try { localStorage.setItem('tanks_mission_stars', JSON.stringify(updated)); } catch (_) {}
           return updated;
         });
@@ -2806,14 +4303,287 @@ export const App = () => {
     localStorage.setItem('tanks_unlocked_level', unlockedLevel.toString());
   }, [unlockedLevel]);
 
+  const applyPackRewards = useCallback((pack: StripePack, customerEmail?: string) => {
+    const addCoins = pack.coinsReward || pack.RewardCoins || 0;
+    const addGems = pack.gemsReward || pack.RewardGems || 0;
+    if (addCoins > 0) setCoins(c => c + addCoins);
+    if (addGems > 0) setGems(g => g + addGems);
+
+    let nextSkin = playerSkin;
+    let nextHat = playerHat;
+    let nextTrail = playerTrail;
+
+    const skinsToUnlock = pack.unlockSkins || (pack.UnlockSkin ? [pack.UnlockSkin] : []);
+    if (skinsToUnlock.length > 0) {
+      setOwnedSkins(prev => Array.from(new Set([...prev, ...skinsToUnlock])));
+      nextSkin = skinsToUnlock[0];
+      setPlayerSkin(nextSkin);
+    }
+
+    const hatsToUnlock = pack.unlockHats || (pack.UnlockHat ? [pack.UnlockHat] : []);
+    if (hatsToUnlock.length > 0) {
+      setOwnedHats(prev => Array.from(new Set([...prev, ...hatsToUnlock])));
+      nextHat = hatsToUnlock[0];
+      setPlayerHat(nextHat);
+    }
+
+    const trailsToUnlock = pack.unlockTrails || (pack.UnlockTrail ? [pack.UnlockTrail] : []);
+    if (trailsToUnlock.length > 0) {
+      setOwnedTrails(prev => Array.from(new Set([...prev, ...trailsToUnlock])));
+      nextTrail = trailsToUnlock[0];
+      setPlayerTrail(nextTrail);
+    }
+
+    engineRef.current?.setPlayerLoadout(nextSkin, playerPerk, nextHat, nextTrail);
+
+    if (pack.unlockVipPass || pack.UnlockVipPass) {
+      setVipPassActive(true);
+      setBpXp(x => x + 150);
+    }
+    if (pack.unlockSupporterBadge || pack.UnlockSupporterBadge || pack.id === 'coffee_support') {
+      setSupporterBadge(true);
+    }
+
+    const receipt: PurchaseReceipt = {
+      id: `STRP-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      packId: pack.id,
+      packTitle: pack.title || pack.name,
+      priceEur: pack.priceEur,
+      dateIso: new Date().toISOString(),
+      email: customerEmail
+    };
+    setPurchaseReceipts(prev => [receipt, ...prev]);
+
+    engineRef.current?.audio?.play('powerup');
+    showToast(`🎉 ¡${(pack.title || pack.name).toUpperCase()} ACTIVADO Y GUARDADO EN TU CUENTA!`, '#4ade80');
+  }, [playerPerk, playerHat, playerTrail, playerSkin, showToast]);
+
+  const handleRestoreFromPassport = useCallback((payload: BackupPayload) => {
+    setCoins(prev => Math.max(prev, payload.c || 0));
+    setGems(prev => Math.max(prev, payload.g || 0));
+    setBpXp(prev => Math.max(prev, payload.xp || 0));
+    if (payload.vip) setVipPassActive(true);
+    if (payload.sup) setSupporterBadge(true);
+    if (Array.isArray(payload.sk)) {
+      setOwnedSkins(prev => Array.from(new Set([...prev, ...payload.sk])));
+    }
+    if (Array.isArray(payload.ht)) {
+      setOwnedHats(prev => Array.from(new Set([...prev, ...payload.ht])));
+    }
+    if (Array.isArray(payload.tr)) {
+      setOwnedTrails(prev => Array.from(new Set([...prev, ...payload.tr])));
+    }
+    engineRef.current?.audio?.play('powerup');
+    showToast('🔐 ¡COMPRAS E INVENTARIO 3D RESTAURADOS CON ÉXITO!', '#4ade80');
+  }, [showToast]);
+
+  // Handle return from live Stripe Checkout redirect (?purchase_success=true&product=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('purchase_success') === 'true') {
+      const productId = params.get('product');
+      const pack = STRIPE_PACKS_LIST.find(p => p.id === productId);
+      if (pack) {
+        applyPackRewards(pack);
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [applyPackRewards]);
+
   const handleSelectSkin = (skinId: string) => {
     setPlayerSkin(skinId);
-    engineRef.current?.setPlayerLoadout(skinId, playerPerk);
+    engineRef.current?.setPlayerLoadout(skinId, playerPerk, playerHat, playerTrail);
   };
 
   const handleSelectPerk = (perkId: string) => {
     setPlayerPerk(perkId);
-    engineRef.current?.setPlayerLoadout(playerSkin, perkId);
+    engineRef.current?.setPlayerLoadout(playerSkin, perkId, playerHat, playerTrail);
+  };
+
+  const handleSelectHat = (hatId: string) => {
+    setPlayerHat(hatId);
+    engineRef.current?.setPlayerLoadout(playerSkin, playerPerk, hatId, playerTrail);
+  };
+
+  const handleSelectTrail = (trailId: string) => {
+    setPlayerTrail(trailId);
+    engineRef.current?.setPlayerLoadout(playerSkin, playerPerk, playerHat, trailId);
+  };
+
+  const handleUnlockCosmetic = (category: 'skin' | 'hat' | 'trail', id: string, coinCost: number, gemCost: number) => {
+    if (coinCost > 0) {
+      if (coins < coinCost) {
+        showToast('⚠️ No tienes suficientes Monedas de Oro 🪙. ¡Juega misiones o abre cofres!', '#f87171');
+        return;
+      }
+      setCoins(c => c - coinCost);
+    } else if (gemCost > 0) {
+      if (gems < gemCost) {
+        setShowHangar(false);
+        setStoreInitialTab('gems');
+        setShowStore(true);
+        showToast('💎 Consigue Gemas de Plasma en la Tienda o en el Pase de Batalla', '#38bdf8');
+        return;
+      }
+      setGems(g => g - gemCost);
+    }
+
+    if (category === 'skin') {
+      setOwnedSkins(prev => prev.includes(id) ? prev : [...prev, id]);
+      handleSelectSkin(id);
+    } else if (category === 'hat') {
+      setOwnedHats(prev => prev.includes(id) ? prev : [...prev, id]);
+      handleSelectHat(id);
+    } else if (category === 'trail') {
+      setOwnedTrails(prev => prev.includes(id) ? prev : [...prev, id]);
+      handleSelectTrail(id);
+    }
+    engineRef.current?.audio?.play('powerup');
+    showToast('✨ ¡COSMÉTICO 3D DESBLOQUEADO Y EQUIPADO!', '#4ade80');
+  };
+
+  const handleTryCosmeticFree = (category: 'skin' | 'hat' | 'trail', id: string, name: string) => {
+    setTrialLoadout(prev => ({
+      ...(prev || {}),
+      [category]: id
+    }));
+    engineRef.current?.audio?.play('powerup');
+    showToast(`🎮 ¡PRUEBA ACTIVA! Jugarás la próxima misión con "${name}" gratis`, '#38bdf8');
+  };
+
+  const handleClaimDailyGift = () => {
+    if (dailyClaimedToday) return;
+    setDailyClaimedToday(true);
+    try { localStorage.setItem('tanks_daily_gift_date', todayKey); } catch (_) {}
+    setCoins(c => c + 250);
+    setGems(g => g + 25);
+    engineRef.current?.audio?.play('powerup');
+    showToast('🎁 ¡SUMINISTRO DIARIO RECLAMADO! +250 🪙 y +25 💎', '#4ade80');
+  };
+
+  const handleClaimBattlePassTier = (tier: number, isVipTrack: boolean) => {
+    const tierData = BATTLE_PASS_TIERS.find(t => t.tier === tier);
+    if (!tierData) return;
+
+    const reward = isVipTrack ? tierData.vipReward : tierData.freeReward;
+    if (isVipTrack) {
+      if (claimedVipTiers.includes(tier)) return;
+      setClaimedVipTiers(prev => [...prev, tier]);
+    } else {
+      if (claimedFreeTiers.includes(tier)) return;
+      setClaimedFreeTiers(prev => [...prev, tier]);
+    }
+
+    if (reward.type === 'coins' && reward.amount) setCoins(c => c + reward.amount!);
+    if (reward.type === 'gems' && reward.amount) setGems(g => g + reward.amount!);
+    if (reward.type === 'skin' && reward.itemId) {
+      setOwnedSkins(prev => prev.includes(reward.itemId!) ? prev : [...prev, reward.itemId!]);
+      handleSelectSkin(reward.itemId);
+    }
+    if (reward.type === 'hat' && reward.itemId) {
+      setOwnedHats(prev => prev.includes(reward.itemId!) ? prev : [...prev, reward.itemId!]);
+      handleSelectHat(reward.itemId);
+    }
+    if (reward.type === 'trail' && reward.itemId) {
+      setOwnedTrails(prev => prev.includes(reward.itemId!) ? prev : [...prev, reward.itemId!]);
+      handleSelectTrail(reward.itemId);
+    }
+    engineRef.current?.audio?.play('powerup');
+    showToast(`🎖️ ¡RECOMPENSA NIVEL ${tier} RECLAMADA: ${reward.label}!`, '#e879f9');
+  };
+
+  const handleOpenMysteryCrate = (currency: 'coins' | 'gems'): { title: string; subtitle: string; icon: string; color: string } | null => {
+    if (currency === 'coins') {
+      if (coins < 400) {
+        showToast('⚠️ Necesitas 400 Monedas 🪙 para abrir esta Caja Misteriosa', '#f87171');
+        return null;
+      }
+      setCoins(c => c - 400);
+    } else {
+      if (gems < 50) {
+        showToast('⚠️ Necesitas 50 Gemas 💎 para abrir el Cofre Épico', '#f87171');
+        return null;
+      }
+      setGems(g => g - 50);
+    }
+
+    engineRef.current?.audio?.play('powerup');
+
+    // Build pool of unowned cosmetics (No-duplicate protection!)
+    const unownedPool: { category: 'skin' | 'hat' | 'trail'; id: string; name: string; rarity: string; icon: string; color: string }[] = [];
+    TANK_SKINS_LIST.forEach(s => {
+      if (!ownedSkins.includes(s.id)) {
+        unownedPool.push({ category: 'skin', id: s.id, name: `Skin 3D: ${s.name}`, rarity: s.rarity, icon: s.badge, color: s.accent });
+      }
+    });
+    TANK_HATS_LIST.forEach(h => {
+      if (!ownedHats.includes(h.id)) {
+        unownedPool.push({ category: 'hat', id: h.id, name: `Casco 3D: ${h.name}`, rarity: h.rarity, icon: h.icon, color: h.color });
+      }
+    });
+    BULLET_TRAILS_LIST.forEach(tr => {
+      if (!ownedTrails.includes(tr.id)) {
+        unownedPool.push({ category: 'trail', id: tr.id, name: `Trazadora: ${tr.name}`, rarity: tr.rarity, icon: tr.icon, color: tr.color });
+      }
+    });
+
+    const guaranteedRare = currency === 'gems' || pityCounter >= 3;
+    if (unownedPool.length > 0 && (guaranteedRare || Math.random() < 0.65)) {
+      const chosen = unownedPool[Math.floor(Math.random() * unownedPool.length)];
+      if (chosen.category === 'skin') {
+        setOwnedSkins(prev => [...prev, chosen.id]);
+        handleSelectSkin(chosen.id);
+      } else if (chosen.category === 'hat') {
+        setOwnedHats(prev => [...prev, chosen.id]);
+        handleSelectHat(chosen.id);
+      } else {
+        setOwnedTrails(prev => [...prev, chosen.id]);
+        handleSelectTrail(chosen.id);
+      }
+      setPityCounter(1);
+      return {
+        title: `¡NUEVO COSMÉTICO: ${chosen.name.toUpperCase()}!`,
+        subtitle: `Rareza ${chosen.rarity} • Equipado automáticamente en tu tanque 3D`,
+        icon: chosen.icon,
+        color: chosen.color
+      };
+    }
+
+    // Fallback jackpot currency reward if all cosmetics owned or normal roll
+    setPityCounter(p => Math.min(3, p + 1));
+    const bonusGems = currency === 'gems' ? 75 : 35;
+    const bonusCoins = 550;
+    setGems(g => g + bonusGems);
+    setCoins(c => c + bonusCoins);
+    return {
+      title: `¡BOTÍN DE GUERRA: +${bonusCoins} 🪙 Y +${bonusGems} 💎!`,
+      subtitle: 'Suministros añadidos a tu cuenta • Pity de Cosmético aumentado',
+      icon: '💎',
+      color: '#38bdf8'
+    };
+  };
+
+  const handleRevivePlayer = () => {
+    if (!engineRef.current) return;
+    if (!freeReviveUsedToday) {
+      setFreeReviveUsedToday(true);
+      try { localStorage.setItem('tanks_free_revive_date', todayKey); } catch (_) {}
+    } else if (gems >= 25) {
+      setGems(g => g - 25);
+    } else {
+      setStoreInitialTab('gems');
+      setShowStore(true);
+      return;
+    }
+
+    const revived = engineRef.current.revivePlayer();
+    if (revived) {
+      missionEndedRef.current = false;
+      setIsPlayerDying(false);
+      setGameState('PLAYING');
+      showToast('⚡ ¡TANQUE REANIMADO CON ESCUDO DE PLASMA Y BLINDAJE AL 100%!', '#38bdf8');
+    }
   };
 
   const handleSelectDifficulty = (diffId: string) => {
@@ -2854,7 +4624,19 @@ export const App = () => {
       if (e.code === 'KeyM') {
         toggleMute();
       } else if (e.code === 'Escape' || e.code === 'KeyP') {
-        if (gameState === 'PLAYING' && !isPlayerDying) {
+        if (activeStripePack) {
+          setActiveStripePack(null);
+        } else if (showStore) {
+          setShowStore(false);
+        } else if (showHangar) {
+          setShowHangar(false);
+        } else if (showSettings) {
+          setShowSettings(false);
+        } else if (showIntel) {
+          setShowIntel(false);
+        } else if (gameState === 'LEVEL_SELECT') {
+          setGameState('MENU');
+        } else if (gameState === 'PLAYING' && !isPlayerDying) {
           pauseGame();
         } else if (gameState === 'PAUSED') {
           resumeGame();
@@ -2874,7 +4656,7 @@ export const App = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, toggleCamera, isPlayerDying]);
+  }, [gameState, toggleCamera, isPlayerDying, activeStripePack, showStore, showHangar, showSettings, showIntel]);
 
   // Two-finger pinch zoom on mobile touch
   const lastTouchDist = useRef<number | null>(null);
@@ -2936,7 +4718,17 @@ export const App = () => {
 
   const startGame = (levelIndex: number) => {
     if (engineRef.current) {
+      missionEndedRef.current = false;
       setIsPlayerDying(false);
+      // Apply 1-mission Free Trial cosmetic if active, otherwise permanent loadout
+      const effectiveSkin = trialLoadout?.skin || playerSkin;
+      const effectiveHat = trialLoadout?.hat || playerHat;
+      const effectiveTrail = trialLoadout?.trail || playerTrail;
+      engineRef.current.setPlayerLoadout(effectiveSkin, playerPerk, effectiveHat, effectiveTrail);
+      if (trialLoadout) {
+        setTrialLoadout(null);
+      }
+
       engineRef.current.setJoystickInput(0, 0, false);
       engineRef.current.setAimStickInput(0, 0, false);
       engineRef.current.startAudio();
@@ -2992,6 +4784,7 @@ export const App = () => {
   };
 
   const returnToMenu = () => {
+    missionEndedRef.current = false;
     setIsPlayerDying(false);
     if (engineRef.current) {
       engineRef.current.setPause(false);
@@ -3018,21 +4811,29 @@ export const App = () => {
         }}
       />
 
-      {showIntroSplash && gameState === 'MENU' && (
-        <ToyBlockIntroSplash
-          onFinish={() => setShowIntroSplash(false)}
-          onPlayBlockSound={(idx) => engineRef.current?.audio?.play('wood_pop', idx)}
-        />
-      )}
-
-      {gameState === 'MENU' && !showIntroSplash && (
+      {gameState === 'MENU' && (
         <MainMenu
           onStart={startCampaign}
           onQuickStartLevel={(lvl) => startGame(lvl)}
           onLevelSelect={() => setGameState('LEVEL_SELECT')}
           onOpenIntel={() => setShowIntel(true)}
           onOpenHangar={() => setShowHangar(true)}
+          onOpenStore={(tab = 'featured') => {
+            setStoreInitialTab(tab);
+            setShowStore(true);
+          }}
+          onQuickBuyStarterPack={() => {
+            const starter = STRIPE_PACKS_LIST.find(p => p.id === 'starter_pack');
+            if (starter) setActiveStripePack(starter);
+          }}
           onOpenSettings={() => setShowSettings(true)}
+          onReplayIntro={() => {
+            setShowIntroSplash(false);
+            setTimeout(() => setShowIntroSplash(true), 20);
+          }}
+          showIntroSplash={showIntroSplash}
+          onFinishIntro={() => setShowIntroSplash(false)}
+          onPlayBlockSound={(idx) => engineRef.current?.audio?.play('wood_pop', idx)}
           unlockedLevel={unlockedLevel}
           totalLevels={totalLevels}
           totalStars={totalStarsEarned}
@@ -3042,6 +4843,14 @@ export const App = () => {
           onToggleMusic={toggleMusic}
           selectedSkin={playerSkin}
           selectedPerk={playerPerk}
+          selectedHat={playerHat}
+          selectedTrail={playerTrail}
+          coins={coins}
+          gems={gems}
+          bpXp={bpXp}
+          vipPassActive={vipPassActive}
+          supporterBadge={supporterBadge}
+          starterPackOwned={ownedSkins.includes('inferno_dragon')}
         />
       )}
 
@@ -3221,38 +5030,39 @@ export const App = () => {
           {/* Virtual On-Screen Gamepad for Mobile Touch */}
           {touchControlsEnabled && !isPlayerDying && (
             <div style={styles.mobileControlsContainer}>
-              <div style={{ pointerEvents: 'auto' }}>
-                <VirtualJoystick
-                  onMove={(x, y, active) => {
-                    if (engineRef.current) {
-                      engineRef.current.setJoystickInput(x, y, active);
-                    }
-                  }}
-                />
-              </div>
+              <VirtualJoystick
+                onMove={(x, y, active) => {
+                  if (engineRef.current) {
+                    engineRef.current.setJoystickInput(x, y, active);
+                  }
+                }}
+              />
 
-              <div style={{ pointerEvents: 'auto' }}>
-                <MobileControlsCluster
-                  onAim={(x, y, active) => {
-                    engineRef.current?.setAimStickInput(x, y, active);
-                  }}
-                  onQuickShoot={() => {
-                    engineRef.current?.triggerAutoAimShoot();
-                  }}
-                  onMine={() => {
-                    engineRef.current?.triggerMine();
-                  }}
-                  onBazooka={() => {
-                    engineRef.current?.triggerBazooka();
-                  }}
-                  onToggleCamera={toggleCamera}
-                  onZoomIn={zoomIn}
-                  onZoomOut={zoomOut}
-                  cameraMode={cameraMode}
-                  mineReady={gameStats.mineReady}
-                  bazookaReady={gameStats.bazookaReady}
-                />
-              </div>
+              <MobileControlsCluster
+                onAim={(x, y, active, shouldAutoFire = true) => {
+                  engineRef.current?.setAimStickInput(x, y, active, shouldAutoFire);
+                }}
+                onBazookaStick={(x, y, active, fireOnRelease) => {
+                  engineRef.current?.setBazookaStickInput(x, y, active, fireOnRelease);
+                }}
+                onQuickShoot={() => {
+                  engineRef.current?.triggerShoot();
+                }}
+                onMine={() => {
+                  engineRef.current?.triggerMine();
+                }}
+                onBazooka={() => {
+                  engineRef.current?.triggerBazooka();
+                }}
+                onToggleCamera={toggleCamera}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                cameraMode={cameraMode}
+                mineReady={gameStats.mineReady}
+                mineCooldownProgress={gameStats.mineCooldownProgress}
+                bazookaReady={gameStats.bazookaReady}
+                bazookaCooldownProgress={gameStats.bazookaCooldownProgress}
+              />
             </div>
           )}
         </>
@@ -3290,6 +5100,15 @@ export const App = () => {
           starsEarned={lastResultMeta.starsEarned}
           elapsedSec={lastResultMeta.elapsedSec}
           damageTaken={lastResultMeta.damageTaken}
+          coinsEarned={lastResultMeta.coinsEarned}
+          xpEarned={lastResultMeta.xpEarned}
+          gems={gems}
+          freeReviveAvailable={!freeReviveUsedToday}
+          onRevive={handleRevivePlayer}
+          onOpenStoreGems={() => {
+            setStoreInitialTab('gems');
+            setShowStore(true);
+          }}
           onNext={nextLevel}
           onRestart={restartLevel}
           onLevelSelect={() => setGameState('LEVEL_SELECT')}
@@ -3302,9 +5121,81 @@ export const App = () => {
         <HangarModal
           selectedSkin={playerSkin}
           selectedPerk={playerPerk}
+          selectedHat={playerHat}
+          selectedTrail={playerTrail}
+          ownedSkins={ownedSkins}
+          ownedHats={ownedHats}
+          ownedTrails={ownedTrails}
+          coins={coins}
+          gems={gems}
+          trialLoadout={trialLoadout}
           onSelectSkin={handleSelectSkin}
           onSelectPerk={handleSelectPerk}
+          onSelectHat={handleSelectHat}
+          onSelectTrail={handleSelectTrail}
+          onUnlockCosmetic={handleUnlockCosmetic}
+          onTryCosmeticFree={handleTryCosmeticFree}
+          onOpenStore={() => {
+            setShowHangar(false);
+            setStoreInitialTab('featured');
+            setShowStore(true);
+          }}
           onClose={() => setShowHangar(false)}
+        />
+      )}
+      {showStore && (
+        <StoreModal
+          coins={coins}
+          gems={gems}
+          bpXp={bpXp}
+          vipPassActive={vipPassActive}
+          supporterBadge={supporterBadge}
+          ownedSkins={ownedSkins}
+          ownedHats={ownedHats}
+          ownedTrails={ownedTrails}
+          claimedFreeTiers={claimedFreeTiers}
+          claimedVipTiers={claimedVipTiers}
+          pityCounter={pityCounter}
+          dailyClaimedToday={dailyClaimedToday}
+          purchaseReceipts={purchaseReceipts}
+          onClaimDailyReward={handleClaimDailyGift}
+          onClaimDailyGift={handleClaimDailyGift}
+          onClaimBattlePassTier={handleClaimBattlePassTier}
+          onOpenMysteryChest={handleOpenMysteryCrate}
+          onOpenMysteryCrate={handleOpenMysteryCrate}
+          onOpenStripeCheckout={(pack) => setActiveStripePack(pack)}
+          onInitiateStripeCheckout={(pack) => setActiveStripePack(pack)}
+          onRestoreFromPassport={handleRestoreFromPassport}
+          onRestoreStripeProducts={(productIds, email) => {
+            const uniqueIds = Array.from(new Set(productIds));
+            uniqueIds.forEach(pid => {
+              const pack = STRIPE_PACKS_LIST.find(p => p.id === pid);
+              const alreadyApplied = purchaseReceipts.some(r => r.packId === pid);
+              if (pack && !alreadyApplied) {
+                applyPackRewards(pack, email);
+              }
+            });
+          }}
+          onOpenHangar={() => {
+            setShowStore(false);
+            setShowHangar(true);
+          }}
+          onClose={() => setShowStore(false)}
+          initialTab={storeInitialTab}
+        />
+      )}
+      {activeStripePack && (
+        <StripeCheckoutModal
+          pack={activeStripePack}
+          onConfirmSuccess={(pack, email) => {
+            applyPackRewards(pack, email);
+            setActiveStripePack(null);
+          }}
+          onSuccess={(pack, email) => {
+            applyPackRewards(pack, email);
+            setActiveStripePack(null);
+          }}
+          onClose={() => setActiveStripePack(null)}
         />
       )}
       {showSettings && (

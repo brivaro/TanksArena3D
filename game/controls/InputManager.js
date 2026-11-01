@@ -14,9 +14,12 @@ export class InputManager {
 
     // Mobile / Touch Virtual Controls State
     this.isTouchDevice = false;
+    this.usingTouchControls = false;
     this.virtualJoystick = { x: 0, y: 0, active: false }; // Normalized [-1, 1]
-    this.virtualAimStick = { x: 0, y: 0, active: false, distance: 0 }; // Brawl Stars aim & fire joystick
+    this.virtualAimStick = { x: 0, y: 0, active: false, distance: 0 }; // Cannon aim & fire joystick
+    this.bazookaAimStick = { x: 0, y: 0, active: false, distance: 0 }; // Bazooka drag-to-aim joystick
     this.virtualAim = { active: false, worldPos: new THREE.Vector3() };
+    this.lastAimDir = { x: 0, z: -1, hasCustomAim: false }; // Persistent compass aim vector on mobile
     this.controlMode = 'twinStick'; // 'twinStick' or 'classic'
 
     this.isMouseDown = false;
@@ -37,6 +40,9 @@ export class InputManager {
   initListeners() {
     // Detect touch capability
     this.isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (this.isTouchDevice) {
+      this.usingTouchControls = true;
+    }
 
     // Keyboard
     const onKeyDown = (e) => {
@@ -65,41 +71,44 @@ export class InputManager {
     };
     this.addListener(window, 'contextmenu', onContextMenu);
 
-    // Mouse / Pointer Move
+    // Mouse Move (Strictly physical mouse only — NEVER touch events on joysticks or buttons!)
     const onPointerMove = (e) => {
-      // If event came from mouse or active pen
-      if (e.pointerType === 'mouse' || !this.virtualAim.active) {
-        this.updateMouseCoords(e.clientX, e.clientY);
-      }
+      if (e.pointerType !== 'mouse') return;
+      if (this.virtualJoystick.active || this.virtualAimStick.active || this.bazookaAimStick.active) return;
+      const target = e.target;
+      if (target && target.closest && (target.closest('button') || target.closest('[data-ui-element]'))) return;
+      this.usingTouchControls = false;
+      this.updateMouseCoords(e.clientX, e.clientY);
     };
     this.addListener(window, 'pointermove', onPointerMove);
 
     // Pointer Down (Left click = Fire or Bazooka if holding Shift/Q/F, Right click = Mine on PC)
     const onPointerDown = (e) => {
-      if (e.pointerType === 'mouse') {
-        const target = e.target;
-        if (target && target.tagName === 'BUTTON') return;
-        if (target && target.closest && (target.closest('button') || target.closest('[data-ui-element]'))) return;
+      if (e.pointerType !== 'mouse') return;
+      if (this.virtualJoystick.active || this.virtualAimStick.active || this.bazookaAimStick.active) return;
+      const target = e.target;
+      if (target && target.tagName === 'BUTTON') return;
+      if (target && target.closest && (target.closest('button') || target.closest('[data-ui-element]'))) return;
 
-        // Right-click (button 2) or Middle-click (button 1) deploys a mine on PC!
-        if (e.button === 2 || e.button === 1) {
-          e.preventDefault();
-          this.shouldMine = true;
-          return;
-        }
+      this.usingTouchControls = false;
 
-        this.updateMouseCoords(e.clientX, e.clientY);
-
-        // If holding Shift, Q, or F while clicking Left Mouse Button, fire Bazooka!
-        if (e.shiftKey || this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['KeyQ'] || this.keys['KeyF']) {
-          this.shouldBazooka = true;
-          return;
-        }
-
-        this.isMouseDown = true;
-        this.shouldShoot = true;
+      // Right-click (button 2) or Middle-click (button 1) deploys a mine on PC!
+      if (e.button === 2 || e.button === 1) {
+        e.preventDefault();
+        this.shouldMine = true;
+        return;
       }
-      // On mobile/touch devices, all firing is exclusively governed by the aim stick!
+
+      this.updateMouseCoords(e.clientX, e.clientY);
+
+      // If holding Shift, Q, or F while clicking Left Mouse Button, fire Bazooka!
+      if (e.shiftKey || this.keys['ShiftLeft'] || this.keys['ShiftRight'] || this.keys['KeyQ'] || this.keys['KeyF']) {
+        this.shouldBazooka = true;
+        return;
+      }
+
+      this.isMouseDown = true;
+      this.shouldShoot = true;
     };
 
     const onPointerUp = (e) => {
@@ -137,6 +146,10 @@ export class InputManager {
     this.virtualAimStick.y = 0;
     this.virtualAimStick.active = false;
     this.virtualAimStick.distance = 0;
+    this.bazookaAimStick.x = 0;
+    this.bazookaAimStick.y = 0;
+    this.bazookaAimStick.active = false;
+    this.bazookaAimStick.distance = 0;
     this.virtualAim.active = false;
     this.isMouseDown = false;
     this.shouldShoot = false;
@@ -161,9 +174,19 @@ export class InputManager {
 
   // Set virtual joystick from UI component (x, y between -1 and 1)
   setJoystickInput(x, y, active) {
+    if (active) this.usingTouchControls = true;
     this.virtualJoystick.x = x;
     this.virtualJoystick.y = y;
     this.virtualJoystick.active = active;
+
+    // If the player hasn't manually aimed with the right stick yet, point the default aim ahead in movement direction
+    if (active && !this.lastAimDir.hasCustomAim && !this.virtualAimStick.active && !this.bazookaAimStick.active) {
+      const mag = Math.hypot(x, y);
+      if (mag > 0.25) {
+        this.lastAimDir.x = x / mag;
+        this.lastAimDir.z = y / mag;
+      }
+    }
   }
 
   // Set aim position directly (e.g. from touch drag or right virtual stick)
@@ -172,36 +195,83 @@ export class InputManager {
     this.virtualAim.angle = angleRad;
   }
 
-  // Brawl Stars Twin-Stick: Move aim stick beyond deadzone to aim and auto-shoot
-  setAimStickInput(x, y, active, playerPosition = null) {
+  // Twin-Stick Cannon Aim & Fire:
+  // Supports both continuous auto-fire ('auto') and precision aim-then-release / rim-burst ('smart')
+  setAimStickInput(x, y, active, playerPosition = null, shouldAutoFire = true) {
+    if (active) this.usingTouchControls = true;
     this.virtualAimStick.x = x;
     this.virtualAimStick.y = y;
     this.virtualAimStick.active = active;
-    this.virtualAimStick.distance = Math.hypot(x, y);
+    const dist = Math.hypot(x, y);
+    this.virtualAimStick.distance = dist;
 
-    // Deadzone: Only aim and shoot if actively dragged beyond 28% from center!
-    // If the user merely touches the stick without moving it, it WILL NOT shoot.
-    if (active && this.virtualAimStick.distance >= 0.28) {
+    // If Bazooka drag-aim stick is currently being held, let Bazooka stick control the turret aim
+    if (this.bazookaAimStick.active) {
+      this.autoShootHold = false;
+      this.shouldShoot = false;
+      return;
+    }
+
+    if (active && dist >= 0.18) {
       this.virtualAim.active = true;
+      this.lastAimDir.x = x / dist;
+      this.lastAimDir.z = y / dist;
+      this.lastAimDir.hasCustomAim = true;
+
       const aimDistance = 28;
       const basePos = playerPosition || new THREE.Vector3(0, 0, 0);
-
-      // x is horizontal (-1 left, 1 right), y is vertical (-1 up/North, 1 down/South)
       this.mouseWorldPos.set(
-        basePos.x + (x * aimDistance),
+        basePos.x + (this.lastAimDir.x * aimDistance),
         0.5,
-        basePos.z + (y * aimDistance)
+        basePos.z + (this.lastAimDir.z * aimDistance)
       );
 
-      // Auto-fire while deliberately moving/aiming the stick
-      this.autoShootHold = true;
+      this.autoShootHold = Boolean(shouldAutoFire && dist >= 0.28);
     } else {
-      // In deadzone or released: Immediately cease shooting!
       this.autoShootHold = false;
       this.shouldShoot = false;
       if (!active) {
         this.virtualAim.active = false;
         this.virtualAimStick.distance = 0;
+      }
+    }
+  }
+
+  // Dedicated Bazooka Drag-to-Aim Stick:
+  // Dragging the 🚀 Bazooka button aims the turret & laser sight WITHOUT firing normal cannon bullets,
+  // and releasing fires the Bazooka rocket in that exact direction!
+  setBazookaStickInput(x, y, active, playerPosition = null, fireOnRelease = false) {
+    if (active || fireOnRelease) this.usingTouchControls = true;
+    this.bazookaAimStick.x = x;
+    this.bazookaAimStick.y = y;
+    this.bazookaAimStick.active = active;
+    const dist = Math.hypot(x, y);
+    this.bazookaAimStick.distance = dist;
+
+    // Always pause normal cannon auto-fire while aiming/firing Bazooka
+    this.autoShootHold = false;
+    this.shouldShoot = false;
+
+    if (active && dist >= 0.18) {
+      this.virtualAim.active = true;
+      this.lastAimDir.x = x / dist;
+      this.lastAimDir.z = y / dist;
+      this.lastAimDir.hasCustomAim = true;
+
+      const aimDistance = 28;
+      const basePos = playerPosition || new THREE.Vector3(0, 0, 0);
+      this.mouseWorldPos.set(
+        basePos.x + (this.lastAimDir.x * aimDistance),
+        0.5,
+        basePos.z + (this.lastAimDir.z * aimDistance)
+      );
+    } else if (!active) {
+      if (!this.virtualAimStick.active) {
+        this.virtualAim.active = false;
+      }
+      this.bazookaAimStick.distance = 0;
+      if (fireOnRelease) {
+        this.shouldBazooka = true;
       }
     }
   }
@@ -229,6 +299,8 @@ export class InputManager {
   }
 
   triggerBazooka() {
+    this.autoShootHold = false;
+    this.shouldShoot = false;
     this.shouldBazooka = true;
   }
 

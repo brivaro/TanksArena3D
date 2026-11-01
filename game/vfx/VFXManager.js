@@ -44,6 +44,13 @@ export class VFXManager {
       opacity: 0.62,
       depthWrite: false
     });
+    this.playerCustomTrailMats = {
+      cyan: this.playerTrailMat,
+      gold_fire: new THREE.MeshBasicMaterial({ color: 0xffd600, transparent: true, opacity: 0.72, depthWrite: false }),
+      void_purple: new THREE.MeshBasicMaterial({ color: 0xe040fb, transparent: true, opacity: 0.72, depthWrite: false }),
+      emerald_laser: new THREE.MeshBasicMaterial({ color: 0x00e676, transparent: true, opacity: 0.72, depthWrite: false }),
+      crimson_lightning: new THREE.MeshBasicMaterial({ color: 0xff1744, transparent: true, opacity: 0.72, depthWrite: false })
+    };
     this.enemyTrailMat = new THREE.MeshBasicMaterial({
       color: 0xff5722,
       transparent: true,
@@ -211,8 +218,9 @@ export class VFXManager {
   }
 
   // Spawn glowing plasma tracer trail behind moving bullets (Uses object pool & shared materials — zero GC!)
-  spawnBulletTrail(pos, isPlayerBullet = true, isBazooka = false) {
-    const mat = isBazooka ? this.enemyTrailMat : (isPlayerBullet ? this.playerTrailMat : this.enemyTrailMat);
+  spawnBulletTrail(pos, isPlayerBullet = true, isBazooka = false, trailId = 'cyan') {
+    const customPlayerMat = (this.playerCustomTrailMats && this.playerCustomTrailMats[trailId]) || this.playerTrailMat;
+    const mat = isBazooka ? this.enemyTrailMat : (isPlayerBullet ? customPlayerMat : this.enemyTrailMat);
     let mesh = this.trailPool.pop();
     if (mesh) {
       mesh.material = mat;
