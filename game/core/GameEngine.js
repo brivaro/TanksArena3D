@@ -4213,6 +4213,7 @@ export class GameEngine {
     }
 
     this.stats.enemiesLeft = this.entities.filter(e => e instanceof EnemyTank).length;
+    this.initialEnemyCount = this.stats.enemiesLeft;
     this.stats.lives = this.playerPerk === 'heavy_armor' ? 4 : 3;
     this.stats.isNightMode = this.isNightStealthActive();
     this.muzzleRevealTimer = 0;
@@ -4222,6 +4223,15 @@ export class GameEngine {
     this.missionStartTime = performance.now();
     this.missionDamageTaken = 0;
     this.isRunning = true;
+
+    if (this.audio && typeof this.audio.startMissionMusic === 'function') {
+      this.audio.startMissionMusic({
+        level: levelIndex,
+        biome: this.currentBiome,
+        isBoss: Boolean(this.bossEntity || levelIndex % 8 === 0),
+        isStealth: this.isNightStealthActive()
+      });
+    }
 
     // Pre-compile scene shaders once on level load so shooting/explosions never stall the frame
     try {
@@ -4368,7 +4378,7 @@ export class GameEngine {
       this.screenShake = 0.65;
   }
 
-  triggerBazookaDemolition(pos, primaryWall = null) {
+  triggerBazookaDemolition(pos, primaryWall = null, attackerTank = null) {
       this.audio.play('barrel_explosion');
       this.vfx.spawnScorchDecal(pos, 1.15);
       this.vfx.spawnExplosion(pos, 0xff3d00, 38, 2.3);
@@ -4377,7 +4387,7 @@ export class GameEngine {
       this.hitStopTimer = 0.04;
 
       if (primaryWall && (!primaryWall.userData || !primaryWall.userData.isBorder)) {
-          this.destroyBlock(primaryWall);
+          this.destroyBlock(primaryWall, attackerTank);
       }
 
       // Demolish any interior obstacle within blast radius (strictly preserving outer arena borders!)
@@ -4387,7 +4397,7 @@ export class GameEngine {
           if (!w || (w.userData && w.userData.isBorder)) return;
           const d = Math.hypot(w.position.x - pos.x, w.position.z - pos.z);
           if (d <= blastRadius) {
-              this.destroyBlock(w);
+              this.destroyBlock(w, attackerTank);
           }
       });
 
@@ -4428,13 +4438,15 @@ export class GameEngine {
           }
       });
 
-      [...this.destructibles].forEach(block => {
-           const box = new THREE.Box3().setFromObject(block);
-           const center = new THREE.Vector3();
-           box.getCenter(center);
-           if (center.distanceTo(pos) < radius) {
-               this.destroyBlock(block);
-           }
+      // Demolish all interior walls, stone blocks, cork blocks, trees, and obstacles within blast radius (just like Bazooka, preserving outer arena borders!)
+      const wallBlastRadius = radius * 0.72;
+      const allBreakables = [...this.walls, ...this.destructibles];
+      allBreakables.forEach(block => {
+          if (!block || (block.userData && block.userData.isBorder)) return;
+          const d = Math.hypot(block.position.x - pos.x, block.position.z - pos.z);
+          if (d <= wallBlastRadius) {
+              this.destroyBlock(block, this.player);
+          }
       });
 
       [...this.mines].forEach(otherMine => {
@@ -4493,6 +4505,9 @@ export class GameEngine {
           this.winTimeout = null;
       }
       this.isDying = true;
+      if (this.audio && typeof this.audio.stopCombatMarch === 'function') {
+          this.audio.stopCombatMarch();
+      }
       if (this.input) this.input.resetInputs();
       this.cursor.setVisible(false);
 
@@ -4599,6 +4614,9 @@ export class GameEngine {
       this.isRunning = true;
       this.isPaused = false;
 
+      if (this.audio && typeof this.audio.startCombatMarch === 'function' && !this.audio.isMusicMuted) {
+          this.audio.startCombatMarch(false);
+      }
       this.audio.play('powerup');
       this.audio.play('victory');
       this.vfx.spawnPowerUpBurst(spawnPos, 0xffd700);
@@ -4786,7 +4804,7 @@ export class GameEngine {
         return;
     }
 
-    // 1. Power-Up Crates (gentle bobbing & hovering rotation)
+    // 1. Power-Up Crates (gentle bobbing & hovering rotation; collectible by Player OR Enemy Tanks!)
     this.powerUpCrates.forEach(crate => {
         if (!crate.userData.collected) {
             crate.rotation.y += dt * 1.6;
@@ -4796,6 +4814,15 @@ export class GameEngine {
                 const dist = this.player.mesh.position.distanceTo(crate.position);
                 if (dist < 3.2) {
                     this.collectPowerUp(crate, this.player);
+                    return;
+                }
+            }
+            for (const ent of this.entities) {
+                if (ent instanceof EnemyTank && !ent.isDead && ent.mesh) {
+                    if (ent.mesh.position.distanceTo(crate.position) < 3.2) {
+                        this.collectPowerUp(crate, ent);
+                        return;
+                    }
                 }
             }
         }
@@ -5013,7 +5040,7 @@ export class GameEngine {
                 if (p.hitMine) {
                     this.triggerMineExplosion(p.hitMine);
                 }
-                this.triggerBazookaDemolition(p.mesh.position, p.hitWallToDemolish || p.hitDestructible);
+                this.triggerBazookaDemolition(p.mesh.position, p.hitWallToDemolish || p.hitDestructible, p.owner);
             } else if (p.hitTarget && p.hitTarget.mesh) {
                 if (p.hitTarget instanceof EnemyTank) {
                    const wasRicochet = p.bounces > 0;
@@ -5023,7 +5050,7 @@ export class GameEngine {
                 }
                 this.vfx.spawnExplosion(p.mesh.position, 0xffff00, 6, 0.35);
             } else if (p.hitDestructible) {
-                this.destroyBlock(p.hitDestructible);
+                this.destroyBlock(p.hitDestructible, p.owner);
             } else if (p.hitMine) {
                 this.triggerMineExplosion(p.hitMine);
             } else {
@@ -5036,14 +5063,15 @@ export class GameEngine {
     }
   }
 
-  destroyBlock(block) {
+  destroyBlock(block, attackerTank = null) {
       if (!block || (block.userData && block.userData.isBorder)) return;
       if (block.userData && block.userData.type === 'barrel') {
           this.triggerBarrelExplosion(block);
           return;
       }
       if (block.userData && block.userData.type === 'powerup') {
-          this.collectPowerUp(block, this.player);
+          const collector = (attackerTank && !attackerTank.isDead && attackerTank.mesh) ? attackerTank : this.player;
+          this.collectPowerUp(block, collector);
           return;
       }
 
@@ -5124,8 +5152,7 @@ export class GameEngine {
       if (crate.userData) crate.userData.bounds = null;
 
       const pos = crate.position.clone();
-      this.vfx.spawnPowerUpBurst(pos, 0x00E5FF);
-      this.audio.play('powerup');
+      const isEnemyCollector = (tank instanceof EnemyTank);
 
       this.scene.remove(crate);
       this.destructibles = this.destructibles.filter(b => b !== crate);
@@ -5133,6 +5160,64 @@ export class GameEngine {
       this.powerUpCrates = this.powerUpCrates.filter(c => c !== crate);
 
       const rand = Math.random();
+
+      // If an Enemy Tank shot or drove into the Power-Up Crate, the ENEMY gets the advantage!
+      if (isEnemyCollector) {
+          this.vfx.spawnPowerUpBurst(pos, 0xFF1744);
+          if (tank.mesh) {
+              this.vfx.spawnPowerUpBurst(tank.mesh.position, 0xFF1744);
+              this.vfx.spawnShockwave(tank.mesh.position, 0xFF1744, 5.0);
+          }
+          this.audio.play('boost');
+          this.audio.play('impact');
+
+          let eType = 'shield';
+          let eFloat = '⚠️ ¡ENEMIGO CON ESCUDO!';
+          let eToast = '⚠️ ¡EL ENEMIGO HA ROBADO UN ESCUDO ENERGÉTICO!';
+
+          if (rand < 0.38) {
+              eType = 'shield';
+              eFloat = '🛡️ ¡ENEMIGO CON ESCUDO!';
+              eToast = '⚠️ ¡EL ENEMIGO DISPARÓ A LA CAJA Y OBTUVO ESCUDO!';
+          } else if (rand < 0.72) {
+              eType = 'rapid';
+              eFloat = '⚡ ¡ENEMIGO CON RÁFAGA!';
+              eToast = '⚠️ ¡EL ENEMIGO ROBÓ LA CAJA: RÁFAGA RÁPIDA ENEMIGA!';
+          } else if (rand < 0.90) {
+              eType = 'speed';
+              eFloat = '🚀 ¡ENEMIGO TURBO!';
+              eToast = '⚠️ ¡EL ENEMIGO ROBÓ LA CAJA: MOTOR TURBO ENEMIGO!';
+          } else {
+              eType = 'life';
+              eFloat = '🛡️ ¡ENEMIGO REFORZADO!';
+              eToast = '⚠️ ¡EL ENEMIGO ROBÓ LA CAJA: BLINDAJE EXTRA ENEMIGO!';
+          }
+
+          if (typeof tank.applyPowerUp === 'function') {
+              tank.applyPowerUp(eType);
+          }
+          if (tank.isBoss && eType === 'life') {
+              this.stats.bossInfo = {
+                  name: tank.bossName,
+                  hp: tank.hp,
+                  maxHp: tank.maxHp,
+                  enraged: tank.enraged
+              };
+              this.updateUI();
+          }
+
+          const textPos = (tank.mesh && tank.mesh.position) ? tank.mesh.position : pos;
+          this.vfx.spawnFloatingText(textPos, eFloat, '#ff5252', 1.18);
+          this.onEvent({
+              type: 'POWERUP_COLLECTED',
+              data: { type: 'enemy_stolen', label: eToast, isEnemy: true }
+          });
+          return;
+      }
+
+      this.vfx.spawnPowerUpBurst(pos, 0x00E5FF);
+      this.audio.play('powerup');
+
       let pType = 'shield';
       let pLabel = '🛡️ ESCUDO ENERGÉTICO ACTIVADO';
       let floatText = '🛡️ +ESCUDO';
@@ -5181,6 +5266,19 @@ export class GameEngine {
       
       const pos = entity.mesh.position.clone();
       const color = entity.color || 0xff0000;
+
+      // Stolen Enemy Energy Shield Absorbs 1 Hit!
+      if (entity instanceof EnemyTank && entity.shieldActive) {
+          entity.shieldActive = false;
+          if (entity.shieldMesh) entity.shieldMesh.visible = false;
+          entity.hitFlashTimer = 0.25;
+          this.audio.play('impact');
+          this.vfx.spawnPowerUpBurst(pos, 0xFF1744);
+          this.vfx.spawnShockwave(pos, 0xFF5252, 4.5);
+          this.vfx.spawnFloatingText(pos, '🛡️ ¡ESCUDO ENEMIGO ROTO!', '#ff5252', 1.12);
+          this.screenShake = Math.max(this.screenShake, 0.45);
+          return;
+      }
 
       // Multi-HP Boss Tank Damage Handling (Punto 1)
       if (entity.isBoss && entity.hp > 0) {
@@ -5284,6 +5382,11 @@ export class GameEngine {
           });
 
           this.updateUI();
+          if (this.stats.enemiesLeft === 1 && (this.initialEnemyCount || 0) > 1 && !this.bossEntity) {
+              if (this.audio && typeof this.audio.setDangerState === 'function') {
+                  this.audio.setDangerState(true);
+              }
+          }
           if (this.stats.enemiesLeft <= 0 && !this.isDying && this.missionOutcome !== 'DEFEAT') {
               this.missionOutcome = 'VICTORY';
               // Immediately make the player invulnerable and disarm all in-flight projectiles & mines so a stray bullet can NEVER kill the player after winning!
@@ -5306,6 +5409,9 @@ export class GameEngine {
               }
               this.mines = [];
 
+              if (this.audio && typeof this.audio.stopCombatMarch === 'function') {
+                  this.audio.stopCombatMarch();
+              }
               this.audio.play('victory');
               this.vfx.spawnFloatingText(
                   this.player && this.player.mesh ? this.player.mesh.position : pos,
@@ -5360,13 +5466,29 @@ export class GameEngine {
   }
 
   togglePause() {
-      this.isPaused = !this.isPaused;
-      return this.isPaused;
+      return this.setPause(!this.isPaused);
   }
 
   setPause(paused) {
       this.isPaused = paused;
+      if (this.audio) {
+          if (paused) {
+              if (typeof this.audio.stopCombatMarch === 'function') {
+                  this.audio.stopCombatMarch();
+              }
+          } else if (this.isRunning && this.audio.musicMode === 'combat' && !this.audio.isMusicMuted) {
+              if (typeof this.audio.startCombatMarch === 'function') {
+                  this.audio.startCombatMarch(false);
+              }
+          }
+      }
       return this.isPaused;
+  }
+
+  startMenuMusic() {
+      if (this.audio && typeof this.audio.startMenuMusic === 'function') {
+          this.audio.startMenuMusic();
+      }
   }
 
   toggleMute() {
@@ -5383,6 +5505,28 @@ export class GameEngine {
 
   isMusicMuted() {
       return this.audio ? this.audio.isMusicMuted : false;
+  }
+
+  setSfxVolume(vol0to1) {
+      if (this.audio && typeof this.audio.setSfxVolume === 'function') {
+          return this.audio.setSfxVolume(vol0to1);
+      }
+      return 0.85;
+  }
+
+  setMusicVolume(vol0to1) {
+      if (this.audio && typeof this.audio.setMusicVolume === 'function') {
+          return this.audio.setMusicVolume(vol0to1);
+      }
+      return 0.35;
+  }
+
+  getSfxVolume() {
+      return (this.audio && typeof this.audio.getSfxVolume === 'function') ? this.audio.getSfxVolume() : 0.85;
+  }
+
+  getMusicVolume() {
+      return (this.audio && typeof this.audio.getMusicVolume === 'function') ? this.audio.getMusicVolume() : 0.35;
   }
 
   // --- Mobile Touch Virtual Controls Delegates ---

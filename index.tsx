@@ -2084,6 +2084,10 @@ interface SettingsModalProps {
   onToggleMute: () => void;
   isMusicMuted: boolean;
   onToggleMusic: () => void;
+  sfxVolume: number;
+  onChangeSfxVolume: (pct: number) => void;
+  musicVolume: number;
+  onChangeMusicVolume: (pct: number) => void;
   touchControlsEnabled: boolean;
   onToggleTouchControls: () => void;
   cameraMode: 'overview' | 'follow';
@@ -2099,6 +2103,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleMute,
   isMusicMuted,
   onToggleMusic,
+  sfxVolume,
+  onChangeSfxVolume,
+  musicVolume,
+  onChangeMusicVolume,
   touchControlsEnabled,
   onToggleTouchControls,
   cameraMode,
@@ -2122,38 +2130,110 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <ModalCloseButton onClick={onClose} />
         </div>
 
-        {/* 1. Audio */}
-        <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '7px' }}>
-            🔊 SONIDO
+        {/* 1. Audio & Volume Sliders */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '0.8px', marginBottom: '8px' }}>
+            🔊 MEZCLADOR DE AUDIO (EFECTOS Y MÚSICA)
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              type="button"
-              data-audio-toggle="true"
-              onClick={onToggleMusic}
-              style={{
-                ...styles.secondaryButton,
-                backgroundColor: isMusicMuted ? 'rgba(30, 41, 59, 0.85)' : 'rgba(20, 83, 45, 0.45)',
-                borderColor: isMusicMuted ? 'rgba(148, 163, 184, 0.3)' : 'rgba(74, 222, 128, 0.6)',
-                color: isMusicMuted ? '#94a3b8' : '#4ade80'
-              }}
-            >
-              {isMusicMuted ? '🎵 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
-            </button>
-            <button
-              type="button"
-              data-audio-toggle="true"
-              onClick={onToggleMute}
-              style={{
-                ...styles.secondaryButton,
-                backgroundColor: isMuted ? 'rgba(30, 41, 59, 0.85)' : 'rgba(14, 116, 144, 0.35)',
-                borderColor: isMuted ? 'rgba(148, 163, 184, 0.3)' : 'rgba(56, 189, 248, 0.6)',
-                color: isMuted ? '#94a3b8' : '#38bdf8'
-              }}
-            >
-              {isMuted ? '🔇 EFECTOS: OFF' : '🔊 EFECTOS: ON'}
-            </button>
+
+          <div style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            border: '1px solid rgba(148, 163, 184, 0.25)',
+            borderRadius: '12px',
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            {/* SFX Volume Slider */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: isMuted ? '#94a3b8' : '#38bdf8' }}>
+                  💥 Efectos (Disparos y Explosiones)
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 900, color: isMuted ? '#64748b' : '#f8fafc', fontVariantNumeric: 'tabular-nums', minWidth: '38px', textAlign: 'right' }}>
+                    {isMuted ? '0%' : `${sfxVolume}%`}
+                  </span>
+                  <button
+                    type="button"
+                    data-audio-toggle="true"
+                    onClick={onToggleMute}
+                    style={{
+                      backgroundColor: isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                      border: isMuted ? '1px solid rgba(248, 113, 113, 0.5)' : '1px solid rgba(56, 189, 248, 0.5)',
+                      color: isMuted ? '#f87171' : '#38bdf8',
+                      borderRadius: '7px',
+                      padding: '4px 8px',
+                      fontSize: '10px',
+                      fontWeight: 900,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isMuted ? '🔇 OFF' : '🔊 ON'}
+                  </button>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={isMuted ? 0 : sfxVolume}
+                onChange={(e) => onChangeSfxVolume(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  accentColor: '#38bdf8',
+                  cursor: 'pointer',
+                  height: '6px'
+                }}
+              />
+            </div>
+
+            {/* Music Volume Slider */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: isMusicMuted ? '#94a3b8' : '#4ade80' }}>
+                  🎵 Música (Menú y Marchas de Combate)
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 900, color: isMusicMuted ? '#64748b' : '#f8fafc', fontVariantNumeric: 'tabular-nums', minWidth: '38px', textAlign: 'right' }}>
+                    {isMusicMuted ? '0%' : `${musicVolume}%`}
+                  </span>
+                  <button
+                    type="button"
+                    data-audio-toggle="true"
+                    onClick={onToggleMusic}
+                    style={{
+                      backgroundColor: isMusicMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(74, 222, 128, 0.2)',
+                      border: isMusicMuted ? '1px solid rgba(248, 113, 113, 0.5)' : '1px solid rgba(74, 222, 128, 0.5)',
+                      color: isMusicMuted ? '#f87171' : '#4ade80',
+                      borderRadius: '7px',
+                      padding: '4px 8px',
+                      fontSize: '10px',
+                      fontWeight: 900,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isMusicMuted ? '🔇 OFF' : '🎵 ON'}
+                  </button>
+                </div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={isMusicMuted ? 0 : musicVolume}
+                onChange={(e) => onChangeMusicVolume(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  accentColor: '#4ade80',
+                  cursor: 'pointer',
+                  height: '6px'
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -2570,261 +2650,431 @@ const HUD: React.FC<HUDProps> = ({
   return (
     <div style={{
       ...styles.hudContainer,
+      padding: touchControlsEnabled ? '8px 10px' : '14px 18px',
       opacity: isDying ? 0 : 1,
       transition: 'opacity 0.45s ease-out'
     }}>
-      <div style={{ ...styles.hudTop, position: 'relative' }}>
-        {/* Left Controls Stacked into 2 Compact Rows so Center Mission/Boss Header Never Shifts Off-Center */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', zIndex: 3 }}>
-          {/* Row 1: Top-Left Menu Box Button (Opens Pause Modal to Return to Main Menu), SFX Mute, Music Toggle */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{
-              ...styles.hudPanel,
-              borderColor: 'rgba(251, 191, 36, 0.55)',
-              backgroundColor: 'rgba(15, 23, 42, 0.94)'
-            }}>
+      {touchControlsEnabled ? (
+        /* --- CLEAN MOBILE TOP BAR (Single Non-Overlapping Row + Optional Boss/Stealth Sub-Banner) --- */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%', zIndex: 3 }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '6px',
+            width: '100%',
+            flexWrap: 'nowrap'
+          }}>
+            {/* Left: Menu Button + Armor Hearts */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
               <button
+                type="button"
                 onClick={onPause}
                 style={{
-                  ...styles.hudButton,
+                  backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                  border: '1.5px solid rgba(251, 191, 36, 0.65)',
+                  borderRadius: '10px',
+                  padding: '6px 10px',
                   color: '#fbbf24',
+                  fontSize: '11.5px',
                   fontWeight: 900,
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '4px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
                 }}
-                title="Abrir menú de pausa o volver al Menú Principal [Esc / P]"
               >
-                <span>☰ MENÚ</span>
+                <span>☰</span>
               </button>
-            </div>
-            <div style={styles.hudPanel}>
-              <button data-audio-toggle="true" onClick={onToggleMute} style={styles.hudButton} title="Silenciar / Activar efectos de sonido [M]">
-                {isMuted ? '🔇' : '🔊'}
-              </button>
-            </div>
-            <div style={{
-              ...styles.hudPanel,
-              borderColor: !isMusicMuted ? 'rgba(74, 222, 128, 0.45)' : 'rgba(148, 163, 184, 0.25)'
-            }}>
-              <button
-                data-audio-toggle="true"
-                onClick={onToggleMusic}
-                style={{
-                  ...styles.hudButton,
-                  color: !isMusicMuted ? '#4ade80' : '#94a3b8',
-                  fontSize: '11px'
-                }}
-                title="Activar / Desactivar banda sonora de fondo"
-              >
-                🎵 {!isMusicMuted ? 'ON' : 'OFF'}
-              </button>
-            </div>
-          </div>
 
-          {/* Row 2: Camera Mode + Zoom, Touch Toggle & Night Stealth Toggle */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{
-              ...styles.hudPanel,
-              borderColor: cameraMode === 'follow' ? 'rgba(56, 189, 248, 0.65)' : 'rgba(148, 163, 184, 0.3)'
-            }}>
-              <button
-                onClick={onToggleCamera}
-                style={{
-                  ...styles.hudButton,
-                  color: cameraMode === 'overview' ? '#fbbf24' : '#38bdf8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                title="Alternar entre ver todo el mapa o seguir al tanque [C]"
-              >
-                {cameraMode === 'overview' ? '🗺️ MAPA' : '🎯 TANQUE'}
-              </button>
-              <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '6px' }}>
-                <button onClick={onZoomIn} style={styles.miniBtn} title="Acercar cámara [Z / +]">🔍+</button>
-                <button onClick={onZoomOut} style={styles.miniBtn} title="Alejar cámara [X / -]">🔍-</button>
-              </div>
-            </div>
-
-            <div style={styles.hudPanel}>
-              <button
-                onClick={onToggleTouchControls}
-                style={{
-                  ...styles.hudButton,
-                  color: touchControlsEnabled ? '#4ade80' : '#94a3b8',
-                  fontSize: '11px'
-                }}
-                title="Mostrar u ocultar joystick táctil"
-              >
-                📱 {touchControlsEnabled ? 'TÁCTIL: ON' : 'TÁCTIL: OFF'}
-              </button>
-            </div>
-
-            {onToggleNightMode && (
               <div style={{
-                ...styles.hudPanel,
-                borderColor: isNightMode ? 'rgba(129, 140, 248, 0.7)' : 'rgba(148, 163, 184, 0.25)',
-                backgroundColor: isNightMode ? 'rgba(30, 27, 75, 0.92)' : 'rgba(15, 23, 42, 0.92)'
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                border: '1px solid rgba(148, 163, 184, 0.25)',
+                borderRadius: '10px',
+                padding: '4px 8px',
+                display: 'flex',
+                alignItems: 'center',
+                pointerEvents: 'none',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
               }}>
-                <button
-                  onClick={onToggleNightMode}
-                  style={{
-                    ...styles.hudButton,
-                    color: isNightMode ? '#a5b4fc' : '#94a3b8',
-                    fontSize: '11px'
-                  }}
-                  title="Activar / Desactivar Modo Sigilo Nocturno [Tecla N]"
-                >
-                  🌙 {isNightMode ? 'NOCHE: ON' : 'NOCHE: OFF'}
-                </button>
+                {Array.from({ length: 4 }, (_, i) => {
+                  if (i === 3 && lives < 4) return null;
+                  const active = i < lives;
+                  return (
+                    <span
+                      key={i}
+                      style={{
+                        fontSize: '13.5px',
+                        margin: '0 1px',
+                        opacity: active ? 1 : 0.2,
+                        filter: active ? 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.8))' : 'none'
+                      }}
+                    >
+                      ❤️
+                    </span>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Truly Centered Level, Biome, Stealth Status & Boss Health Bar Header */}
-        <div style={{
-          position: 'absolute',
-          left: '50%',
-          top: 0,
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '6px',
-          zIndex: 2,
-          pointerEvents: 'none'
-        }}>
-          <div style={{ ...styles.hudPanel, flexDirection: 'column', alignItems: 'center', padding: '5px 18px', pointerEvents: 'auto' }}>
+            {/* Center: Compact Mission Pill (Flex-shrinking, never overlaps!) */}
             <div style={{
-              fontSize: '9.5px',
-              color: biomeMeta?.color || '#fbbf24',
-              letterSpacing: '1.2px',
-              fontWeight: 800,
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              border: '1px solid rgba(148, 163, 184, 0.25)',
+              borderRadius: '10px',
+              padding: '4px 10px',
+              minWidth: 0,
+              flex: '0 1 auto',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{
+                fontSize: '11px',
+                fontWeight: 900,
+                color: '#f8fafc',
+                fontFamily: '"Chakra Petch", sans-serif',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                <span style={{ color: '#fbbf24' }}>M#{mission}</span>
+                {missionName ? ` • ${missionName.toUpperCase()}` : ''}
+              </div>
+            </div>
+
+            {/* Right: Hostiles Left + Score */}
+            <div style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.92)',
+              border: '1px solid rgba(148, 163, 184, 0.25)',
+              borderRadius: '10px',
+              padding: '5px 9px',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '7px',
+              flexShrink: 0,
+              pointerEvents: 'none',
+              fontVariantNumeric: 'tabular-nums',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
             }}>
-              <span>{biomeMeta?.icon} {biomeMeta?.label.split(' ')[0].toUpperCase()}</span>
-              <span style={{ color: '#475569' }}>•</span>
-              <span style={{ color: diffMeta.color }}>IA: {diffMeta.label}</span>
-            </div>
-            <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif', whiteSpace: 'nowrap' }}>
-              MISIÓN <span style={styles.highlight}>#{mission}</span>
-              {missionName ? ` • ${missionName.toUpperCase()}` : ''}
+              <span style={{ fontSize: '12px', fontWeight: 900, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                🎯 {enemiesLeft}
+              </span>
+              <span style={{ color: '#475569', fontSize: '10px' }}>|</span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#f8fafc' }}>
+                {score} <span style={{ fontSize: '9px', color: '#94a3b8' }}>PTS</span>
+              </span>
             </div>
           </div>
 
-          {/* Live Stealth / Lighthouse Detection Status Pill */}
-          {stealthStatus && (
-            <div style={{
-              ...styles.hudPanel,
-              padding: '4px 14px',
-              fontSize: '10.5px',
-              fontWeight: 900,
-              letterSpacing: '0.6px',
-              backgroundColor: stealthStatus === 'SPOTTED'
-                ? 'rgba(127, 29, 29, 0.94)'
-                : stealthStatus === 'STEALTH'
-                ? 'rgba(12, 74, 110, 0.92)'
-                : 'rgba(30, 41, 59, 0.92)',
-              borderColor: stealthStatus === 'SPOTTED'
-                ? '#ff1744'
-                : stealthStatus === 'STEALTH'
-                ? '#38bdf8'
-                : '#fbbf24',
-              color: stealthStatus === 'SPOTTED'
-                ? '#fecdd3'
-                : stealthStatus === 'STEALTH'
-                ? '#7dd3fc'
-                : '#fde047',
-              boxShadow: stealthStatus === 'SPOTTED'
-                ? '0 0 18px rgba(255, 23, 68, 0.6)'
-                : stealthStatus === 'STEALTH'
-                ? '0 0 14px rgba(56, 189, 248, 0.35)'
-                : 'none'
-            }}>
-              {stealthStatus === 'SPOTTED'
-                ? '🚨 ¡ILUMINADO POR EL FARO! POSICIÓN REVELADA'
-                : stealthStatus === 'STEALTH'
-                ? '🥷 OCULTO EN SIGILO NOCTURNO (+150 PTS BONUS)'
-                : '💥 DISPARO DETECTADO • REUBÍCATE EN LA SOMBRA'}
-            </div>
-          )}
-
-          {/* Punto 1: Boss Dreadnought Health Bar */}
-          {bossInfo && bossInfo.hp > 0 && (
-            <div style={{
-              ...styles.hudPanel,
-              flexDirection: 'column',
-              alignItems: 'stretch',
-              minWidth: '280px',
-              padding: '7px 14px',
-              borderColor: bossInfo.enraged ? '#ef4444' : '#f59e0b',
-              backgroundColor: 'rgba(15, 23, 42, 0.94)',
-              boxShadow: bossInfo.enraged ? '0 0 22px rgba(239, 68, 68, 0.5)' : '0 6px 18px rgba(0,0,0,0.45)',
-              pointerEvents: 'auto'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '10px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 900, color: bossInfo.enraged ? '#fca5a5' : '#fde047', letterSpacing: '0.6px' }}>
-                  {bossInfo.name} {bossInfo.enraged ? '🔥 ENFURECIDO' : ''}
-                </span>
-                <span style={{ fontSize: '11px', fontWeight: 900, color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
-                  {bossInfo.hp} / {bossInfo.maxHp} HP
-                </span>
-              </div>
-              <div style={{ width: '100%', height: '7px', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: '4px', overflow: 'hidden' }}>
+          {/* Second Sub-Row (Only visible when Boss, Stealth Alert, Combo, or Active Power-up is active) */}
+          {(bossInfo || stealthStatus || combo >= 2 || activePowerup) && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
+              {bossInfo && bossInfo.hp > 0 && (
                 <div style={{
-                  width: `${Math.max(0, Math.min(100, (bossInfo.hp / bossInfo.maxHp) * 100))}%`,
-                  height: '100%',
-                  background: bossInfo.enraged
-                    ? 'linear-gradient(90deg, #dc2626 0%, #f87171 100%)'
-                    : 'linear-gradient(90deg, #d97706 0%, #fbbf24 100%)',
-                  transition: 'width 0.18s ease-out'
-                }} />
+                  ...styles.hudPanel,
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  width: 'min(92vw, 290px)',
+                  padding: '5px 12px',
+                  borderColor: bossInfo.enraged ? '#ef4444' : '#f59e0b',
+                  backgroundColor: 'rgba(15, 23, 42, 0.94)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 900, color: bossInfo.enraged ? '#fca5a5' : '#fde047' }}>
+                      {bossInfo.name} {bossInfo.enraged ? '🔥' : ''}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: 900, color: '#f8fafc' }}>
+                      {bossInfo.hp}/{bossInfo.maxHp} HP
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.max(0, Math.min(100, (bossInfo.hp / bossInfo.maxHp) * 100))}%`,
+                      height: '100%',
+                      background: bossInfo.enraged ? '#ef4444' : '#fbbf24'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                {combo >= 2 && (
+                  <div style={{
+                    ...styles.hudPanel,
+                    padding: '3px 10px',
+                    backgroundColor: 'rgba(234, 88, 12, 0.3)',
+                    borderColor: '#fb923c',
+                    color: '#fdba74',
+                    fontWeight: 900,
+                    fontSize: '11px'
+                  }}>
+                    🔥 RACHA x{combo}
+                  </div>
+                )}
+
+                {activePowerup && (
+                  <div style={{
+                    ...styles.hudPanel,
+                    padding: '3px 10px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                    borderColor: '#fbbf24',
+                    color: '#fde047',
+                    fontSize: '10.5px',
+                    fontWeight: 900
+                  }}>
+                    {activePowerup}
+                  </div>
+                )}
+
+                {stealthStatus && (
+                  <div style={{
+                    ...styles.hudPanel,
+                    padding: '3px 10px',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    backgroundColor: stealthStatus === 'SPOTTED' ? 'rgba(127, 29, 29, 0.94)' : 'rgba(12, 74, 110, 0.92)',
+                    borderColor: stealthStatus === 'SPOTTED' ? '#ff1744' : '#38bdf8',
+                    color: stealthStatus === 'SPOTTED' ? '#fecdd3' : '#7dd3fc'
+                  }}>
+                    {stealthStatus === 'SPOTTED' ? '🚨 ¡ILUMINADO POR FARO!' : stealthStatus === 'STEALTH' ? '🥷 SIGILO (+150 PTS)' : '💥 DETECTADO'}
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
-
-        {/* Right Hostiles, Armor & Score (In top bar on Mobile so Bottom Thumb Zones are 100% Unobstructed!) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end', zIndex: 3, pointerEvents: 'none' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {combo >= 2 && (
+      ) : (
+        /* --- DESKTOP TOP BAR --- */
+        <div style={{ ...styles.hudTop, position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', zIndex: 3 }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{
                 ...styles.hudPanel,
-                backgroundColor: 'rgba(234, 88, 12, 0.25)',
-                borderColor: '#fb923c',
-                color: '#fdba74',
-                fontWeight: 900,
-                fontSize: '13px',
-                boxShadow: '0 0 16px rgba(249, 115, 22, 0.45)',
-                pointerEvents: 'none'
+                borderColor: 'rgba(251, 191, 36, 0.55)',
+                backgroundColor: 'rgba(15, 23, 42, 0.94)'
               }}>
-                🔥 RACHA x{combo}
+                <button
+                  onClick={onPause}
+                  style={{
+                    ...styles.hudButton,
+                    color: '#fbbf24',
+                    fontWeight: 900,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="Abrir menú de pausa o volver al Menú Principal [Esc / P]"
+                >
+                  <span>☰ MENÚ</span>
+                </button>
               </div>
-            )}
-            <div style={{ ...styles.hudPanel, pointerEvents: 'none' }}>
-              <span style={{ marginRight: '6px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>HOSTILES:</span>
-              <span style={{ ...styles.highlight, fontSize: '18px', fontVariantNumeric: 'tabular-nums' }}>{enemiesLeft}</span>
-              <span style={{ marginLeft: '5px', fontSize: '16px' }}>🎯</span>
+              <div style={styles.hudPanel}>
+                <button data-audio-toggle="true" onClick={onToggleMute} style={styles.hudButton} title="Silenciar / Activar efectos de sonido [M]">
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+              </div>
+              <div style={{
+                ...styles.hudPanel,
+                borderColor: !isMusicMuted ? 'rgba(74, 222, 128, 0.45)' : 'rgba(148, 163, 184, 0.25)'
+              }}>
+                <button
+                  data-audio-toggle="true"
+                  onClick={onToggleMusic}
+                  style={{
+                    ...styles.hudButton,
+                    color: !isMusicMuted ? '#4ade80' : '#94a3b8',
+                    fontSize: '11px'
+                  }}
+                  title="Activar / Desactivar banda sonora de fondo"
+                >
+                  🎵 {!isMusicMuted ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{
+                ...styles.hudPanel,
+                borderColor: cameraMode === 'follow' ? 'rgba(56, 189, 248, 0.65)' : 'rgba(148, 163, 184, 0.3)'
+              }}>
+                <button
+                  onClick={onToggleCamera}
+                  style={{
+                    ...styles.hudButton,
+                    color: cameraMode === 'overview' ? '#fbbf24' : '#38bdf8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Alternar entre ver todo el mapa o seguir al tanque [C]"
+                >
+                  {cameraMode === 'overview' ? '🗺️ MAPA' : '🎯 TANQUE'}
+                </button>
+                <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '6px' }}>
+                  <button onClick={onZoomIn} style={styles.miniBtn} title="Acercar cámara [Z / +]">🔍+</button>
+                  <button onClick={onZoomOut} style={styles.miniBtn} title="Alejar cámara [X / -]">🔍-</button>
+                </div>
+              </div>
+
+              <div style={styles.hudPanel}>
+                <button
+                  onClick={onToggleTouchControls}
+                  style={{
+                    ...styles.hudButton,
+                    color: touchControlsEnabled ? '#4ade80' : '#94a3b8',
+                    fontSize: '11px'
+                  }}
+                  title="Mostrar u ocultar joystick táctil"
+                >
+                  📱 {touchControlsEnabled ? 'TÁCTIL: ON' : 'TÁCTIL: OFF'}
+                </button>
+              </div>
+
+              {onToggleNightMode && (
+                <div style={{
+                  ...styles.hudPanel,
+                  borderColor: isNightMode ? 'rgba(129, 140, 248, 0.7)' : 'rgba(148, 163, 184, 0.25)',
+                  backgroundColor: isNightMode ? 'rgba(30, 27, 75, 0.92)' : 'rgba(15, 23, 42, 0.92)'
+                }}>
+                  <button
+                    onClick={onToggleNightMode}
+                    style={{
+                      ...styles.hudButton,
+                      color: isNightMode ? '#a5b4fc' : '#94a3b8',
+                      fontSize: '11px'
+                    }}
+                    title="Activar / Desactivar Modo Sigilo Nocturno [Tecla N]"
+                  >
+                    🌙 {isNightMode ? 'NOCHE: ON' : 'NOCHE: OFF'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {touchControlsEnabled && (
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', pointerEvents: 'none' }}>
-              <div style={{ ...styles.hudPanel, padding: '4px 10px', pointerEvents: 'none' }}>
-                {hearts}
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            top: 0,
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '6px',
+            zIndex: 2,
+            pointerEvents: 'none'
+          }}>
+            <div style={{ ...styles.hudPanel, flexDirection: 'column', alignItems: 'center', padding: '5px 18px', pointerEvents: 'auto' }}>
+              <div style={{
+                fontSize: '9.5px',
+                color: biomeMeta?.color || '#fbbf24',
+                letterSpacing: '1.2px',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>{biomeMeta?.icon} {biomeMeta?.label.split(' ')[0].toUpperCase()}</span>
+                <span style={{ color: '#475569' }}>•</span>
+                <span style={{ color: diffMeta.color }}>IA: {diffMeta.label}</span>
               </div>
-              <div style={{ ...styles.hudPanel, padding: '4px 10px', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800 }}>PTS</span>
-                <span style={styles.highlight}>{score}</span>
+              <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#f8fafc', fontFamily: '"Chakra Petch", sans-serif', whiteSpace: 'nowrap' }}>
+                MISIÓN <span style={styles.highlight}>#{mission}</span>
+                {missionName ? ` • ${missionName.toUpperCase()}` : ''}
               </div>
             </div>
-          )}
+
+            {stealthStatus && (
+              <div style={{
+                ...styles.hudPanel,
+                padding: '4px 14px',
+                fontSize: '10.5px',
+                fontWeight: 900,
+                letterSpacing: '0.6px',
+                backgroundColor: stealthStatus === 'SPOTTED'
+                  ? 'rgba(127, 29, 29, 0.94)'
+                  : stealthStatus === 'STEALTH'
+                  ? 'rgba(12, 74, 110, 0.92)'
+                  : 'rgba(30, 41, 59, 0.92)',
+                borderColor: stealthStatus === 'SPOTTED'
+                  ? '#ff1744'
+                  : stealthStatus === 'STEALTH'
+                  ? '#38bdf8'
+                  : '#fbbf24',
+                color: stealthStatus === 'SPOTTED'
+                  ? '#fecdd3'
+                  : stealthStatus === 'STEALTH'
+                  ? '#7dd3fc'
+                  : '#fde047'
+              }}>
+                {stealthStatus === 'SPOTTED'
+                  ? '🚨 ¡ILUMINADO POR EL FARO! POSICIÓN REVELADA'
+                  : stealthStatus === 'STEALTH'
+                  ? '🥷 OCULTO EN SIGILO NOCTURNO (+150 PTS BONUS)'
+                  : '💥 DISPARO DETECTADO • REUBÍCATE EN LA SOMBRA'}
+              </div>
+            )}
+
+            {bossInfo && bossInfo.hp > 0 && (
+              <div style={{
+                ...styles.hudPanel,
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                minWidth: '280px',
+                padding: '7px 14px',
+                borderColor: bossInfo.enraged ? '#ef4444' : '#f59e0b',
+                backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                pointerEvents: 'auto'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 900, color: bossInfo.enraged ? '#fca5a5' : '#fde047', letterSpacing: '0.6px' }}>
+                    {bossInfo.name} {bossInfo.enraged ? '🔥 ENFURECIDO' : ''}
+                  </span>
+                  <span style={{ fontSize: '11px', fontWeight: 900, color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+                    {bossInfo.hp} / {bossInfo.maxHp} HP
+                  </span>
+                </div>
+                <div style={{ width: '100%', height: '7px', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.max(0, Math.min(100, (bossInfo.hp / bossInfo.maxHp) * 100))}%`,
+                    height: '100%',
+                    background: bossInfo.enraged
+                      ? 'linear-gradient(90deg, #dc2626 0%, #f87171 100%)'
+                      : 'linear-gradient(90deg, #d97706 0%, #fbbf24 100%)',
+                    transition: 'width 0.18s ease-out'
+                  }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end', zIndex: 3, pointerEvents: 'none' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {combo >= 2 && (
+                <div style={{
+                  ...styles.hudPanel,
+                  backgroundColor: 'rgba(234, 88, 12, 0.25)',
+                  borderColor: '#fb923c',
+                  color: '#fdba74',
+                  fontWeight: 900,
+                  fontSize: '13px',
+                  pointerEvents: 'none'
+                }}>
+                  🔥 RACHA x{combo}
+                </div>
+              )}
+              <div style={{ ...styles.hudPanel, pointerEvents: 'none' }}>
+                <span style={{ marginRight: '6px', fontSize: '11px', color: '#94a3b8', fontWeight: 800 }}>HOSTILES:</span>
+                <span style={{ ...styles.highlight, fontSize: '18px', fontVariantNumeric: 'tabular-nums' }}>{enemiesLeft}</span>
+                <span style={{ marginLeft: '5px', fontSize: '16px' }}>🎯</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={{ ...styles.hudBottom, position: 'relative' }}>
         {/* Left: Armor Hearts (Shown at bottom only when Touch Joysticks are OFF) */}
@@ -2835,7 +3085,7 @@ const HUD: React.FC<HUDProps> = ({
           </div>
         ) : <div />}
 
-        {/* Truly Centered Bottom Action Cluster: Active Power-Up Pill + Mine & Bazooka Buttons */}
+        {/* Truly Centered Bottom Action Cluster: Active Power-Up Pill + Mine & Bazooka Buttons (Desktop only) */}
         <div style={{
           position: 'absolute',
           left: '50%',
@@ -2848,8 +3098,8 @@ const HUD: React.FC<HUDProps> = ({
           zIndex: 2,
           pointerEvents: 'none'
         }}>
-          {/* Active Power-up Status Pill (Synced live with player tank timers/shield) */}
-          {activePowerup && (
+          {/* Active Power-up Status Pill on Desktop */}
+          {!touchControlsEnabled && activePowerup && (
             <div style={{
               ...styles.hudPanel,
               backgroundColor: 'rgba(15, 23, 42, 0.92)',
@@ -2989,6 +3239,10 @@ interface PauseMenuProps {
   onToggleMute: () => void;
   isMusicMuted: boolean;
   onToggleMusic: () => void;
+  sfxVolume: number;
+  onChangeSfxVolume: (pct: number) => void;
+  musicVolume: number;
+  onChangeMusicVolume: (pct: number) => void;
   aiDifficulty: string;
   onSelectDifficulty: (diffId: string) => void;
   onToggleCamera: () => void;
@@ -3008,6 +3262,10 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
   onToggleMute,
   isMusicMuted,
   onToggleMusic,
+  sfxVolume,
+  onChangeSfxVolume,
+  musicVolume,
+  onChangeMusicVolume,
   aiDifficulty,
   onSelectDifficulty,
   onToggleCamera,
@@ -3023,18 +3281,18 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
       if (e.target === e.currentTarget) onResume();
     }}
   >
-    <div style={{ ...styles.menuBox, maxWidth: '450px', padding: '22px 26px', textAlign: 'left' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '12px', marginBottom: '14px' }}>
+    <div style={{ ...styles.menuBox, maxWidth: '460px', padding: '20px 24px', textAlign: 'left' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(148, 163, 184, 0.2)', paddingBottom: '10px', marginBottom: '12px' }}>
         <div>
           <div style={{ fontSize: '10px', fontWeight: 900, color: '#fbbf24', letterSpacing: '1.2px' }}>
             MISIÓN #{mission} • {missionName || 'EN CURSO'}
           </div>
-          <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>⏸️ PAUSA</h2>
+          <h2 style={{ ...styles.title, fontSize: '22px', margin: 0 }}>⏸️ PAUSA Y AJUSTES</h2>
         </div>
         <ModalCloseButton onClick={onResume} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
         <button className="tactical-btn-primary" style={styles.primaryButton} onClick={onResume}>
           ▶ CONTINUAR MISIÓN
         </button>
@@ -3061,6 +3319,63 @@ const PauseMenu: React.FC<PauseMenuProps> = ({
           <button className="tactical-btn-secondary" style={styles.secondaryButton} onClick={onSelectLevel}>
             🗺️ MISIONES
           </button>
+        </div>
+
+        {/* Live Audio Mixer Sliders (SFX & Music) inside Pause Menu */}
+        <div style={{
+          backgroundColor: 'rgba(15, 23, 42, 0.88)',
+          border: '1px solid rgba(148, 163, 184, 0.24)',
+          borderRadius: '10px',
+          padding: '10px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '9px'
+        }}>
+          <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#fbbf24', letterSpacing: '1px' }}>
+            🔊 VOLUMEN DE AUDIO
+          </div>
+
+          {/* SFX Slider */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: isMuted ? '#94a3b8' : '#38bdf8' }}>
+                💥 Efectos (Disparos)
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+                {isMuted ? '0%' : `${sfxVolume}%`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={isMuted ? 0 : sfxVolume}
+              onChange={(e) => onChangeSfxVolume(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer', height: '5px' }}
+            />
+          </div>
+
+          {/* Music Slider */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: isMusicMuted ? '#94a3b8' : '#4ade80' }}>
+                🎵 Música de Fondo
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#f8fafc', fontVariantNumeric: 'tabular-nums' }}>
+                {isMusicMuted ? '0%' : `${musicVolume}%`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={isMusicMuted ? 0 : musicVolume}
+              onChange={(e) => onChangeMusicVolume(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#4ade80', cursor: 'pointer', height: '5px' }}
+            />
+          </div>
         </div>
 
         {/* Compact AI Difficulty */}
@@ -3984,6 +4299,26 @@ export const App = () => {
   const [isMusicMuted, setIsMusicMuted] = useState<boolean>(() => {
     try { return localStorage.getItem('tanks_music_muted') === 'true'; } catch { return false; }
   });
+  const [sfxVolume, setSfxVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_sfx_volume');
+      if (saved !== null) {
+        const parsed = parseFloat(saved);
+        if (!Number.isNaN(parsed)) return Math.round(Math.max(0, Math.min(1, parsed)) * 100);
+      }
+      return 85;
+    } catch { return 85; }
+  });
+  const [musicVolume, setMusicVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('tanks_music_volume');
+      if (saved !== null) {
+        const parsed = parseFloat(saved);
+        if (!Number.isNaN(parsed)) return Math.round(Math.max(0, Math.min(1, parsed)) * 100);
+      }
+      return 35;
+    } catch { return 35; }
+  });
   const [cameraMode, setCameraMode] = useState<'overview' | 'follow'>('overview');
   const [isPlayerDying, setIsPlayerDying] = useState(false);
 
@@ -4184,11 +4519,19 @@ export const App = () => {
       }
     } else if (event.type === 'POWERUP_COLLECTED' && event.data) {
       const toastId = Date.now();
-      const color = event.data.type === 'shield' ? '#00e5ff' : event.data.type === 'rapid' ? '#ffeb3b' : event.data.type === 'speed' ? '#00e676' : '#ff4081';
+      const color = event.data.isEnemy
+        ? '#ff5252'
+        : event.data.type === 'shield'
+        ? '#00e5ff'
+        : event.data.type === 'rapid'
+        ? '#ffeb3b'
+        : event.data.type === 'speed'
+        ? '#00e676'
+        : '#ff4081';
       setPowerupToast({ text: event.data.label || '¡MEJORA OBTENIDA!', color, id: toastId });
       setTimeout(() => {
         setPowerupToast(cur => cur?.id === toastId ? null : cur);
-      }, 2600);
+      }, 2800);
     } else if (event.type === 'SHIELD_BROKEN') {
       const toastId = Date.now();
       setPowerupToast({ text: '⚠️ ¡ESCUDO ROTO! (Absorbió el impacto)', color: '#ff5252', id: toastId });
@@ -4690,6 +5033,10 @@ export const App = () => {
     if (engineRef.current) {
       const muted = engineRef.current.toggleMute();
       setIsMuted(muted);
+      if (!muted && sfxVolume === 0) {
+        setSfxVolume(85);
+        engineRef.current.setSfxVolume(0.85);
+      }
     }
   };
 
@@ -4697,6 +5044,31 @@ export const App = () => {
     if (engineRef.current) {
       const musicMuted = engineRef.current.toggleMusic();
       setIsMusicMuted(musicMuted);
+      if (!musicMuted && musicVolume === 0) {
+        setMusicVolume(35);
+        engineRef.current.setMusicVolume(0.35);
+      }
+    }
+  };
+
+  const handleChangeSfxVolume = (pct: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    setSfxVolume(clamped);
+    setIsMuted(clamped === 0);
+    if (engineRef.current) {
+      engineRef.current.setSfxVolume(clamped / 100);
+      if (clamped > 0) {
+        engineRef.current.audio?.play('shoot');
+      }
+    }
+  };
+
+  const handleChangeMusicVolume = (pct: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    setMusicVolume(clamped);
+    setIsMusicMuted(clamped === 0);
+    if (engineRef.current) {
+      engineRef.current.setMusicVolume(clamped / 100);
     }
   };
 
@@ -4790,6 +5162,7 @@ export const App = () => {
       engineRef.current.setPause(false);
       engineRef.current.cleanup();
       engineRef.current.decorateTable('workshop', 80, 80);
+      engineRef.current.startMenuMusic?.();
     }
     setGameState('MENU');
   };
@@ -4991,7 +5364,10 @@ export const App = () => {
             aiDifficulty={aiDifficulty}
             touchControlsEnabled={touchControlsEnabled}
             isDying={isPlayerDying}
-            onMenu={() => setGameState('LEVEL_SELECT')}
+            onMenu={() => {
+              engineRef.current?.startMenuMusic?.();
+              setGameState('LEVEL_SELECT');
+            }}
             onToggleMute={toggleMute}
             onToggleMusic={toggleMusic}
             onPause={pauseGame}
@@ -5072,12 +5448,19 @@ export const App = () => {
         <PauseMenu
           onResume={resumeGame}
           onRestart={restartLevel}
-          onSelectLevel={() => setGameState('LEVEL_SELECT')}
+          onSelectLevel={() => {
+            engineRef.current?.startMenuMusic?.();
+            setGameState('LEVEL_SELECT');
+          }}
           onMenu={returnToMenu}
           isMuted={isMuted}
           onToggleMute={toggleMute}
           isMusicMuted={isMusicMuted}
           onToggleMusic={toggleMusic}
+          sfxVolume={sfxVolume}
+          onChangeSfxVolume={handleChangeSfxVolume}
+          musicVolume={musicVolume}
+          onChangeMusicVolume={handleChangeMusicVolume}
           aiDifficulty={aiDifficulty}
           onSelectDifficulty={handleSelectDifficulty}
           onToggleCamera={toggleCamera}
@@ -5111,7 +5494,10 @@ export const App = () => {
           }}
           onNext={nextLevel}
           onRestart={restartLevel}
-          onLevelSelect={() => setGameState('LEVEL_SELECT')}
+          onLevelSelect={() => {
+            engineRef.current?.startMenuMusic?.();
+            setGameState('LEVEL_SELECT');
+          }}
           onMenu={returnToMenu}
         />
       )}
@@ -5206,6 +5592,10 @@ export const App = () => {
           onToggleMute={toggleMute}
           isMusicMuted={isMusicMuted}
           onToggleMusic={toggleMusic}
+          sfxVolume={sfxVolume}
+          onChangeSfxVolume={handleChangeSfxVolume}
+          musicVolume={musicVolume}
+          onChangeMusicVolume={handleChangeMusicVolume}
           touchControlsEnabled={touchControlsEnabled}
           onToggleTouchControls={() => setTouchControlsEnabled(prev => !prev)}
           cameraMode={cameraMode}

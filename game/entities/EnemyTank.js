@@ -132,8 +132,55 @@ export class EnemyTank extends Tank {
     this.changeDirTimer = 0;
     this.targetAngle = 0;
 
+    // Power-Up States (when an Enemy Tank shoots or collects a Power-Up Crate!)
+    this.shieldActive = false;
+    this.rapidFireTimer = 0;
+    this.speedBoostTimer = 0;
+
+    // Visual Crimson Energy Shield Dome for Enemy Tanks
+    const shieldGeo = new THREE.IcosahedronGeometry(2.65, 2);
+    const shieldMat = new THREE.MeshPhysicalMaterial({
+      color: 0xff1744,
+      emissive: 0xd50000,
+      emissiveIntensity: 0.75,
+      transparent: true,
+      opacity: 0.38,
+      roughness: 0.1,
+      metalness: 0.1,
+      clearcoat: 1.0,
+      depthWrite: false
+    });
+    this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+    this.shieldMesh.position.y = 1.25;
+    this.shieldMesh.visible = false;
+
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: 0xff8a80,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.48
+    });
+    const wireMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(2.68, 1), wireMat);
+    this.shieldMesh.add(wireMesh);
+    this.mesh.add(this.shieldMesh);
+
     this.applyDifficulty(difficulty, true);
     this.addRankInsignia(typeKey);
+  }
+
+  applyPowerUp(type) {
+    if (type === 'shield' || type === 'life') {
+      this.shieldActive = true;
+      if (this.shieldMesh) this.shieldMesh.visible = true;
+      if (this.isBoss && type === 'life') {
+        this.hp = Math.min(this.maxHp, this.hp + 2);
+      }
+    } else if (type === 'rapid') {
+      this.rapidFireTimer = 8.0;
+      this.cooldown = Math.min(this.cooldown, 0.15);
+    } else if (type === 'speed') {
+      this.speedBoostTimer = 6.5;
+    }
   }
 
   applyDifficulty(difficulty = 'normal', isInitial = false) {
@@ -258,6 +305,21 @@ export class EnemyTank extends Tank {
   update(dt, collisionObstacles, visionObstacles, entities, stealthContext = null) {
     this.updateCooldown(dt);
     if (this.warpCooldown > 0) this.warpCooldown -= dt;
+
+    // Update stolen Power-Up timers & shield animation
+    if (this.rapidFireTimer > 0) {
+      this.rapidFireTimer = Math.max(0, this.rapidFireTimer - dt);
+      if (this.cooldown > 0) {
+        this.cooldown = Math.max(0, this.cooldown - dt * 1.15); // >2x fire rate!
+      }
+    }
+    if (this.speedBoostTimer > 0) {
+      this.speedBoostTimer = Math.max(0, this.speedBoostTimer - dt);
+    }
+    if (this.shieldActive && this.shieldMesh) {
+      this.shieldMesh.rotation.y += dt * 1.8;
+      this.shieldMesh.rotation.x += dt * 0.9;
+    }
 
     if (this.radarDish) {
       this.radarDish.rotation.z += dt * 4.0;
@@ -444,13 +506,14 @@ export class EnemyTank extends Tank {
 
     let forwardSpeed = 0;
     let turnRate = 0;
+    const turboMult = this.speedBoostTimer > 0 ? 1.45 : 1.0;
 
     if (Math.abs(angleDiff) > 0.1) {
-        turnRate = Math.sign(angleDiff) * this.rotationSpeed;
+        turnRate = Math.sign(angleDiff) * this.rotationSpeed * (this.speedBoostTimer > 0 ? 1.3 : 1.0);
         this.mesh.rotation.y += turnRate * dt;
     }
     if (Math.abs(angleDiff) < 0.65) {
-        forwardSpeed = this.speed * (Math.abs(angleDiff) > 0.15 ? 0.72 : 1.0);
+        forwardSpeed = this.speed * turboMult * (Math.abs(angleDiff) > 0.15 ? 0.72 : 1.0);
         const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
         const newPos = this.mesh.position.clone().add(forward.multiplyScalar(forwardSpeed * dt));
         
