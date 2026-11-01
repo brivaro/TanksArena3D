@@ -1,14 +1,16 @@
 /**
  * Netlify Serverless Function: /netlify/functions/verify-purchase.js
- *
- * ¿Cómo recuerda el juego que un jugador ha pagado sin pagar base de datos?
- * ¡Usando el propio Stripe como base de datos gratuita de recibos!
- *
- * Esta función permite:
- * 1. Verificar un `session_id` recién pagado al volver de Stripe Checkout.
- * 2. Restaurar todas las compras anteriores de un jugador buscando sus sesiones
- *    pagadas en Stripe por su correo electrónico (`customer_email`).
  */
+
+function getStripeKey() {
+  const raw =
+    process.env.STRIPE_SECRET_KEY ||
+    process.env.STRIPE_API_KEY ||
+    process.env.STRIPE_KEY ||
+    process.env.VITE_STRIPE_SECRET_KEY ||
+    '';
+  return raw.trim().replace(/^["']|["']$/g, '');
+}
 
 export const handler = async (event) => {
   const headers = {
@@ -32,9 +34,8 @@ export const handler = async (event) => {
 
   try {
     const { email, sessionId } = JSON.parse(event.body || '{}');
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const stripeSecretKey = getStripeKey();
 
-    // Si aún no has configurado STRIPE_SECRET_KEY en Netlify, devolvemos modo demo informativo
     if (!stripeSecretKey) {
       return {
         statusCode: 200,
@@ -42,12 +43,11 @@ export const handler = async (event) => {
         body: JSON.stringify({
           mode: 'demo_local',
           verified: true,
-          message: 'Modo Previsualización: Las compras se guardan en localStorage y en tu Código de Pasaporte TK3D. Al añadir STRIPE_SECRET_KEY en Netlify, este botón restaura automáticamente las compras reales de Stripe usando el Email del jugador.'
+          message: 'Modo Previsualización: Las compras se guardan en localStorage y en tu Código de Pasaporte TK3D. Al añadir STRIPE_SECRET_KEY en Netlify y redesplegar, este botón consulta las compras reales en Stripe por Email.'
         })
       };
     }
 
-    // 1. Verificar una sesión específica de Stripe Checkout
     if (sessionId) {
       const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
         method: 'GET',
@@ -77,7 +77,6 @@ export const handler = async (event) => {
       };
     }
 
-    // 2. Restaurar compras buscando en Stripe las sesiones pagadas con el Email del jugador
     if (email) {
       const response = await fetch('https://api.stripe.com/v1/checkout/sessions?limit=100', {
         method: 'GET',
@@ -90,7 +89,7 @@ export const handler = async (event) => {
         return {
           statusCode: 400,
           headers,
-          body: JSON.stringify({ error: data.error?.message || 'Error al consultar Stripe' })
+          body: JSON.stringify({ error: data.error?.message || 'Error al consultar Stripe (revisa permisos de lectura de Checkout Sessions en tu clave rk_live)' })
         };
       }
 

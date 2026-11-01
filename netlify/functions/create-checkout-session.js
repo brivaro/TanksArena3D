@@ -2,8 +2,10 @@
  * Netlify Serverless Function: create-checkout-session.js
  * Ubicación automática para Netlify: /netlify/functions/create-checkout-session.js
  *
- * Variables de entorno requeridas en el panel de Netlify (Site configuration > Environment variables):
- *   STRIPE_SECRET_KEY = sk_live_... (o sk_test_... para hacer pruebas gratis)
+ * Soporta tanto Claves Secretas Estándar (sk_live_... / sk_test_...)
+ * como Claves Restringidas (rk_live_... / rk_test_...) que tengan permisos de:
+ *   - Checkout Sessions: Write (Escritura)
+ *   - Products: Write (Escritura) / Prices: Write (Escritura)
  */
 
 const CATALOG_PRODUCTS = {
@@ -45,16 +47,42 @@ const CATALOG_PRODUCTS = {
   }
 };
 
+function getStripeKey() {
+  const raw =
+    process.env.STRIPE_SECRET_KEY ||
+    process.env.STRIPE_API_KEY ||
+    process.env.STRIPE_KEY ||
+    process.env.VITE_STRIPE_SECRET_KEY ||
+    '';
+  return raw.trim().replace(/^["']|["']$/g, '');
+}
+
 export const handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
+  }
+
+  const stripeSecretKey = getStripeKey();
+
+  // Diagnóstico rápido si abres /.netlify/functions/create-checkout-session en el navegador
+  if (event.httpMethod === 'GET') {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        status: 'ok',
+        function: 'create-checkout-session',
+        keyConfigured: Boolean(stripeSecretKey),
+        keyType: stripeSecretKey ? `${stripeSecretKey.slice(0, 8)}...` : 'MISSING (Configure STRIPE_SECRET_KEY in Netlify and Trigger Deploy)'
+      })
+    };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -77,26 +105,37 @@ export const handler = async (event) => {
       };
     }
 
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     const originHeader = event.headers?.origin || event.headers?.Origin;
     const siteUrl = originHeader || process.env.URL || 'http://localhost:3000';
 
-    // Si aún no se ha configurado STRIPE_SECRET_KEY en Netlify, devolvemos modo simulación seguro
+    // Si aún no se ha configurado STRIPE_SECRET_KEY en Netlify (o no se ha hecho Redeploy tras añadirla)
     if (!stripeSecretKey) {
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           mode: 'demo_simulation',
+          reason: 'missing_stripe_secret_key',
+          message: 'Netlify aún no detecta STRIPE_SECRET_KEY. Asegúrate de llamarla STRIPE_SECRET_KEY en Environment Variables y pulsar "Trigger deploy -> Deploy site" en Netlify.',
           productId,
           checkoutUrl: `${siteUrl}/?purchase_success=true&product=${encodeURIComponent(productId)}`
         })
       };
     }
 
-    // Llamada directa a la API REST de Stripe Checkout (sin necesitar instalar paquetes externos)
+    // Si el usuario puso por error la clave pública (pk_live_) en lugar de la secreta (sk_live_ o rk_live_)
+    if (stripeSecretKey.startsWith('pk_')) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: 'Has puesto la Clave Publicable (pk_live_...). Debes poner la Clave Secreta (sk_live_...) o una Clave Restringida (rk_live_...) con permisos de escritura en Checkout Sessions.'
+        })
+      };
+    }
+
+    // Llamada directa a la API REST de Stripe Checkout
     const params = new URLSearchParams();
-    params.append('payment_method_types[]', 'card');
     params.append('mode', 'payment');
     params.append('success_url', `${siteUrl}/?purchase_success=true&product=${encodeURIComponent(productId)}&session_id={CHECKOUT_SESSION_ID}`);
     params.append('cancel_url', `${siteUrl}/?purchase_canceled=true`);
@@ -125,10 +164,19 @@ export const handler = async (event) => {
     const session = await response.json();
 
     if (!response.ok) {
+      const rawMsg = session.error?.message || 'Error al crear sesión de Stripe';
+      const isRestrictedPermissionError =
+        stripeSecretKey.startsWith('rk_') &&
+        (response.status === 403 || rawMsg.toLowerCase().includes('permission'));
+
       return {
         statusCode: response.status,
         headers,
-        body: JSON.stringify({ error: session.error?.message || 'Error al crear sesión de Stripe' })
+        body: JSON.stringify({
+          error: isRestrictedPermissionError
+            ? `Tu clave restringida (${stripeSecretKey.slice(0, 8)}...) no tiene permisos suficientes en Stripe. En Stripe > Developers > API Keys, edita tu clave rk_live y activa "Write" (Escritura) en: "Checkout Sessions", "Products" y "Prices" (o usa directamente la clave secreta estándar sk_live_...). Detalle Stripe: ${rawMsg}`
+            : rawMsg
+        })
       };
     }
 
