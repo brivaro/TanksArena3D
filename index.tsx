@@ -881,17 +881,17 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
 // --- Professional Tactical UI Components ---
 
 const BIOMES_LIST = [
-  { id: 'all', label: 'TODAS (80)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
+  { id: 'all', label: 'TODAS (120)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
   { id: 'workshop', label: 'Taller (1-8)', icon: '🌲', range: [1, 8], color: '#fbbf24', accent: 'rgba(251, 191, 36, 0.16)' },
   { id: 'desert', label: 'Desierto (9-16)', icon: '🏜️', range: [9, 16], color: '#fb923c', accent: 'rgba(251, 146, 60, 0.16)' },
-  { id: 'cyber', label: 'Cyber Matrix (17-24)', icon: '⚡', range: [17, 24], color: '#22d3ee', accent: 'rgba(34, 211, 238, 0.18)' },
-  { id: 'arctic', label: 'Ártico (25-32)', icon: '❄️', range: [25, 32], color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
-  { id: 'volcano', label: 'Volcán (33-40)', icon: '🌋', range: [33, 40], color: '#f87171', accent: 'rgba(248, 113, 113, 0.18)' },
+  { id: 'cyber', label: 'Cyber & Portales', icon: '⚡', range: [17, 24], color: '#22d3ee', accent: 'rgba(34, 211, 238, 0.18)' },
+  { id: 'arctic', label: 'Ártico & Espejos', icon: '❄️', range: [25, 32], color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
+  { id: 'volcano', label: 'Volcán & Pirotecnia', icon: '🌋', range: [33, 40], color: '#f87171', accent: 'rgba(248, 113, 113, 0.18)' },
   { id: 'jungle', label: 'Selva (41-48)', icon: '🌴', range: [41, 48], color: '#4ade80', accent: 'rgba(74, 222, 128, 0.18)' },
   { id: 'sunset_city', label: 'Ciudad Atardecer (49-56)', icon: '🌇', range: [49, 56], color: '#ff8a65', accent: 'rgba(255, 138, 101, 0.2)' },
-  { id: 'matsuri', label: 'Festival Japonés (57-64)', icon: '🏮', range: [57, 64], color: '#f472b6', accent: 'rgba(244, 114, 182, 0.2)' },
+  { id: 'matsuri', label: 'Festival Hanabi', icon: '🏮', range: [57, 64], color: '#f472b6', accent: 'rgba(244, 114, 182, 0.2)' },
   { id: 'tropical_island', label: 'Isla Tropical (65-72)', icon: '🏝️', range: [65, 72], color: '#2dd4bf', accent: 'rgba(45, 212, 191, 0.2)' },
-  { id: 'night_stealth', label: 'Sigilo Nocturno (73-80)', icon: '🌙', range: [73, 80], color: '#818cf8', accent: 'rgba(129, 140, 248, 0.22)' }
+  { id: 'night_stealth', label: 'Sigilo Nocturno', icon: '🌙', range: [73, 80], color: '#818cf8', accent: 'rgba(129, 140, 248, 0.22)' }
 ];
 
 // TANK_SKINS_LIST, TANK_HATS_LIST, BULLET_TRAILS_LIST imported from ./game/store/MonetizationCatalog
@@ -2368,6 +2368,27 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                const maxPool = unlockAll ? totalLevels : Math.max(1, unlocked);
+                const rndLvl = Math.floor(Math.random() * maxPool) + 1;
+                onSelectLevel(rndLvl);
+              }}
+              style={{
+                backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                color: '#fbbf24',
+                border: '1px solid rgba(251, 191, 36, 0.6)',
+                height: '36px',
+                padding: '0 13px',
+                borderRadius: '9px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 900
+              }}
+              title="Jugar una misión aleatoria al instante"
+            >
+              🎲 SORPRESA
+            </button>
             <button
               onClick={onOpenHangar}
               style={{

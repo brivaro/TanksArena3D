@@ -7,8 +7,12 @@ export class Mine {
     this.timer = 0;
     this.armed = false;
     this.armTime = 0.65; // Arms after 0.65s so owner can drive away safely
-    this.blastRadius = 9.8;
-    this.proximityRadius = 3.2; // Auto-detonates if an enemy tank drives within 3.2 units!
+    this.fuseDuration = 3.8; // Auto-detonates after 3.8s so mines can demolish walls & obstacles on their own
+    this.barrelFuseDuration = 1.45; // Accelerates fuse when placed next to an Explosive Barrel ('B')!
+    this.nearBarrel = false;
+    this.shouldExplode = false;
+    this.blastRadius = 12.0;
+    this.proximityRadius = 3.6; // Auto-detonates if an enemy tank drives within 3.6 units!
     
     this.mesh = new THREE.Group();
     this.mesh.position.copy(position);
@@ -69,14 +73,33 @@ export class Mine {
       this.armed = true;
     }
 
-    const blinkSpeed = this.armed ? 9.0 : 3.0;
+    const effectiveFuse = this.nearBarrel ? this.barrelFuseDuration : this.fuseDuration;
+    if (this.armed && this.timer >= effectiveFuse) {
+      this.shouldExplode = true;
+    }
+
+    const timeRemaining = Math.max(0, effectiveFuse - this.timer);
+    // Accelerate blink rate as the mine approaches detonation
+    let blinkSpeed = 3.0;
+    if (this.armed) {
+      if (timeRemaining < 1.1 || this.nearBarrel) {
+        blinkSpeed = 24.0;
+      } else if (timeRemaining < 2.0) {
+        blinkSpeed = 15.0;
+      } else {
+        blinkSpeed = 9.0;
+      }
+    }
+
     const val = Math.sin(this.timer * blinkSpeed);
-    this.lightMat.color.setHex(val > 0 ? 0xff1744 : 0x4a0000);
+    const activeColor = this.nearBarrel ? 0xff6d00 : 0xff1744;
+    this.lightMat.color.setHex(val > 0 ? activeColor : 0x4a0000);
 
     if (this.ring) {
-      const pulse = 1.0 + Math.sin(this.timer * 4.0) * 0.06;
+      const pulse = 1.0 + Math.sin(this.timer * (this.nearBarrel ? 10.0 : 4.0)) * (this.nearBarrel ? 0.12 : 0.06);
       this.ring.scale.set(pulse, pulse, 1);
-      this.ringMat.opacity = this.armed ? (0.35 + (val + 1) * 0.15) : 0.18;
+      this.ringMat.color.setHex(activeColor);
+      this.ringMat.opacity = this.armed ? (0.38 + (val + 1) * 0.18) : 0.18;
     }
   }
 }

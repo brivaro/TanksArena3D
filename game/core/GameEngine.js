@@ -4131,7 +4131,7 @@ export class GameEngine {
           for (let dc = -rad; dc <= rad; dc++) {
             const rr = rPref + dr;
             const cc = cPref + dc;
-            if (rr >= 1 && rr < rows - 1 && cc >= 1 && cc < cols - 1 && map[rr][cc] === '.') {
+            if (rr >= 1 && rr < rows - 1 && cc >= 1 && cc < cols - 1 && map[rr][cc] === ' ') {
               const wx = (cc * cellSize) - offX + cellSize / 2;
               const wz = (rr * cellSize) - offZ + cellSize / 2;
               return { r: rr, c: cc, x: wx, z: wz };
@@ -4173,21 +4173,26 @@ export class GameEngine {
       }
     }
 
-    // --- PUNTO 1: BIOME BOSS FINALE ON MISSIONS 8, 16, 24, 32, 40, 48, 56, 64, 72, 80 ---
+    // --- PUNTO 1: BIOME BOSS FINALE ON EVERY 8TH MISSION ---
     this.bossEntity = null;
     this.stats.bossInfo = null;
     if (levelIndex % 8 === 0) {
       const BOSS_METADATA = {
-        8:  { name: '👑 COLOSO DE ROBLE MK-I', color: 0xb71c1c, maxHp: 10 },
-        16: { name: '👑 FARAÓN ESCORPIÓN', color: 0xe65100, maxHp: 12 },
-        24: { name: '👑 OVERLORD MATRIX Ω', color: 0xd500f9, maxHp: 14 },
-        32: { name: '👑 TITÁN CRIOGÉNICO', color: 0x0091ea, maxHp: 16 },
-        40: { name: '👑 VULCANO DESTRUCTOR', color: 0xff1744, maxHp: 18 },
-        48: { name: '👑 GUARDIÁN DE EL DORADO', color: 0xffab00, maxHp: 20 },
-        56: { name: '👑 GUARDIÁN METRÓPOLIS NOCTURNA', color: 0xff6e40, maxHp: 22 },
-        64: { name: '👑 SHOGUN DEL FESTIVAL CARMESÍ', color: 0xff1744, maxHp: 24 },
-        72: { name: '👑 KRAKEN DE CORAL MK-IX', color: 0x00e5ff, maxHp: 26 },
-        80: { name: '👑 ESPECTRO NOCTURNO MK-X', color: 0x38bdf8, maxHp: 28 }
+        8:   { name: '👑 COLOSO DE ROBLE MK-I', color: 0xb71c1c, maxHp: 10 },
+        16:  { name: '👑 FARAÓN ESCORPIÓN', color: 0xe65100, maxHp: 12 },
+        24:  { name: '👑 OVERLORD MATRIX Ω', color: 0xd500f9, maxHp: 14 },
+        32:  { name: '👑 TITÁN CRIOGÉNICO', color: 0x0091ea, maxHp: 16 },
+        40:  { name: '👑 VULCANO DESTRUCTOR', color: 0xff1744, maxHp: 18 },
+        48:  { name: '👑 GUARDIÁN DE EL DORADO', color: 0xffab00, maxHp: 20 },
+        56:  { name: '👑 GUARDIÁN METRÓPOLIS NOCTURNA', color: 0xff6e40, maxHp: 22 },
+        64:  { name: '👑 SHOGUN DEL FESTIVAL CARMESÍ', color: 0xff1744, maxHp: 24 },
+        72:  { name: '👑 KRAKEN DE CORAL MK-IX', color: 0x00e5ff, maxHp: 26 },
+        80:  { name: '👑 ESPECTRO NOCTURNO MK-X', color: 0x38bdf8, maxHp: 28 },
+        88:  { name: '👑 ARQUITECTO DEL PORTAL MK-XI', color: 0x00e5ff, maxHp: 28 },
+        96:  { name: '👑 EMPERADOR DE LA PIROTECNIA', color: 0xff3d00, maxHp: 30 },
+        104: { name: '👑 LEVIATÁN DEL CENTURIÓN', color: 0x40c4ff, maxHp: 32 },
+        112: { name: '👑 SOBERANO CIBERNÉTICO DE TOKIO', color: 0xf50057, maxHp: 34 },
+        120: { name: '👑 OMEGA PRIME: COMANDANTE SUPREMO', color: 0xffd700, maxHp: 36 }
       };
       const bossCfg = BOSS_METADATA[levelIndex] || { name: '👑 MEGATANK JEFE', color: 0xb71c1c, maxHp: 12 };
       const enemies = this.entities.filter(e => e instanceof EnemyTank);
@@ -4416,7 +4421,7 @@ export class GameEngine {
       if (!mine || mine.exploded) return;
       mine.exploded = true;
       const pos = mine.mesh.position.clone();
-      const radius = (this.player && this.player.perkId === 'ordnance') ? 13.5 : 10.5; 
+      const radius = (this.player && this.player.perkId === 'ordnance') ? 15.0 : 12.0; 
       
       this.audio.play('big_explosion');
       this.vfx.spawnScorchDecal(pos, 1.25);
@@ -4438,8 +4443,8 @@ export class GameEngine {
           }
       });
 
-      // Demolish all interior walls, stone blocks, cork blocks, trees, and obstacles within blast radius (just like Bazooka, preserving outer arena borders!)
-      const wallBlastRadius = radius * 0.72;
+      // Demolish all interior walls, stone blocks, cork blocks, trees, and obstacles within blast radius (covering full 8-unit adjacent tiles, preserving outer arena borders!)
+      const wallBlastRadius = Math.max(10.2, radius * 0.86);
       const allBreakables = [...this.walls, ...this.destructibles];
       allBreakables.forEach(block => {
           if (!block || (block.userData && block.userData.isBorder)) return;
@@ -4449,8 +4454,30 @@ export class GameEngine {
           }
       });
 
+      // Explicitly detonate any Explosive Barrels ('B') within extended blast radius (orthogonal & diagonal adjacent tiles!)
+      [...this.barrels].forEach(barrel => {
+          if (barrel && (!barrel.userData || !barrel.userData.exploded)) {
+              const d = Math.hypot(barrel.position.x - pos.x, barrel.position.z - pos.z);
+              if (d <= radius + 3.0) {
+                  this.triggerBarrelExplosion(barrel);
+              }
+          }
+      });
+
+      // Trigger any Laser Gate Switches ('K') or Prism Pillars ('M') caught in the mine shockwave
+      this.laserSwitches.forEach(sw => {
+          if (sw && sw.mesh && Math.hypot(sw.mesh.position.x - pos.x, sw.mesh.position.z - pos.z) <= radius) {
+              this.toggleLaserGates(sw);
+          }
+      });
+      this.prisms.forEach(prism => {
+          if (prism && Math.hypot(prism.position.x - pos.x, prism.position.z - pos.z) <= radius) {
+              this.activatePrismLight(prism, 'mine');
+          }
+      });
+
       [...this.mines].forEach(otherMine => {
-          if (!otherMine.exploded && otherMine.mesh.position.distanceTo(pos) < radius * 0.85) {
+          if (!otherMine.exploded && otherMine.mesh.position.distanceTo(pos) < radius + 2.0) {
               this.triggerMineExplosion(otherMine);
           }
       });
@@ -4959,12 +4986,30 @@ export class GameEngine {
         }
     });
 
-    // Update Mines & Check Proximity Sensor against Enemy Tanks
+    // Update Mines & Check Proximity Sensor against Enemy Tanks, Explosive Barrels, and Countdown Fuse
     for (let i = this.mines.length - 1; i >= 0; i--) {
         const m = this.mines[i];
         if (!m || !m.mesh) continue;
+
+        // Detect if this mine was placed near an Explosive Barrel ('B') so it accelerates its fuse and blows the barrel up!
+        let nearAnyBarrel = false;
+        for (const barrel of this.barrels) {
+            if (barrel && (!barrel.userData || !barrel.userData.exploded)) {
+                const distToBarrel = Math.hypot(barrel.position.x - m.mesh.position.x, barrel.position.z - m.mesh.position.z);
+                if (distToBarrel <= 9.8) {
+                    nearAnyBarrel = true;
+                    break;
+                }
+            }
+        }
+        m.nearBarrel = nearAnyBarrel;
+
         m.update(dt);
         if (m.armed && !m.exploded) {
+            if (m.shouldExplode) {
+                this.triggerMineExplosion(m);
+                continue;
+            }
             for (const entity of this.entities) {
                 if (entity instanceof EnemyTank && entity.mesh) {
                     if (entity.mesh.position.distanceTo(m.mesh.position) < m.proximityRadius) {
@@ -5102,6 +5147,7 @@ export class GameEngine {
 
       const pos = barrel.position.clone();
       this.vfx.spawnBarrelDebris(pos);
+      this.vfx.spawnScorchDecal(pos, 1.3);
       this.vfx.spawnFloatingText(pos, '💥 ¡BOOM!', '#ff6d00', 1.25);
       this.audio.play('barrel_explosion');
       this.screenShake = 1.45;
@@ -5112,7 +5158,7 @@ export class GameEngine {
       this.walls = this.walls.filter(w => w !== barrel);
       this.barrels = this.barrels.filter(b => b !== barrel);
 
-      const radius = 11.5;
+      const radius = 12.5;
 
       if (this.player && this.player.mesh && this.player.mesh.position.distanceTo(pos) < radius) {
           this.damagePlayer(1);
@@ -5126,21 +5172,49 @@ export class GameEngine {
           }
       });
 
-      [...this.destructibles].forEach(block => {
-          if (block !== barrel && block.userData && block.userData.type === 'cork' && block.position.distanceTo(pos) < radius) {
-              this.destroyBlock(block);
+      // Demolish adjacent interior walls, cork crates, stone blocks, and obstacles (preserving outer border walls!)
+      const wallBlastRadius = 9.8;
+      const allBreakables = [...this.walls, ...this.destructibles];
+      allBreakables.forEach(block => {
+          if (!block || block === barrel || (block.userData && block.userData.isBorder)) return;
+          if (block.userData && block.userData.type === 'barrel') return;
+          const d = Math.hypot(block.position.x - pos.x, block.position.z - pos.z);
+          if (d <= wallBlastRadius) {
+              this.destroyBlock(block, this.player);
+          }
+      });
+
+      // Chain-detonate any nearby Mines!
+      [...this.mines].forEach(mine => {
+          if (mine && !mine.exploded && mine.mesh) {
+              const d = Math.hypot(mine.mesh.position.x - pos.x, mine.mesh.position.z - pos.z);
+              if (d <= radius + 3.0) {
+                  this.triggerMineExplosion(mine);
+              }
+          }
+      });
+
+      // Trigger any Laser Gate Switches ('K') or Prism Pillars ('M') in the barrel blast
+      this.laserSwitches.forEach(sw => {
+          if (sw && sw.mesh && Math.hypot(sw.mesh.position.x - pos.x, sw.mesh.position.z - pos.z) <= radius) {
+              this.toggleLaserGates(sw);
+          }
+      });
+      this.prisms.forEach(prism => {
+          if (prism && Math.hypot(prism.position.x - pos.x, prism.position.z - pos.z) <= radius) {
+              this.activatePrismLight(prism, 'barrel');
           }
       });
 
       [...this.barrels].forEach(otherBarrel => {
           if (otherBarrel !== barrel && otherBarrel.userData && !otherBarrel.userData.exploded) {
               const d = otherBarrel.position.distanceTo(pos);
-              if (d < radius + 3.0) {
+              if (d < radius + 3.5) {
                   setTimeout(() => {
                       if (this.isRunning && !this.isPaused) {
                           this.triggerBarrelExplosion(otherBarrel);
                       }
-                  }, 110);
+                  }, 105);
               }
           }
       });
