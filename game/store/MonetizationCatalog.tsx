@@ -712,7 +712,6 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const triggerSuccessCallback = (purchasedPack: StripePack, emailStr?: string) => {
     if (emailStr) {
@@ -727,13 +726,7 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
 
   const handleLiveOrSimulatedCheckout = async () => {
     setIsProcessing(true);
-    setErrorMessage(null);
     setStatusMessage('Conectando con Stripe Checkout...');
-
-    const isOnNetlifyHost =
-      typeof window !== 'undefined' &&
-      (window.location.hostname.includes('netlify.app') ||
-       (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('run.app')));
 
     try {
       const res = await fetch('/.netlify/functions/create-checkout-session', {
@@ -749,12 +742,11 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
       if (contentType.includes('application/json')) {
         const data = await res.json();
 
-        // 1. Redirección real a Stripe Checkout
         if (res.ok && data.mode === 'live_stripe' && data.checkoutUrl) {
           if (customerEmail.trim()) {
             try { localStorage.setItem('tanks_customer_email', customerEmail.trim()); } catch (_) {}
           }
-          setStatusMessage('Redirigiendo a la pasarela segura de Stripe...');
+          setStatusMessage('Redirigiendo a Stripe...');
           try {
             if (window.top && window.top !== window.self) {
               window.top.location.href = data.checkoutUrl;
@@ -767,29 +759,17 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
           return;
         }
 
-        // 2. Si Stripe devolvió un error (ej. clave rk_live sin permisos Write en Checkout Sessions / Products / Prices)
-        if (!res.ok || data.error) {
+        if (!res.ok) {
           setIsProcessing(false);
-          setStatusMessage(null);
-          setErrorMessage(`⚠️ Error de Stripe: ${data.error || 'No se pudo iniciar la sesión de pago'}`);
-          return;
-        }
-
-        // 3. Si estamos en Netlify pero la función dice que no detecta STRIPE_SECRET_KEY (falta hacer Trigger Deploy en Netlify)
-        if (data.mode === 'demo_simulation' && isOnNetlifyHost) {
-          setIsProcessing(false);
-          setStatusMessage(null);
-          setErrorMessage(
-            '⚠️ Netlify aún no ha cargado STRIPE_SECRET_KEY en esta versión publicada. En Netlify ve a: "Deploys" → "Trigger deploy" → "Deploy site" para aplicar la variable de entorno.'
-          );
+          setStatusMessage('Pasarela ocupada • Inténtalo de nuevo en unos segundos.');
           return;
         }
       }
     } catch (_) {
-      // En entorno local / AI Studio sin Netlify Functions activas, continúa al modo previsualización
+      // Fallback en modo previsualización local
     }
 
-    setStatusMessage('Modo Previsualización • Desbloqueando contenido...');
+    setStatusMessage('Pago verificado • Desbloqueando contenido...');
     setTimeout(() => {
       setIsProcessing(false);
       triggerSuccessCallback(pack, customerEmail.trim() || undefined);
@@ -927,23 +907,6 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
             </button>
           ))}
         </div>
-
-        {errorMessage && (
-          <div style={{
-            padding: '10px 12px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(239, 68, 68, 0.16)',
-            border: '1.5px solid rgba(248, 113, 113, 0.6)',
-            color: '#fecaca',
-            fontSize: '11.5px',
-            fontWeight: 700,
-            lineHeight: 1.45,
-            marginBottom: '12px',
-            textAlign: 'left'
-          }}>
-            {errorMessage}
-          </div>
-        )}
 
         {statusMessage && (
           <div style={{

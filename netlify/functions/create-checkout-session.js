@@ -1,11 +1,6 @@
 /**
  * Netlify Serverless Function: create-checkout-session.js
  * Ubicación automática para Netlify: /netlify/functions/create-checkout-session.js
- *
- * Soporta tanto Claves Secretas Estándar (sk_live_... / sk_test_...)
- * como Claves Restringidas (rk_live_... / rk_test_...) que tengan permisos de:
- *   - Checkout Sessions: Write (Escritura)
- *   - Products: Write (Escritura) / Prices: Write (Escritura)
  */
 
 const CATALOG_PRODUCTS = {
@@ -57,32 +52,45 @@ function getStripeKey() {
   return raw.trim().replace(/^["']|["']$/g, '');
 }
 
+function buildCheckoutParams(product, productId, playerId, customerEmail, siteUrl, options = {}) {
+  const params = new URLSearchParams();
+  params.append('mode', 'payment');
+  params.append('success_url', `${siteUrl}/?purchase_success=true&product=${encodeURIComponent(productId)}&session_id={CHECKOUT_SESSION_ID}`);
+  params.append('cancel_url', `${siteUrl}/?purchase_canceled=true`);
+  params.append('client_reference_id', playerId || 'anonymous_commander');
+  params.append('metadata[productId]', productId);
+
+  if (customerEmail && typeof customerEmail === 'string' && customerEmail.includes('@')) {
+    params.append('customer_email', customerEmail.trim());
+  }
+
+  params.append('line_items[0][price_data][currency]', product.currency);
+  params.append('line_items[0][price_data][unit_amount]', String(product.amountCents));
+  params.append('line_items[0][price_data][product_data][name]', product.name);
+  params.append('line_items[0][price_data][product_data][description]', product.description);
+  params.append('line_items[0][quantity]', '1');
+
+  if (options.useTaxCode) {
+    // Código fiscal oficial de Stripe para Videojuegos y bienes digitales in-game (compatible con Managed Payments)
+    params.append('line_items[0][price_data][product_data][tax_code]', 'txcd_10201000');
+  }
+  if (options.disableManagedPayments) {
+    params.append('managed_payments[enabled]', 'false');
+  }
+
+  return params;
+}
+
 export const handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
-  }
-
-  const stripeSecretKey = getStripeKey();
-
-  // Diagnóstico rápido si abres /.netlify/functions/create-checkout-session en el navegador
-  if (event.httpMethod === 'GET') {
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        status: 'ok',
-        function: 'create-checkout-session',
-        keyConfigured: Boolean(stripeSecretKey),
-        keyType: stripeSecretKey ? `${stripeSecretKey.slice(0, 8)}...` : 'MISSING (Configure STRIPE_SECRET_KEY in Netlify and Trigger Deploy)'
-      })
-    };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -105,54 +113,29 @@ export const handler = async (event) => {
       };
     }
 
+    const stripeSecretKey = getStripeKey();
     const originHeader = event.headers?.origin || event.headers?.Origin;
     const siteUrl = originHeader || process.env.URL || 'http://localhost:3000';
 
-    // Si aún no se ha configurado STRIPE_SECRET_KEY en Netlify (o no se ha hecho Redeploy tras añadirla)
     if (!stripeSecretKey) {
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           mode: 'demo_simulation',
-          reason: 'missing_stripe_secret_key',
-          message: 'Netlify aún no detecta STRIPE_SECRET_KEY. Asegúrate de llamarla STRIPE_SECRET_KEY en Environment Variables y pulsar "Trigger deploy -> Deploy site" en Netlify.',
           productId,
           checkoutUrl: `${siteUrl}/?purchase_success=true&product=${encodeURIComponent(productId)}`
         })
       };
     }
 
-    // Si el usuario puso por error la clave pública (pk_live_) en lugar de la secreta (sk_live_ o rk_live_)
-    if (stripeSecretKey.startsWith('pk_')) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          error: 'Has puesto la Clave Publicable (pk_live_...). Debes poner la Clave Secreta (sk_live_...) o una Clave Restringida (rk_live_...) con permisos de escritura en Checkout Sessions.'
-        })
-      };
-    }
+    // Intento 1: Con tax_code digital oficial de videojuegos (txcd_10201000) para cuentas con Managed Payments activo
+    let params = buildCheckoutParams(product, productId, playerId, customerEmail, siteUrl, {
+      useTaxCode: true,
+      disableManagedPayments: false
+    });
 
-    // Llamada directa a la API REST de Stripe Checkout
-    const params = new URLSearchParams();
-    params.append('mode', 'payment');
-    params.append('success_url', `${siteUrl}/?purchase_success=true&product=${encodeURIComponent(productId)}&session_id={CHECKOUT_SESSION_ID}`);
-    params.append('cancel_url', `${siteUrl}/?purchase_canceled=true`);
-    params.append('client_reference_id', playerId || 'anonymous_commander');
-    params.append('metadata[productId]', productId);
-
-    if (customerEmail && typeof customerEmail === 'string' && customerEmail.includes('@')) {
-      params.append('customer_email', customerEmail.trim());
-    }
-
-    params.append('line_items[0][price_data][currency]', product.currency);
-    params.append('line_items[0][price_data][unit_amount]', String(product.amountCents));
-    params.append('line_items[0][price_data][product_data][name]', product.name);
-    params.append('line_items[0][price_data][product_data][description]', product.description);
-    params.append('line_items[0][quantity]', '1');
-
-    const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    let response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${stripeSecretKey}`,
@@ -161,22 +144,51 @@ export const handler = async (event) => {
       body: params.toString()
     });
 
-    const session = await response.json();
+    let session = await response.json();
+
+    // Intento 2 automático: Si la cuenta requiere desactivar managed_payments en la sesión, reintenta al instante
+    if (!response.ok) {
+      params = buildCheckoutParams(product, productId, playerId, customerEmail, siteUrl, {
+        useTaxCode: false,
+        disableManagedPayments: true
+      });
+
+      response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+
+      session = await response.json();
+    }
+
+    // Intento 3 automático: Sesión estándar limpia por si la cuenta no tiene Managed Payments ni Stripe Tax
+    if (!response.ok) {
+      params = buildCheckoutParams(product, productId, playerId, customerEmail, siteUrl, {
+        useTaxCode: false,
+        disableManagedPayments: false
+      });
+
+      response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      });
+
+      session = await response.json();
+    }
 
     if (!response.ok) {
-      const rawMsg = session.error?.message || 'Error al crear sesión de Stripe';
-      const isRestrictedPermissionError =
-        stripeSecretKey.startsWith('rk_') &&
-        (response.status === 403 || rawMsg.toLowerCase().includes('permission'));
-
       return {
         statusCode: response.status,
         headers,
-        body: JSON.stringify({
-          error: isRestrictedPermissionError
-            ? `Tu clave restringida (${stripeSecretKey.slice(0, 8)}...) no tiene permisos suficientes en Stripe. En Stripe > Developers > API Keys, edita tu clave rk_live y activa "Write" (Escritura) en: "Checkout Sessions", "Products" y "Prices" (o usa directamente la clave secreta estándar sk_live_...). Detalle Stripe: ${rawMsg}`
-            : rawMsg
-        })
+        body: JSON.stringify({ error: 'No se pudo iniciar la pasarela de pago en este momento.' })
       };
     }
 
@@ -193,7 +205,7 @@ export const handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: err.message || 'Internal Server Error' })
+      body: JSON.stringify({ error: 'Internal Server Error' })
     };
   }
 };
