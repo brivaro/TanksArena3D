@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GameEngine } from './game/core/GameEngine.js';
 import { LevelLoader } from './game/world/LevelLoader.js';
@@ -457,6 +457,7 @@ const VirtualAimJoystick: React.FC<VirtualAimJoystickProps> = ({
 // Tap = Arm Bazooka on main stick (or fire immediately if already aiming/armed)
 // Drag = Aim Bazooka trajectory directly without shooting bullets & release to launch rocket!
 interface BazookaSmartStickButtonProps {
+  bazookaUnlocked?: boolean;
   bazookaReady: boolean;
   bazookaCooldownProgress: number;
   bazookaArmed: boolean;
@@ -465,6 +466,7 @@ interface BazookaSmartStickButtonProps {
 }
 
 const BazookaSmartStickButton: React.FC<BazookaSmartStickButtonProps> = ({
+  bazookaUnlocked = true,
   bazookaReady,
   bazookaCooldownProgress,
   bazookaArmed,
@@ -483,6 +485,10 @@ const BazookaSmartStickButton: React.FC<BazookaSmartStickButtonProps> = ({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     e.stopPropagation();
+    if (!bazookaUnlocked) {
+      onTapBazooka();
+      return;
+    }
     if (activeTouchId.current !== null) return;
     const touch = e.targetTouches[0] || e.changedTouches[0];
     if (!touch) return;
@@ -589,15 +595,21 @@ const BazookaSmartStickButton: React.FC<BazookaSmartStickButtonProps> = ({
         width: '66px',
         height: '66px',
         borderRadius: '50%',
-        backgroundColor: bazookaReady
+        backgroundColor: !bazookaUnlocked
+          ? 'rgba(15, 23, 42, 0.78)'
+          : bazookaReady
           ? (bazookaArmed || isDragging ? '#c2410c' : '#ea580c')
           : 'rgba(30, 41, 59, 0.88)',
-        border: bazookaArmed || isDragging
+        border: !bazookaUnlocked
+          ? '2px dashed rgba(148, 163, 184, 0.45)'
+          : bazookaArmed || isDragging
           ? '3px solid #fde047'
           : bazookaReady
           ? '2.5px solid rgba(255, 255, 255, 0.92)'
           : '2px solid rgba(148, 163, 184, 0.4)',
-        boxShadow: bazookaArmed || isDragging
+        boxShadow: !bazookaUnlocked
+          ? '0 4px 10px rgba(0,0,0,0.35)'
+          : bazookaArmed || isDragging
           ? '0 0 24px rgba(251, 191, 36, 0.85)'
           : bazookaReady
           ? '0 6px 18px rgba(234, 88, 12, 0.7)'
@@ -611,9 +623,10 @@ const BazookaSmartStickButton: React.FC<BazookaSmartStickButtonProps> = ({
         justifyContent: 'center',
         touchAction: 'none',
         pointerEvents: 'auto',
-        userSelect: 'none'
+        userSelect: 'none',
+        opacity: bazookaUnlocked ? 1 : 0.72
       }}
-      title="Toca para armar/disparar Bazoca o arrastra este botón para apuntar el cohete"
+      title={bazookaUnlocked ? 'Toca para armar/disparar Bazoca o arrastra este botón para apuntar el cohete' : 'Se desbloquea en el Nivel 6'}
     >
       <div
         style={{
@@ -626,9 +639,9 @@ const BazookaSmartStickButton: React.FC<BazookaSmartStickButtonProps> = ({
           pointerEvents: 'none'
         }}
       >
-        <span style={{ fontSize: '21px', lineHeight: 1 }}>🚀</span>
-        <span style={{ fontSize: '8px', fontWeight: 900, marginTop: '2px', letterSpacing: '0.3px', color: bazookaReady ? '#fff' : '#94a3b8' }}>
-          {bazookaArmed ? 'ARMADO' : bazookaReady ? 'BAZOCA' : `${Math.round(bazookaCooldownProgress * 100)}%`}
+        <span style={{ fontSize: '21px', lineHeight: 1 }}>{bazookaUnlocked ? '🚀' : '🔒'}</span>
+        <span style={{ fontSize: '8px', fontWeight: 900, marginTop: '2px', letterSpacing: '0.3px', color: !bazookaUnlocked ? '#94a3b8' : bazookaReady ? '#fff' : '#94a3b8' }}>
+          {!bazookaUnlocked ? 'NV.6' : bazookaArmed ? 'ARMADO' : bazookaReady ? 'BAZOCA' : `${Math.round(bazookaCooldownProgress * 100)}%`}
         </span>
       </div>
     </div>
@@ -641,14 +654,20 @@ interface MobileControlsClusterProps {
   onQuickShoot?: () => void;
   onMine: () => void;
   onBazooka: () => void;
+  onEmp: () => void;
   onToggleCamera: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   cameraMode?: 'overview' | 'follow';
+  mineUnlocked?: boolean;
   mineReady: boolean;
   mineCooldownProgress?: number;
+  bazookaUnlocked?: boolean;
   bazookaReady: boolean;
   bazookaCooldownProgress?: number;
+  empUnlocked?: boolean;
+  empReady?: boolean;
+  empCooldownProgress?: number;
 }
 
 const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
@@ -657,14 +676,21 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
   onQuickShoot,
   onMine,
   onBazooka,
+  onEmp,
   onToggleCamera,
   cameraMode,
+  mineUnlocked = true,
   mineReady,
   mineCooldownProgress = 1,
+  bazookaUnlocked = true,
   bazookaReady,
-  bazookaCooldownProgress = 1
+  bazookaCooldownProgress = 1,
+  empUnlocked = false,
+  empReady = true,
+  empCooldownProgress = 1
 }) => {
   const [minePressed, setMinePressed] = useState(false);
+  const [empPressed, setEmpPressed] = useState(false);
   const [bazookaArmed, setBazookaArmed] = useState(false);
   const [fireMode, setFireMode] = useState<'smart' | 'auto'>(() => {
     try {
@@ -719,7 +745,7 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
   };
 
   const handleTapBazooka = () => {
-    if (!bazookaReady) {
+    if (!bazookaUnlocked || !bazookaReady) {
       onBazooka();
       return;
     }
@@ -731,6 +757,17 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
     } else {
       setBazookaArmed(true);
     }
+  };
+
+  const handleEmpTrigger = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEmpPressed(true);
+    setTimeout(() => setEmpPressed(false), 180);
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(35); } catch (_) {}
+    }
+    onEmp();
   };
 
   return (
@@ -802,16 +839,61 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
         </button>
       </div>
 
+      {/* Upper-Right Arc: ⚡ Orbital EMP Pulse Button (Unlocks at Lv.18) */}
+      <div
+        data-ui-element="true"
+        onTouchStart={handleEmpTrigger}
+        onClick={handleEmpTrigger}
+        style={{
+          position: 'absolute',
+          left: '82px',
+          top: '34px',
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          backgroundColor: !empUnlocked
+            ? 'rgba(15, 23, 42, 0.75)'
+            : empReady
+            ? '#0284c7'
+            : 'rgba(30, 41, 59, 0.88)',
+          border: !empUnlocked
+            ? '1.5px dashed rgba(148, 163, 184, 0.4)'
+            : empReady
+            ? '2.5px solid #38bdf8'
+            : '2px solid rgba(148, 163, 184, 0.4)',
+          boxShadow: empUnlocked && empReady ? '0 0 18px rgba(56, 189, 248, 0.7)' : '0 4px 10px rgba(0,0,0,0.4)',
+          color: '#fff',
+          cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          touchAction: 'none',
+          pointerEvents: 'auto',
+          userSelect: 'none',
+          opacity: empUnlocked ? 1 : 0.7,
+          transform: empPressed ? 'scale(0.88)' : 'scale(1)',
+          transition: 'transform 0.1s ease-out'
+        }}
+        title={empUnlocked ? 'Pulso EMP Orbital: Destruye balas enemigas y congela tanques' : 'Pulso EMP: Se desbloquea en el Nivel 18'}
+      >
+        <span style={{ fontSize: '15px', lineHeight: 1, pointerEvents: 'none' }}>{empUnlocked ? '⚡' : '🔒'}</span>
+        <span style={{ fontSize: '7.5px', fontWeight: 900, marginTop: '1px', color: !empUnlocked ? '#94a3b8' : empReady ? '#e0f2fe' : '#94a3b8', pointerEvents: 'none' }}>
+          {!empUnlocked ? 'NV.18' : empReady ? 'EMP' : `${Math.round(empCooldownProgress * 100)}%`}
+        </span>
+      </div>
+
       {/* Upper-Left Radial Arc: 🚀 Bazooka Smart Button (Tap to Arm/Fire OR Drag to Aim & Release!) */}
       <div
         style={{
           position: 'absolute',
-          left: '10px',
+          left: '8px',
           top: '44px',
           pointerEvents: 'auto'
         }}
       >
         <BazookaSmartStickButton
+          bazookaUnlocked={bazookaUnlocked}
           bazookaReady={bazookaReady}
           bazookaCooldownProgress={bazookaCooldownProgress}
           bazookaArmed={bazookaArmed}
@@ -834,9 +916,21 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
           width: '62px',
           height: '62px',
           borderRadius: '50%',
-          backgroundColor: mineReady ? '#15803d' : 'rgba(30, 41, 59, 0.88)',
-          border: mineReady ? '2.5px solid #4ade80' : '2px solid rgba(148, 163, 184, 0.4)',
-          boxShadow: mineReady ? '0 6px 18px rgba(22, 163, 74, 0.65)' : '0 4px 10px rgba(0,0,0,0.4)',
+          backgroundColor: !mineUnlocked
+            ? 'rgba(15, 23, 42, 0.78)'
+            : mineReady
+            ? '#15803d'
+            : 'rgba(30, 41, 59, 0.88)',
+          border: !mineUnlocked
+            ? '2px dashed rgba(148, 163, 184, 0.45)'
+            : mineReady
+            ? '2.5px solid #4ade80'
+            : '2px solid rgba(148, 163, 184, 0.4)',
+          boxShadow: !mineUnlocked
+            ? '0 4px 10px rgba(0,0,0,0.35)'
+            : mineReady
+            ? '0 6px 18px rgba(22, 163, 74, 0.65)'
+            : '0 4px 10px rgba(0,0,0,0.4)',
           color: '#fff',
           cursor: 'pointer',
           display: 'flex',
@@ -846,13 +940,14 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
           touchAction: 'none',
           pointerEvents: 'auto',
           userSelect: 'none',
+          opacity: mineUnlocked ? 1 : 0.72,
           transform: minePressed ? 'scale(0.88)' : 'scale(1)',
           transition: 'transform 0.1s ease-out'
         }}
       >
-        <span style={{ fontSize: '20px', lineHeight: 1, pointerEvents: 'none' }}>💣</span>
-        <span style={{ fontSize: '8px', fontWeight: 900, marginTop: '2px', letterSpacing: '0.3px', color: mineReady ? '#bbf7d0' : '#94a3b8', pointerEvents: 'none' }}>
-          {mineReady ? 'MINA' : `${Math.round(mineCooldownProgress * 100)}%`}
+        <span style={{ fontSize: '20px', lineHeight: 1, pointerEvents: 'none' }}>{mineUnlocked ? '💣' : '🔒'}</span>
+        <span style={{ fontSize: '8px', fontWeight: 900, marginTop: '2px', letterSpacing: '0.3px', color: !mineUnlocked ? '#94a3b8' : mineReady ? '#bbf7d0' : '#94a3b8', pointerEvents: 'none' }}>
+          {!mineUnlocked ? 'NV.3' : mineReady ? 'MINA' : `${Math.round(mineCooldownProgress * 100)}%`}
         </span>
       </div>
 
@@ -881,16 +976,16 @@ const MobileControlsCluster: React.FC<MobileControlsClusterProps> = ({
 // --- Professional Tactical UI Components ---
 
 const BIOMES_LIST = [
-  { id: 'all', label: 'TODAS (120)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
+  { id: 'all', label: 'TODAS (160)', icon: '🗺️', color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
   { id: 'workshop', label: 'Taller (1-8)', icon: '🌲', range: [1, 8], color: '#fbbf24', accent: 'rgba(251, 191, 36, 0.16)' },
   { id: 'desert', label: 'Desierto (9-16)', icon: '🏜️', range: [9, 16], color: '#fb923c', accent: 'rgba(251, 146, 60, 0.16)' },
-  { id: 'cyber', label: 'Cyber & Portales', icon: '⚡', range: [17, 24], color: '#22d3ee', accent: 'rgba(34, 211, 238, 0.18)' },
-  { id: 'arctic', label: 'Ártico & Espejos', icon: '❄️', range: [25, 32], color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
+  { id: 'cyber', label: 'Cyber & EMP', icon: '⚡', range: [17, 24], color: '#22d3ee', accent: 'rgba(34, 211, 238, 0.18)' },
+  { id: 'arctic', label: 'Ártico Criogénico', icon: '❄️', range: [25, 32], color: '#38bdf8', accent: 'rgba(56, 189, 248, 0.18)' },
   { id: 'volcano', label: 'Volcán & Pirotecnia', icon: '🌋', range: [33, 40], color: '#f87171', accent: 'rgba(248, 113, 113, 0.18)' },
-  { id: 'jungle', label: 'Selva (41-48)', icon: '🌴', range: [41, 48], color: '#4ade80', accent: 'rgba(74, 222, 128, 0.18)' },
-  { id: 'sunset_city', label: 'Ciudad Atardecer (49-56)', icon: '🌇', range: [49, 56], color: '#ff8a65', accent: 'rgba(255, 138, 101, 0.2)' },
+  { id: 'jungle', label: 'Selva & Médico', icon: '🌴', range: [41, 48], color: '#4ade80', accent: 'rgba(74, 222, 128, 0.18)' },
+  { id: 'sunset_city', label: 'Ciudad Atardecer', icon: '🌇', range: [49, 56], color: '#ff8a65', accent: 'rgba(255, 138, 101, 0.2)' },
   { id: 'matsuri', label: 'Festival Hanabi', icon: '🏮', range: [57, 64], color: '#f472b6', accent: 'rgba(244, 114, 182, 0.2)' },
-  { id: 'tropical_island', label: 'Isla Tropical (65-72)', icon: '🏝️', range: [65, 72], color: '#2dd4bf', accent: 'rgba(45, 212, 191, 0.2)' },
+  { id: 'tropical_island', label: 'Isla Tropical', icon: '🏝️', range: [65, 72], color: '#2dd4bf', accent: 'rgba(45, 212, 191, 0.2)' },
   { id: 'night_stealth', label: 'Sigilo Nocturno', icon: '🌙', range: [73, 80], color: '#818cf8', accent: 'rgba(129, 140, 248, 0.22)' }
 ];
 
@@ -1343,16 +1438,31 @@ const MainMenu: React.FC<MainMenuProps> = ({
   const bpLevel = Math.min(10, Math.floor(bpXp / 100) + 1);
 
   // Seamless FLIP Wooden Block Title Intro -> Top-Left Slot State
+  // CRITICAL MOBILE FIX: Compute initial centerOffset synchronously from window.innerWidth/innerHeight
+  // AND measure inside useLayoutEffect BEFORE first browser paint so the title NEVER flashes in a corner on mobile!
   const logoSlotRef = useRef<HTMLDivElement | null>(null);
   const [introPhase, setIntroPhase] = useState<'center' | 'docking' | 'docked'>(() =>
     showIntroSplash ? 'center' : 'docked'
   );
   const [dropCycleKey, setDropCycleKey] = useState(0);
-  const [viewport, setViewport] = useState({
+  const [viewport, setViewport] = useState(() => ({
     w: typeof window !== 'undefined' ? window.innerWidth : 1280,
     h: typeof window !== 'undefined' ? window.innerHeight : 800
+  }));
+  const [centerOffset, setCenterOffset] = useState(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const cScale = Math.min(1.06, (vw - 26) / WOOD_LOGO_BASE_WIDTH, (vh * 0.44) / WOOD_LOGO_BASE_HEIGHT);
+    const targetCenterX = (vw - WOOD_LOGO_BASE_WIDTH * cScale) / 2;
+    const targetCenterY = (vh - WOOD_LOGO_BASE_HEIGHT * cScale) / 2 - 18;
+    const approxPadX = Math.min(26, Math.max(14, vw * 0.028));
+    const approxPadY = Math.min(20, Math.max(12, vw * 0.022));
+    return {
+      x: Math.round(targetCenterX - approxPadX),
+      y: Math.round(targetCenterY - approxPadY),
+      scale: Number(cScale.toFixed(4))
+    };
   });
-  const [centerOffset, setCenterOffset] = useState({ x: 240, y: 180, scale: 0.9 });
 
   const isMobileScreen = viewport.w < 680;
   const dockScale = isMobileScreen ? 0.36 : 0.44;
@@ -1377,22 +1487,25 @@ const MainMenu: React.FC<MainMenuProps> = ({
         scale: Number(cScale.toFixed(4))
       });
     } else {
+      const approxPadX = Math.min(26, Math.max(14, vw * 0.028));
+      const approxPadY = Math.min(20, Math.max(12, vw * 0.022));
       setCenterOffset({
-        x: Math.round(targetCenterX - 24),
-        y: Math.round(targetCenterY - 20),
+        x: Math.round(targetCenterX - approxPadX),
+        y: Math.round(targetCenterY - approxPadY),
         scale: Number(cScale.toFixed(4))
       });
     }
   }, []);
 
-  useEffect(() => {
+  // Measure synchronously before the browser paints the very first frame!
+  useLayoutEffect(() => {
     measureCenterOffset();
     window.addEventListener('resize', measureCenterOffset);
     return () => window.removeEventListener('resize', measureCenterOffset);
   }, [measureCenterOffset]);
 
   // Trigger or replay the center wooden block drop & smooth corner glide
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!showIntroSplash) return;
     measureCenterOffset();
     setIntroPhase('center');
@@ -1436,8 +1549,9 @@ const MainMenu: React.FC<MainMenuProps> = ({
     }
   };
 
-  const isCenterPhase = introPhase === 'center';
-  const menuRevealed = introPhase !== 'center';
+  const effectivePhase = showIntroSplash && introPhase === 'docked' ? 'center' : introPhase;
+  const isCenterPhase = effectivePhase === 'center';
+  const menuRevealed = effectivePhase !== 'center';
 
   return (
     <div
@@ -1562,7 +1676,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
                 transform: isCenterPhase
                   ? `translate3d(${centerOffset.x}px, ${centerOffset.y}px, 0) scale(${centerOffset.scale})`
                   : `translate3d(0px, 0px, 0) scale(${dockScale})`,
-                transition: introPhase === 'docking'
+                transition: effectivePhase === 'docking'
                   ? 'transform 1.2s cubic-bezier(0.22, 1, 0.36, 1)'
                   : 'none',
                 pointerEvents: 'none'
@@ -1857,8 +1971,8 @@ const MainMenu: React.FC<MainMenuProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={styles.studioMenuIcon}>🗺️</span>
                 <div>
-                  <div style={styles.studioMenuTitle}>80 MISIONES</div>
-                  <div style={styles.studioMenuSub}>10 Biomas Tácticos</div>
+                  <div style={styles.studioMenuTitle}>160 MISIONES</div>
+                  <div style={styles.studioMenuSub}>Desbloqueo Progresivo</div>
                 </div>
               </div>
             </button>
@@ -2541,7 +2655,7 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                     {name}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '8px', gap: '4px' }}>
                     <div style={{
                       fontSize: '9px',
                       fontWeight: 800,
@@ -2552,19 +2666,40 @@ const LevelSelect: React.FC<LevelSelectProps> = ({
                     }}>
                       {biomeMeta.label.split(' ')[0].toUpperCase()}
                     </div>
-                    {isBossLevel && (
-                      <span style={{
-                        fontSize: '8.5px',
-                        fontWeight: 900,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(239, 68, 68, 0.25)',
-                        color: '#fca5a5',
-                        border: '1px solid rgba(248, 113, 113, 0.45)'
-                      }}>
-                        👑 JEFE
-                      </span>
-                    )}
+                    {(() => {
+                      const milestone = LevelLoader.getMilestoneUnlockInfo(lvl);
+                      if (milestone) {
+                        return (
+                          <span style={{
+                            fontSize: '8.5px',
+                            fontWeight: 900,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(56, 189, 248, 0.22)',
+                            color: '#7dd3fc',
+                            border: '1px solid rgba(56, 189, 248, 0.5)'
+                          }}>
+                            {milestone.icon} NUEVO
+                          </span>
+                        );
+                      }
+                      if (isBossLevel) {
+                        return (
+                          <span style={{
+                            fontSize: '8.5px',
+                            fontWeight: 900,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                            color: '#fca5a5',
+                            border: '1px solid rgba(248, 113, 113, 0.45)'
+                          }}>
+                            👑 JEFE
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </button>
               );
@@ -2585,10 +2720,15 @@ interface HUDProps {
   biome?: string;
   activePowerup?: string | null;
   bossInfo?: { name: string; hp: number; maxHp: number; enraged: boolean } | null;
+  mineUnlocked?: boolean;
   mineReady?: boolean;
   mineCooldownProgress?: number;
+  bazookaUnlocked?: boolean;
   bazookaReady?: boolean;
   bazookaCooldownProgress?: number;
+  empUnlocked?: boolean;
+  empReady?: boolean;
+  empCooldownProgress?: number;
   combo?: number;
   isMuted?: boolean;
   isMusicMuted?: boolean;
@@ -2610,6 +2750,7 @@ interface HUDProps {
   onToggleNightMode?: () => void;
   onMine: () => void;
   onBazooka: () => void;
+  onEmp: () => void;
 }
 
 const HUD: React.FC<HUDProps> = ({
@@ -2621,10 +2762,15 @@ const HUD: React.FC<HUDProps> = ({
   biome = 'workshop',
   activePowerup = null,
   bossInfo = null,
+  mineUnlocked = true,
   mineReady = true,
   mineCooldownProgress = 1.0,
+  bazookaUnlocked = true,
   bazookaReady = true,
   bazookaCooldownProgress = 1.0,
+  empUnlocked = false,
+  empReady = true,
+  empCooldownProgress = 1.0,
   combo = 0,
   isMuted = false,
   isMusicMuted = false,
@@ -2644,7 +2790,8 @@ const HUD: React.FC<HUDProps> = ({
   onToggleTouchControls,
   onToggleNightMode,
   onMine,
-  onBazooka
+  onBazooka,
+  onEmp
 }) => {
   const hearts = Array.from({ length: 4 }, (_, i) => {
     if (i === 3 && lives < 4) return null;
@@ -3135,9 +3282,9 @@ const HUD: React.FC<HUDProps> = ({
             </div>
           )}
 
-          {/* Clickable PC Mine + Bazooka Buttons — Perfectly Centered */}
+          {/* Clickable PC Mine + Bazooka + EMP Buttons — Perfectly Centered with Progressive Level Unlocks */}
           {!touchControlsEnabled && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', pointerEvents: 'auto' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', pointerEvents: 'auto' }}>
               <button
                 type="button"
                 data-ui-element="true"
@@ -3146,23 +3293,32 @@ const HUD: React.FC<HUDProps> = ({
                   onMine();
                   e.currentTarget.blur();
                 }}
-                title="Desplegar Mina Terrestre [Espacio / Tecla E / Clic Derecho]"
+                title={mineUnlocked ? 'Desplegar Mina Terrestre [Espacio / Tecla E / Clic Derecho]' : 'Mina Terrestre: Se desbloquea en la Misión 3'}
                 style={{
                   ...styles.hudPanel,
-                  borderColor: mineReady ? 'rgba(74, 222, 128, 0.65)' : 'rgba(248, 113, 113, 0.45)',
-                  backgroundColor: mineReady ? 'rgba(20, 83, 45, 0.85)' : 'rgba(15, 23, 42, 0.92)',
+                  borderColor: !mineUnlocked
+                    ? 'rgba(148, 163, 184, 0.25)'
+                    : mineReady
+                    ? 'rgba(74, 222, 128, 0.65)'
+                    : 'rgba(248, 113, 113, 0.45)',
+                  backgroundColor: !mineUnlocked
+                    ? 'rgba(15, 23, 42, 0.78)'
+                    : mineReady
+                    ? 'rgba(20, 83, 45, 0.85)'
+                    : 'rgba(15, 23, 42, 0.92)',
                   flexDirection: 'column',
                   gap: '4px',
-                  minWidth: '175px',
+                  minWidth: '165px',
                   cursor: 'pointer',
-                  outline: 'none'
+                  outline: 'none',
+                  opacity: mineUnlocked ? 1 : 0.7
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: '14px', marginRight: '6px' }}>💣</span>
-                    <span style={{ fontSize: '11px', fontWeight: 900, color: mineReady ? '#4ade80' : '#f87171' }}>
-                      {mineReady ? 'PONER MINA' : 'RECARGANDO'}
+                    <span style={{ fontSize: '14px', marginRight: '6px' }}>{mineUnlocked ? '💣' : '🔒'}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 900, color: !mineUnlocked ? '#94a3b8' : mineReady ? '#4ade80' : '#f87171' }}>
+                      {!mineUnlocked ? 'MINA (NV.3)' : mineReady ? 'PONER MINA' : 'RECARGANDO'}
                     </span>
                   </div>
                   <span style={{
@@ -3179,7 +3335,7 @@ const HUD: React.FC<HUDProps> = ({
                 </div>
                 <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{
-                    width: `${Math.round((mineReady ? 1 : mineCooldownProgress) * 100)}%`,
+                    width: `${!mineUnlocked ? 0 : Math.round((mineReady ? 1 : mineCooldownProgress) * 100)}%`,
                     height: '100%',
                     backgroundColor: mineReady ? '#4ade80' : '#f87171',
                     transition: 'width 0.1s linear'
@@ -3195,23 +3351,32 @@ const HUD: React.FC<HUDProps> = ({
                   onBazooka();
                   e.currentTarget.blur();
                 }}
-                title="Disparar Cohete Bazoca Demoledor de Muros [Tecla Q / F / Shift]"
+                title={bazookaUnlocked ? 'Disparar Cohete Bazoca Demoledor de Muros [Tecla Q / F / Shift]' : 'Cohete Bazoca: Se desbloquea en la Misión 6'}
                 style={{
                   ...styles.hudPanel,
-                  borderColor: bazookaReady ? 'rgba(251, 146, 60, 0.75)' : 'rgba(148, 163, 184, 0.35)',
-                  backgroundColor: bazookaReady ? 'rgba(154, 52, 18, 0.88)' : 'rgba(15, 23, 42, 0.92)',
+                  borderColor: !bazookaUnlocked
+                    ? 'rgba(148, 163, 184, 0.25)'
+                    : bazookaReady
+                    ? 'rgba(251, 146, 60, 0.75)'
+                    : 'rgba(148, 163, 184, 0.35)',
+                  backgroundColor: !bazookaUnlocked
+                    ? 'rgba(15, 23, 42, 0.78)'
+                    : bazookaReady
+                    ? 'rgba(154, 52, 18, 0.88)'
+                    : 'rgba(15, 23, 42, 0.92)',
                   flexDirection: 'column',
                   gap: '4px',
-                  minWidth: '180px',
+                  minWidth: '170px',
                   cursor: 'pointer',
-                  outline: 'none'
+                  outline: 'none',
+                  opacity: bazookaUnlocked ? 1 : 0.7
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: '14px', marginRight: '6px' }}>🚀</span>
-                    <span style={{ fontSize: '11px', fontWeight: 900, color: bazookaReady ? '#fdba74' : '#94a3b8' }}>
-                      {bazookaReady ? 'COHETE BAZOCA' : 'RECARGANDO'}
+                    <span style={{ fontSize: '14px', marginRight: '6px' }}>{bazookaUnlocked ? '🚀' : '🔒'}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 900, color: !bazookaUnlocked ? '#94a3b8' : bazookaReady ? '#fdba74' : '#94a3b8' }}>
+                      {!bazookaUnlocked ? 'BAZOCA (NV.6)' : bazookaReady ? 'COHETE BAZOCA' : 'RECARGANDO'}
                     </span>
                   </div>
                   <span style={{
@@ -3223,14 +3388,72 @@ const HUD: React.FC<HUDProps> = ({
                     color: '#fed7aa',
                     border: '1px solid rgba(251, 146, 60, 0.35)'
                   }}>
-                    Q / F / SHIFT
+                    Q / F
                   </span>
                 </div>
                 <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{
-                    width: `${Math.round((bazookaReady ? 1 : bazookaCooldownProgress) * 100)}%`,
+                    width: `${!bazookaUnlocked ? 0 : Math.round((bazookaReady ? 1 : bazookaCooldownProgress) * 100)}%`,
                     height: '100%',
                     backgroundColor: bazookaReady ? '#fb923c' : '#f87171',
+                    transition: 'width 0.1s linear'
+                  }} />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                data-ui-element="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEmp();
+                  e.currentTarget.blur();
+                }}
+                title={empUnlocked ? 'Activar Pulso EMP Orbital: Destruye balas y congela tanques [Tecla R]' : 'Pulso EMP Orbital: Se desbloquea en la Misión 18'}
+                style={{
+                  ...styles.hudPanel,
+                  borderColor: !empUnlocked
+                    ? 'rgba(148, 163, 184, 0.25)'
+                    : empReady
+                    ? 'rgba(56, 189, 248, 0.78)'
+                    : 'rgba(148, 163, 184, 0.35)',
+                  backgroundColor: !empUnlocked
+                    ? 'rgba(15, 23, 42, 0.78)'
+                    : empReady
+                    ? 'rgba(12, 74, 110, 0.9)'
+                    : 'rgba(15, 23, 42, 0.92)',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  minWidth: '165px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  opacity: empUnlocked ? 1 : 0.7
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', marginRight: '6px' }}>{empUnlocked ? '⚡' : '🔒'}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 900, color: !empUnlocked ? '#94a3b8' : empReady ? '#38bdf8' : '#94a3b8' }}>
+                      {!empUnlocked ? 'EMP (NV.18)' : empReady ? 'PULSO EMP' : 'RECARGANDO'}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    color: '#bae6fd',
+                    border: '1px solid rgba(56, 189, 248, 0.35)'
+                  }}>
+                    TECLA R
+                  </span>
+                </div>
+                <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${!empUnlocked ? 0 : Math.round((empReady ? 1 : empCooldownProgress) * 100)}%`,
+                    height: '100%',
+                    backgroundColor: empReady ? '#38bdf8' : '#f87171',
                     transition: 'width 0.1s linear'
                   }} />
                 </div>
@@ -4271,24 +4494,32 @@ const IntelModal: React.FC<IntelModalProps> = ({ onClose }) => (
         </div>
 
         <div style={{ fontSize: '11px', fontWeight: 900, color: '#38bdf8', letterSpacing: '0.8px', marginBottom: '8px' }}>
-          💥 ELEMENTOS DEL ESCENARIO
+          🔓 DESBLOQUEO PROGRESIVO POR NIVEL (160 MISIONES)
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: '8px', marginBottom: '14px' }}>
+          <div style={{ ...styles.intelCard, borderLeft: '3px solid #4ade80' }}>
+            <div style={{ fontWeight: 800, color: '#4ade80', fontSize: '12px' }}>💣 Nv.3: Minas Terrestres</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Explotan por proximidad o junto a barriles.</div>
+          </div>
           <div style={{ ...styles.intelCard, borderLeft: '3px solid #ef4444' }}>
-            <div style={{ fontWeight: 800, color: '#f87171', fontSize: '12px' }}>💥 Barril TNT</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Explosión en cadena al dispararle.</div>
+            <div style={{ fontWeight: 800, color: '#f87171', fontSize: '12px' }}>💥 Nv.4–5: Barril TNT y Cajas</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Explosiones en cadena, Escudos y Plataformas Turbo.</div>
           </div>
-          <div style={{ ...styles.intelCard, borderLeft: '3px solid #fbbf24' }}>
-            <div style={{ fontWeight: 800, color: '#fbbf24', fontSize: '12px' }}>📦 Suministros</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Escudo 🛡️, Ráfaga ⚡, Turbo 🚀 o Vida ❤️.</div>
+          <div style={{ ...styles.intelCard, borderLeft: '3px solid #fb923c' }}>
+            <div style={{ fontWeight: 800, color: '#fdba74', fontSize: '12px' }}>🚀 Nv.6: Cohete Bazoca</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Demuele muros interiores y atraviesa defensas.</div>
           </div>
-          <div style={{ ...styles.intelCard, borderLeft: '3px solid #22d3ee' }}>
-            <div style={{ fontWeight: 800, color: '#22d3ee', fontSize: '12px' }}>💎 Pilar y 🌀 Portal</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Rebota balas o teletransporta tanques.</div>
+          <div style={{ ...styles.intelCard, borderLeft: '3px solid #a855f7' }}>
+            <div style={{ fontWeight: 800, color: '#e879f9', fontSize: '12px' }}>🌀 Nv.10–12: Portales y Láser</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Teletransporta balas/tanques y abre barreras.</div>
           </div>
-          <div style={{ ...styles.intelCard, borderLeft: '3px solid #818cf8' }}>
-            <div style={{ fontWeight: 800, color: '#a5b4fc', fontSize: '12px' }}>🚨 Faro Nocturno</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Evita su haz de luz para +150 pts de sigilo.</div>
+          <div style={{ ...styles.intelCard, borderLeft: '3px solid #00e5ff' }}>
+            <div style={{ fontWeight: 800, color: '#22d3ee', fontSize: '12px' }}>❄️ Nv.14 y 🩹 Nv.16: Crio y Médico</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Barriles que congelan 5s y bases que curan +1❤️.</div>
+          </div>
+          <div style={{ ...styles.intelCard, borderLeft: '3px solid #38bdf8' }}>
+            <div style={{ fontWeight: 800, color: '#38bdf8', fontSize: '12px' }}>⚡ Nv.18: Pulso EMP [Tecla R]</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Pulso orbital que destruye balas y paraliza enemigos.</div>
           </div>
         </div>
       </div>
@@ -4496,10 +4727,15 @@ export const App = () => {
     stealthStatus: null as 'STEALTH' | 'SPOTTED' | 'COMBAT' | null,
     isNightMode: false,
     won: false,
+    mineUnlocked: false,
     mineReady: true,
     mineCooldownProgress: 1.0,
+    bazookaUnlocked: false,
     bazookaReady: true,
     bazookaCooldownProgress: 1.0,
+    empUnlocked: false,
+    empReady: true,
+    empCooldownProgress: 1.0,
     combo: 0,
     isPaused: false,
     cameraMode: 'overview' as 'overview' | 'follow',
@@ -4509,7 +4745,7 @@ export const App = () => {
   const [powerupToast, setPowerupToast] = useState<{ text: string; color: string; id: number } | null>(null);
   const [damageFlash, setDamageFlash] = useState(false);
   const [hitMarker, setHitMarker] = useState<{ label: string; color: string; id: number } | null>(null);
-  const [missionBanner, setMissionBanner] = useState<{ mission: number; name: string; biome: string } | null>(null);
+  const [missionBanner, setMissionBanner] = useState<{ mission: number; name: string; biome: string; unlockTitle?: string; unlockDesc?: string } | null>(null);
   const totalLevels = LevelLoader.getLevelCount();
 
   // Load unlocked level from localStorage
@@ -4604,6 +4840,18 @@ export const App = () => {
       setTimeout(() => {
         setPowerupToast(cur => cur?.id === toastId ? null : cur);
       }, 3000);
+    } else if (event.type === 'WEAPON_LOCKED' && event.data) {
+      const toastId = Date.now();
+      const w = event.data.weapon;
+      const msg = w === 'mine'
+        ? '🔒 MINAS DE PROXIMIDAD: Se desbloquean en la Misión 3'
+        : w === 'bazooka'
+        ? '🔒 COHETE BAZOCA: Se desbloquea en la Misión 6'
+        : '🔒 PULSO EMP ORBITAL: Se desbloquea en la Misión 18';
+      setPowerupToast({ text: msg, color: '#fbbf24', id: toastId });
+      setTimeout(() => {
+        setPowerupToast(cur => cur?.id === toastId ? null : cur);
+      }, 2400);
     } else if (event.type === 'GAME_OVER' && event.data) {
       if (missionEndedRef.current) return;
       missionEndedRef.current = true;
@@ -5128,20 +5376,31 @@ export const App = () => {
       engineRef.current.setPause(false);
       const biome = LevelLoader.getBiome(levelIndex);
       const missionName = LevelLoader.getLevelName(levelIndex);
+      const unlocks = LevelLoader.getUnlockedFeatures(levelIndex);
+      const milestone = LevelLoader.getMilestoneUnlockInfo(levelIndex);
       setGameStats(prev => ({
         ...prev,
         mission: levelIndex,
         missionName,
         biome,
+        mineUnlocked: unlocks.mineUnlocked,
+        bazookaUnlocked: unlocks.bazookaUnlocked,
+        empUnlocked: unlocks.empUnlocked,
         combo: 0,
         activePowerup: null
       }));
       engineRef.current.loadLevel(levelIndex);
       setGameState('PLAYING');
-      setMissionBanner({ mission: levelIndex, name: missionName, biome });
+      setMissionBanner({
+        mission: levelIndex,
+        name: missionName,
+        biome,
+        unlockTitle: milestone ? `${milestone.icon} ${milestone.title}` : undefined,
+        unlockDesc: milestone ? milestone.desc : undefined
+      });
       setTimeout(() => {
         setMissionBanner(cur => cur?.mission === levelIndex ? null : cur);
-      }, 2100);
+      }, milestone ? 3400 : 2100);
     }
   };
 
@@ -5222,8 +5481,7 @@ export const App = () => {
           }}
           onOpenSettings={() => setShowSettings(true)}
           onReplayIntro={() => {
-            setShowIntroSplash(false);
-            setTimeout(() => setShowIntroSplash(true), 20);
+            setShowIntroSplash(true);
           }}
           showIntroSplash={showIntroSplash}
           onFinishIntro={() => setShowIntroSplash(false)}
@@ -5328,7 +5586,7 @@ export const App = () => {
             </div>
           )}
 
-          {/* Mission Start Tactical Banner */}
+          {/* Mission Start Tactical Banner + Progressive Feature Unlock Celebration */}
           {missionBanner && !isPlayerDying && (
             <div style={{
               position: 'absolute',
@@ -5336,21 +5594,38 @@ export const App = () => {
               left: '50%',
               transform: 'translate(-50%, -50%)',
               zIndex: 32,
-              backgroundColor: 'rgba(15, 23, 42, 0.92)',
-              border: '1px solid rgba(251, 191, 36, 0.6)',
+              backgroundColor: 'rgba(15, 23, 42, 0.94)',
+              border: missionBanner.unlockTitle ? '1.5px solid #38bdf8' : '1px solid rgba(251, 191, 36, 0.6)',
               borderRadius: '14px',
-              padding: '14px 34px',
+              padding: '14px 30px',
               textAlign: 'center',
               pointerEvents: 'none',
-              boxShadow: '0 18px 42px rgba(0,0,0,0.6), 0 0 24px rgba(251, 191, 36, 0.2)',
-              backdropFilter: 'blur(10px)'
+              boxShadow: missionBanner.unlockTitle
+                ? '0 18px 42px rgba(0,0,0,0.65), 0 0 28px rgba(56, 189, 248, 0.35)'
+                : '0 18px 42px rgba(0,0,0,0.6), 0 0 24px rgba(251, 191, 36, 0.2)',
+              backdropFilter: 'blur(10px)',
+              maxWidth: '90vw'
             }}>
               <div style={{ color: '#fbbf24', fontSize: '10.5px', fontWeight: 800, letterSpacing: '2px' }}>
                 DESPLIEGUE TÁCTICO • MISIÓN #{missionBanner.mission}
               </div>
-              <div style={{ color: '#f8fafc', fontSize: '24px', fontWeight: 900, marginTop: '4px', fontFamily: '"Chakra Petch", sans-serif' }}>
+              <div style={{ color: '#f8fafc', fontSize: '23px', fontWeight: 900, marginTop: '3px', fontFamily: '"Chakra Petch", sans-serif' }}>
                 {missionBanner.name.toUpperCase()}
               </div>
+              {missionBanner.unlockTitle && (
+                <div style={{
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(56, 189, 248, 0.35)'
+                }}>
+                  <div style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 900, letterSpacing: '0.8px' }}>
+                    🔓 {missionBanner.unlockTitle}
+                  </div>
+                  <div style={{ color: '#cbd5e1', fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>
+                    {missionBanner.unlockDesc}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -5399,6 +5674,7 @@ export const App = () => {
             onToggleNightMode={() => engineRef.current?.toggleNightMode()}
             onMine={() => engineRef.current?.triggerMine()}
             onBazooka={() => engineRef.current?.triggerBazooka()}
+            onEmp={() => engineRef.current?.triggerEmp()}
           />
 
           {/* Floating Power-up Toast Notification */}
@@ -5451,14 +5727,22 @@ export const App = () => {
                 onBazooka={() => {
                   engineRef.current?.triggerBazooka();
                 }}
+                onEmp={() => {
+                  engineRef.current?.triggerEmp();
+                }}
                 onToggleCamera={toggleCamera}
                 onZoomIn={zoomIn}
                 onZoomOut={zoomOut}
                 cameraMode={cameraMode}
+                mineUnlocked={gameStats.mineUnlocked}
                 mineReady={gameStats.mineReady}
                 mineCooldownProgress={gameStats.mineCooldownProgress}
+                bazookaUnlocked={gameStats.bazookaUnlocked}
                 bazookaReady={gameStats.bazookaReady}
                 bazookaCooldownProgress={gameStats.bazookaCooldownProgress}
+                empUnlocked={gameStats.empUnlocked}
+                empReady={gameStats.empReady}
+                empCooldownProgress={gameStats.empCooldownProgress}
               />
             </div>
           )}

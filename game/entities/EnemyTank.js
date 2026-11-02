@@ -136,6 +136,7 @@ export class EnemyTank extends Tank {
     this.shieldActive = false;
     this.rapidFireTimer = 0;
     this.speedBoostTimer = 0;
+    this.freezeTimer = 0;
 
     // Visual Crimson Energy Shield Dome for Enemy Tanks
     const shieldGeo = new THREE.IcosahedronGeometry(2.65, 2);
@@ -164,8 +165,33 @@ export class EnemyTank extends Tank {
     this.shieldMesh.add(wireMesh);
     this.mesh.add(this.shieldMesh);
 
+    // Visual 3D Cryo-EMP Ice Crystal Block when frozen by Cryo Barrel ('F') or EMP Pulse
+    const cryoGeo = new THREE.OctahedronGeometry(2.75, 1);
+    const cryoMat = new THREE.MeshPhysicalMaterial({
+      color: 0x00e5ff,
+      emissive: 0x00b0ff,
+      emissiveIntensity: 0.65,
+      transparent: true,
+      opacity: 0.46,
+      roughness: 0.08,
+      metalness: 0.1,
+      depthWrite: false
+    });
+    this.cryoMesh = new THREE.Mesh(cryoGeo, cryoMat);
+    this.cryoMesh.position.y = 1.3;
+    this.cryoMesh.scale.set(1.0, 0.75, 1.15);
+    this.cryoMesh.visible = false;
+    this.mesh.add(this.cryoMesh);
+
     this.applyDifficulty(difficulty, true);
     this.addRankInsignia(typeKey);
+  }
+
+  applyFreeze(duration = 4.5) {
+    // Boss tanks resist freeze slightly (65% duration)
+    const effectiveDur = this.isBoss ? duration * 0.65 : duration;
+    this.freezeTimer = Math.max(this.freezeTimer || 0, effectiveDur);
+    if (this.cryoMesh) this.cryoMesh.visible = true;
   }
 
   applyPowerUp(type) {
@@ -303,6 +329,27 @@ export class EnemyTank extends Tank {
   }
 
   update(dt, collisionObstacles, visionObstacles, entities, stealthContext = null) {
+    // Handle Cryo / EMP Freeze State
+    if (this.freezeTimer > 0) {
+      this.freezeTimer = Math.max(0, this.freezeTimer - dt);
+      if (this.cryoMesh) {
+        this.cryoMesh.visible = this.freezeTimer > 0;
+        this.cryoMesh.rotation.y += dt * 1.4;
+      }
+      if (this.visorMat) {
+        this.visorMat.color.setHex(0x00e5ff);
+      }
+      if (this.matBody) {
+        this.matBody.emissive.setHex(this.freezeTimer > 0 ? 0x006064 : (this.enraged ? 0x660000 : 0x000000));
+        this.matBody.emissiveIntensity = this.freezeTimer > 0 ? 0.65 : (this.enraged ? 0.45 : 0);
+      }
+      this.velocity.set(0, 0, 0);
+      this.animateSuspension(dt, 0, 0);
+      return;
+    } else if (this.cryoMesh && this.cryoMesh.visible) {
+      this.cryoMesh.visible = false;
+    }
+
     this.updateCooldown(dt);
     if (this.warpCooldown > 0) this.warpCooldown -= dt;
 

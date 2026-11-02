@@ -118,12 +118,22 @@ export class PlayerTank extends Tank {
     this.needsBazooka = false;
     this.bazookaCooldown = 0;
     this.maxBazookaCooldown = perkId === 'ordnance' ? 2.6 : 4.0;
+    this.needsEmp = false;
+    this.empCooldown = 0;
+    this.maxEmpCooldown = perkId === 'ordnance' ? 10.0 : 14.0;
     this.bonusBounces = perkId === 'ricochet' ? 1 : 0;
     this.bulletSpeedMultiplier = perkId === 'ricochet' ? 1.18 : 1.0;
+
+    // Progressive Level Unlock Flags (set by GameEngine.loadLevel)
+    this.mineUnlocked = true;
+    this.bazookaUnlocked = true;
+    this.empUnlocked = false;
+    this.lockedWeaponAttempt = null;
 
     this.invulnerableTimer = 0;
     this.bufferedMineTime = 0;
     this.bufferedBazookaTime = 0;
+    this.bufferedEmpTime = 0;
 
     // Power-Up States
     this.shieldActive = false;
@@ -325,6 +335,7 @@ export class PlayerTank extends Tank {
     this.updateCooldown(dt);
     if (this.mineCooldown > 0) this.mineCooldown -= dt;
     if (this.bazookaCooldown > 0) this.bazookaCooldown -= dt;
+    if (this.empCooldown > 0) this.empCooldown -= dt;
     if (this.warpCooldown > 0) this.warpCooldown -= dt;
 
     // Handle Power-Up Timers
@@ -440,19 +451,23 @@ export class PlayerTank extends Tank {
 
     // 3. Heavy Bazooka Demolition Rocket (Q / F / Shift or Shift+Click or HUD button)
     if (this.input.checkBazooka()) {
-        this.bufferedBazookaTime = 0.5;
+        if (!this.bazookaUnlocked) {
+            this.lockedWeaponAttempt = 'bazooka';
+        } else {
+            this.bufferedBazookaTime = 0.5;
+        }
     }
 
-    if (this.bufferedBazookaTime > 0) {
+    if (this.bufferedBazookaTime > 0 && this.bazookaUnlocked) {
         this.bufferedBazookaTime -= dt;
         if (this.bazookaCooldown <= 0) {
             this.fireBazooka();
         }
     }
 
-    // 4. Standard Shooting (or Bazooka if holding modifier key and Bazooka is ready)
+    // 4. Standard Shooting (or Bazooka if holding modifier key and Bazooka is unlocked & ready)
     if (this.input.checkShoot()) {
-        if (this.input.isHoldingBazookaModifier && this.input.isHoldingBazookaModifier() && this.bazookaCooldown <= 0) {
+        if (this.bazookaUnlocked && this.input.isHoldingBazookaModifier && this.input.isHoldingBazookaModifier() && this.bazookaCooldown <= 0) {
             this.fireBazooka();
         } else {
             this.tryShoot();
@@ -461,15 +476,35 @@ export class PlayerTank extends Tank {
 
     // 5. Mines (with input buffering so taps are never ignored)
     if (this.input.checkMine()) {
-        this.bufferedMineTime = 0.5;
+        if (!this.mineUnlocked) {
+            this.lockedWeaponAttempt = 'mine';
+        } else {
+            this.bufferedMineTime = 0.5;
+        }
     }
 
-    if (this.bufferedMineTime > 0) {
+    if (this.bufferedMineTime > 0 && this.mineUnlocked) {
         this.bufferedMineTime -= dt;
         if (this.mineCooldown <= 0) {
             this.needsMine = true;
             this.mineCooldown = this.maxMineCooldown;
             this.bufferedMineTime = 0;
+        }
+    }
+
+    // 6. Orbital EMP Pulse (Key R or HUD button, unlocked at Mission 18+)
+    if (this.input.checkEmp && this.input.checkEmp()) {
+        if (!this.empUnlocked) {
+            this.lockedWeaponAttempt = 'emp';
+        } else {
+            this.bufferedEmpTime = 0.5;
+        }
+    }
+
+    if (this.bufferedEmpTime > 0 && this.empUnlocked) {
+        this.bufferedEmpTime -= dt;
+        if (this.empCooldown <= 0) {
+            this.fireEmp();
         }
     }
   }
@@ -488,6 +523,10 @@ export class PlayerTank extends Tank {
   }
 
   fireBazooka() {
+    if (!this.bazookaUnlocked) {
+      this.lockedWeaponAttempt = 'bazooka';
+      return false;
+    }
     if (this.bazookaCooldown <= 0) {
       this.needsBazooka = true;
       this.bazookaCooldown = this.maxBazookaCooldown;
@@ -504,6 +543,10 @@ export class PlayerTank extends Tank {
   }
 
   dropMine() {
+    if (!this.mineUnlocked) {
+      this.lockedWeaponAttempt = 'mine';
+      return false;
+    }
     if (this.mineCooldown <= 0) {
       this.needsMine = true;
       this.mineCooldown = this.maxMineCooldown;
@@ -511,6 +554,22 @@ export class PlayerTank extends Tank {
       return true;
     } else {
       this.bufferedMineTime = 0.6;
+      return false;
+    }
+  }
+
+  fireEmp() {
+    if (!this.empUnlocked) {
+      this.lockedWeaponAttempt = 'emp';
+      return false;
+    }
+    if (this.empCooldown <= 0) {
+      this.needsEmp = true;
+      this.empCooldown = this.maxEmpCooldown;
+      this.bufferedEmpTime = 0;
+      return true;
+    } else {
+      this.bufferedEmpTime = 0.55;
       return false;
     }
   }

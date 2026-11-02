@@ -30,6 +30,8 @@ export class GameEngine {
     this.teleporters = [];   // Paired Warp Portals ('O')
     this.laserGates = [];    // Toggleable Laser Forcefields ('G')
     this.laserSwitches = []; // Shootable Laser Switches ('K')
+    this.cryoBarrels = [];   // Cryogenic EMP Freeze Barrels ('F')
+    this.repairPads = [];    // Medical Armor Repair Stations ('D')
     this.tableProps = [];    // Environmental props on the desk outside arena
     this.currentBiome = 'workshop';
 
@@ -57,6 +59,11 @@ export class GameEngine {
         mineCooldownProgress: 1.0,
         bazookaReady: true,
         bazookaCooldownProgress: 1.0,
+        empReady: true,
+        empCooldownProgress: 1.0,
+        mineUnlocked: false,
+        bazookaUnlocked: false,
+        empUnlocked: false,
         combo: 0,
         cameraMode: 'overview',
         zoomLevel: 0.9,
@@ -2609,6 +2616,101 @@ export class GameEngine {
       return group;
   }
 
+  createCryoBarrelMesh(x, z) {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z);
+
+      // Cyan / Liquid Nitrogen Cryogenic Drum
+      const barrelGeo = new THREE.CylinderGeometry(1.6, 1.6, 3.8, 16);
+      const barrelMat = new THREE.MeshStandardMaterial({
+          color: 0x0288D1,
+          emissive: 0x00B0FF,
+          emissiveIntensity: 0.35,
+          roughness: 0.2,
+          metalness: 0.45
+      });
+      const drum = new THREE.Mesh(barrelGeo, barrelMat);
+      drum.position.y = 1.9;
+      drum.castShadow = true;
+      drum.receiveShadow = true;
+      group.add(drum);
+
+      // Frosted chrome rings
+      const ringGeo = new THREE.TorusGeometry(1.64, 0.12, 8, 16);
+      ringGeo.rotateX(Math.PI / 2);
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0xE1F5FE, metalness: 0.85, roughness: 0.15 });
+      const ringTop = new THREE.Mesh(ringGeo, ringMat);
+      ringTop.position.y = 2.85;
+      group.add(ringTop);
+      const ringBottom = new THREE.Mesh(ringGeo, ringMat);
+      ringBottom.position.y = 0.95;
+      group.add(ringBottom);
+
+      // Glowing Ice Cyan Center Band
+      const bandGeo = new THREE.CylinderGeometry(1.63, 1.63, 0.85, 16);
+      const bandMat = new THREE.MeshBasicMaterial({ color: 0x80D8FF });
+      const band = new THREE.Mesh(bandGeo, bandMat);
+      band.position.y = 1.9;
+      group.add(band);
+
+      // Floating Ice Crystal Core on top
+      const crysGeo = new THREE.OctahedronGeometry(0.75, 0);
+      const crysMat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, wireframe: false });
+      const crystal = new THREE.Mesh(crysGeo, crysMat);
+      crystal.position.y = 4.35;
+      group.add(crystal);
+
+      group.userData = {
+          bounds: new THREE.Box3().setFromObject(group),
+          collisionRadius: 1.65,
+          type: 'cryo_barrel',
+          exploded: false,
+          crystal
+      };
+      return group;
+  }
+
+  createRepairPadMesh(x, z) {
+      const group = new THREE.Group();
+      group.position.set(x, 0.05, z);
+
+      // Armored Medical Platform Base
+      const padGeo = new THREE.CylinderGeometry(3.2, 3.5, 0.22, 24);
+      const padMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5, metalness: 0.5 });
+      const pad = new THREE.Mesh(padGeo, padMat);
+      pad.receiveShadow = true;
+      group.add(pad);
+
+      // Glowing Emerald Ring
+      const ringGeo = new THREE.RingGeometry(2.45, 2.95, 28);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00E676, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.y = 0.14;
+      group.add(ring);
+
+      // Rotating 3D Medical Cross Hologram
+      const crossGroup = new THREE.Group();
+      crossGroup.position.y = 1.65;
+      const crossMat = new THREE.MeshBasicMaterial({ color: 0x69F0AE });
+      const barH = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.48, 0.48), crossMat);
+      const barV = new THREE.Mesh(new THREE.BoxGeometry(0.48, 1.7, 0.48), crossMat);
+      crossGroup.add(barH, barV);
+      group.add(crossGroup);
+
+      group.userData = {
+          bounds: new THREE.Box3().setFromObject(group),
+          type: 'repair_pad'
+      };
+      return {
+          mesh: group,
+          crossGroup,
+          ringMat,
+          position: new THREE.Vector3(x, 0, z),
+          cooldown: 0
+      };
+  }
+
   createPrismCrystalMesh(x, z) {
       const group = new THREE.Group();
       group.position.set(x, 0, z);
@@ -3598,6 +3700,12 @@ export class GameEngine {
     if (this.input) this.input.resetInputs();
 
     this.stats.mission = levelIndex;
+    const unlocks = LevelLoader.getUnlockedFeatures(levelIndex);
+    this.stats.mineUnlocked = unlocks.mineUnlocked;
+    this.stats.bazookaUnlocked = unlocks.bazookaUnlocked;
+    this.stats.empUnlocked = unlocks.empUnlocked;
+    this.stats.empReady = true;
+    this.stats.empCooldownProgress = 1.0;
 
     const levelData = LevelLoader.getLevel(levelIndex);
     const map = levelData.map;
@@ -3833,6 +3941,9 @@ export class GameEngine {
         if (type === 'P') {
            this.playerSpawnPos = new THREE.Vector3(x, 0, z);
            this.player = new PlayerTank(this.scene, x, z, this.input, this.playerSkin, this.playerPerk, this.playerHat, this.playerTrail);
+           this.player.mineUnlocked = unlocks.mineUnlocked;
+           this.player.bazookaUnlocked = unlocks.bazookaUnlocked;
+           this.player.empUnlocked = unlocks.empUnlocked;
            this.player.mesh.rotation.y = Math.PI;
            this.entities.push(this.player);
 
@@ -4107,6 +4218,16 @@ export class GameEngine {
             this.scene.add(sw.mesh);
             this.walls.push(sw.mesh);
             this.laserSwitches.push(sw);
+        } else if (type === 'F') { // Cryogenic EMP Freeze Barrel
+            const cryo = this.createCryoBarrelMesh(x, z);
+            this.scene.add(cryo);
+            this.destructibles.push(cryo);
+            this.walls.push(cryo);
+            this.cryoBarrels.push(cryo);
+        } else if (type === 'D') { // Medical Armor Repair Station
+            const rpad = this.createRepairPadMesh(x, z);
+            this.scene.add(rpad.mesh);
+            this.repairPads.push(rpad);
         }
         // --- ENEMIES ---
         else if (['E', '1', '2', '3', '4'].includes(type)) {
@@ -4122,7 +4243,7 @@ export class GameEngine {
       }
     }
 
-    // --- AUTO-DEPLOY TELEPORTER PORTALS & LASER BARRIERS ON TACTICAL MISSIONS ---
+    // --- AUTO-DEPLOY TELEPORTER PORTALS & LASER BARRIERS ON TACTICAL MISSIONS (Gated by Progressive Unlocks!) ---
     const findFreeCell = (rPref, cPref) => {
       const rows = map.length;
       const cols = map[0].length;
@@ -4142,8 +4263,8 @@ export class GameEngine {
       return null;
     };
 
-    // Deploy paired Teleporter Portals (A <-> B) on even missions >= 2
-    if (this.teleporters.length === 0 && levelIndex >= 2 && levelIndex % 2 === 0) {
+    // Deploy paired Teleporter Portals (A <-> B) only from Mission 10+ (when Portals unlock!)
+    if (this.teleporters.length === 0 && levelIndex >= 10 && levelIndex % 2 === 0) {
       const cellA = findFreeCell(2, 2);
       const cellB = findFreeCell(map.length - 3, map[0].length - 3);
       if (cellA && cellB && (cellA.r !== cellB.r || cellA.c !== cellB.c)) {
@@ -4155,8 +4276,8 @@ export class GameEngine {
       }
     }
 
-    // Deploy Laser Forcefield Gate + Shootable Crystal Switch on missions divisible by 3
-    if (this.laserGates.length === 0 && levelIndex >= 3 && levelIndex % 3 === 0) {
+    // Deploy Laser Forcefield Gate + Shootable Crystal Switch only from Mission 12+ (when Laser Gates unlock!)
+    if (this.laserGates.length === 0 && levelIndex >= 12 && levelIndex % 3 === 0) {
       const gateCell = findFreeCell(Math.floor(map.length / 2), Math.floor(map[0].length / 2));
       const switchCell = findFreeCell(Math.floor(map.length / 2) + 2, 2);
       if (gateCell && switchCell && (gateCell.r !== switchCell.r || gateCell.c !== switchCell.c)) {
@@ -4192,7 +4313,12 @@ export class GameEngine {
         96:  { name: '👑 EMPERADOR DE LA PIROTECNIA', color: 0xff3d00, maxHp: 30 },
         104: { name: '👑 LEVIATÁN DEL CENTURIÓN', color: 0x40c4ff, maxHp: 32 },
         112: { name: '👑 SOBERANO CIBERNÉTICO DE TOKIO', color: 0xf50057, maxHp: 34 },
-        120: { name: '👑 OMEGA PRIME: COMANDANTE SUPREMO', color: 0xffd700, maxHp: 36 }
+        120: { name: '👑 OMEGA PRIME: COMANDANTE SUPREMO', color: 0xffd700, maxHp: 36 },
+        128: { name: '👑 CRIO-LEVIATÁN ZERO-K', color: 0x00e5ff, maxHp: 38 },
+        136: { name: '👑 AEGIS MÉDICO IMPERIAL', color: 0x00e676, maxHp: 40 },
+        144: { name: '👑 SEÑOR DEL ECLIPSE PULSAR', color: 0x7c4dff, maxHp: 42 },
+        152: { name: '👑 DRAGÓN SOLAR DE MAGMA', color: 0xff3d00, maxHp: 44 },
+        160: { name: '👑 EMPERADOR SUPREMO DEL ARENA 160', color: 0xffd700, maxHp: 48 }
       };
       const bossCfg = BOSS_METADATA[levelIndex] || { name: '👑 MEGATANK JEFE', color: 0xb71c1c, maxHp: 12 };
       const enemies = this.entities.filter(e => e instanceof EnemyTank);
@@ -4284,6 +4410,8 @@ export class GameEngine {
       this.scene.remove(lg.blocker);
     });
     this.laserSwitches.forEach(sw => this.scene.remove(sw.mesh));
+    this.cryoBarrels.forEach(cb => this.scene.remove(cb));
+    this.repairPads.forEach(rp => this.scene.remove(rp.mesh));
     this.tableProps.forEach(tp => this.scene.remove(tp));
     this.vfx.clear();
     
@@ -4302,6 +4430,8 @@ export class GameEngine {
     this.teleporters = [];
     this.laserGates = [];
     this.laserSwitches = [];
+    this.cryoBarrels = [];
+    this.repairPads = [];
     this.tableProps = [];
     this.waterMeshes = [];
     this.waterShaderMat = null;
@@ -4621,6 +4751,10 @@ export class GameEngine {
           this.playerTrail
       );
       this.player.mesh.rotation.y = Math.PI;
+      const unlocks = LevelLoader.getUnlockedFeatures(this.stats.mission || 1);
+      this.player.mineUnlocked = unlocks.mineUnlocked;
+      this.player.bazookaUnlocked = unlocks.bazookaUnlocked;
+      this.player.empUnlocked = unlocks.empUnlocked;
       this.player.applyPowerUp('shield');
       this.player.invulnerableTimer = 3.5;
       this.entities.push(this.player);
@@ -4721,6 +4855,9 @@ export class GameEngine {
       const bazookaReady = (this.player.bazookaCooldown || 0) <= 0;
       const bazookaProgress = bazookaReady ? 1.0 : Math.max(0, 1 - ((this.player.bazookaCooldown || 0) / (this.player.maxBazookaCooldown || 4.5)));
 
+      const empReady = (this.player.empCooldown || 0) <= 0;
+      const empProgress = empReady ? 1.0 : Math.max(0, 1 - ((this.player.empCooldown || 0) / (this.player.maxEmpCooldown || 14.0)));
+
       // Live sync of active power-up status pill so it NEVER gets stuck when shield/timers expire
       let currentPowerupLabel = null;
       if (this.player.shieldActive) {
@@ -4736,12 +4873,16 @@ export class GameEngine {
         Math.abs((this.stats.mineCooldownProgress || 0) - progress) > 0.06 ||
         this.stats.bazookaReady !== bazookaReady ||
         Math.abs((this.stats.bazookaCooldownProgress || 0) - bazookaProgress) > 0.06 ||
+        this.stats.empReady !== empReady ||
+        Math.abs((this.stats.empCooldownProgress || 0) - empProgress) > 0.06 ||
         this.stats.activePowerup !== currentPowerupLabel
       ) {
         this.stats.mineReady = ready;
         this.stats.mineCooldownProgress = progress;
         this.stats.bazookaReady = bazookaReady;
         this.stats.bazookaCooldownProgress = bazookaProgress;
+        this.stats.empReady = empReady;
+        this.stats.empCooldownProgress = empProgress;
         this.stats.activePowerup = currentPowerupLabel;
         this.updateUI();
       }
@@ -4949,6 +5090,49 @@ export class GameEngine {
         if (sw.cooldown > 0) sw.cooldown -= dt;
     });
 
+    // 5. Animate Cryogenic EMP Barrels ('F') & Medical Armor Repair Stations ('D')
+    this.cryoBarrels.forEach(cb => {
+        if (cb && cb.userData && cb.userData.crystal) {
+            cb.userData.crystal.rotation.y += dt * 2.5;
+            cb.userData.crystal.position.y = 4.35 + Math.sin(time * 3.5) * 0.16;
+        }
+    });
+
+    this.repairPads.forEach(rpad => {
+        if (rpad.crossGroup) {
+            rpad.crossGroup.rotation.y += dt * 2.2;
+            rpad.crossGroup.position.y = 1.65 + Math.sin(time * 3.0) * 0.2;
+            rpad.crossGroup.visible = rpad.cooldown <= 0;
+        }
+        if (rpad.ringMat) {
+            rpad.ringMat.opacity = rpad.cooldown <= 0 ? 0.85 : 0.22;
+        }
+        if (rpad.cooldown > 0) {
+            rpad.cooldown -= dt;
+        } else if (this.player && this.player.mesh) {
+            const dist = this.player.mesh.position.distanceTo(rpad.position);
+            if (dist < 3.4) {
+                rpad.cooldown = 16.0;
+                this.audio.play('powerup');
+                this.vfx.spawnPowerUpBurst(rpad.position, 0x00E676);
+                this.vfx.spawnShockwave(rpad.position, 0x69F0AE, 7.0);
+                if (this.stats.lives < 4) {
+                    this.stats.lives++;
+                    this.vfx.spawnFloatingText(rpad.position, '🩹 +1 BLINDAJE REPARADO', '#00e676', 1.15);
+                    this.onEvent({
+                        type: 'POWERUP_COLLECTED',
+                        data: { type: 'life', label: '🩹 ¡ESTACIÓN MÉDICA: +1 BLINDAJE REPARADO!' }
+                    });
+                } else {
+                    this.player.applyPowerUp('speed');
+                    this.stats.score += 150;
+                    this.vfx.spawnFloatingText(rpad.position, '🩹 ¡SOBRECARGA MÉDICA +150!', '#00e676', 1.1);
+                }
+                this.updateUI();
+            }
+        }
+    });
+
     const collisionObstacles = [...this.walls, ...this.destructibles, ...this.tankBlockers];
     const visionObstacles = [...this.walls, ...this.destructibles];
     const stealthContext = {
@@ -4972,6 +5156,19 @@ export class GameEngine {
             }
         }
 
+        if (entity.lockedWeaponAttempt) {
+            const lockedType = entity.lockedWeaponAttempt;
+            entity.lockedWeaponAttempt = null;
+            this.onEvent({
+                type: 'WEAPON_LOCKED',
+                data: { weapon: lockedType }
+            });
+        }
+
+        if (entity.needsEmp) {
+            this.triggerEmpPulse(entity);
+            entity.needsEmp = false;
+        }
         if (entity.needsBazooka) {
             this.spawnBazookaProjectile(entity);
             entity.needsBazooka = false;
@@ -4991,7 +5188,7 @@ export class GameEngine {
         const m = this.mines[i];
         if (!m || !m.mesh) continue;
 
-        // Detect if this mine was placed near an Explosive Barrel ('B') so it accelerates its fuse and blows the barrel up!
+        // Detect if this mine was placed near an Explosive Barrel ('B') or Cryo Barrel ('F') so it accelerates its fuse and blows the barrel up!
         let nearAnyBarrel = false;
         for (const barrel of this.barrels) {
             if (barrel && (!barrel.userData || !barrel.userData.exploded)) {
@@ -4999,6 +5196,17 @@ export class GameEngine {
                 if (distToBarrel <= 9.8) {
                     nearAnyBarrel = true;
                     break;
+                }
+            }
+        }
+        if (!nearAnyBarrel) {
+            for (const cb of this.cryoBarrels) {
+                if (cb && (!cb.userData || !cb.userData.exploded)) {
+                    const distToCryo = Math.hypot(cb.position.x - m.mesh.position.x, cb.position.z - m.mesh.position.z);
+                    if (distToCryo <= 9.8) {
+                        nearAnyBarrel = true;
+                        break;
+                    }
                 }
             }
         }
@@ -5114,6 +5322,10 @@ export class GameEngine {
           this.triggerBarrelExplosion(block);
           return;
       }
+      if (block.userData && block.userData.type === 'cryo_barrel') {
+          this.triggerCryoBarrelExplosion(block);
+          return;
+      }
       if (block.userData && block.userData.type === 'powerup') {
           const collector = (attackerTank && !attackerTank.isDead && attackerTank.mesh) ? attackerTank : this.player;
           this.collectPowerUp(block, collector);
@@ -5218,6 +5430,138 @@ export class GameEngine {
               }
           }
       });
+
+      [...this.cryoBarrels].forEach(cb => {
+          if (cb && cb.userData && !cb.userData.exploded) {
+              const d = cb.position.distanceTo(pos);
+              if (d < radius + 3.5) {
+                  this.triggerCryoBarrelExplosion(cb);
+              }
+          }
+      });
+  }
+
+  triggerCryoBarrelExplosion(barrel) {
+      if (!barrel || barrel.userData.exploded) return;
+      barrel.userData.exploded = true;
+      if (barrel.userData) barrel.userData.bounds = null;
+
+      const pos = barrel.position.clone();
+      this.vfx.spawnExplosion(pos, 0x00E5FF, 36, 2.2);
+      this.vfx.spawnShockwave(pos, 0x80D8FF, 15.5);
+      this.vfx.spawnPowerUpBurst(pos, 0x00B0FF);
+      this.vfx.spawnFloatingText(pos, '❄️ ¡ONDA CRIOGÉNICA!', '#00e5ff', 1.25);
+      this.audio.play('barrel_explosion');
+      this.audio.play('powerup');
+      this.screenShake = 1.15;
+      this.hitStopTimer = 0.045;
+
+      this.scene.remove(barrel);
+      this.destructibles = this.destructibles.filter(b => b !== barrel);
+      this.walls = this.walls.filter(w => w !== barrel);
+      this.cryoBarrels = this.cryoBarrels.filter(b => b !== barrel);
+
+      const freezeRadius = 15.5;
+      let frozenCount = 0;
+      this.entities.forEach(entity => {
+          if (entity instanceof EnemyTank && !entity.isDead && entity.mesh) {
+              if (entity.mesh.position.distanceTo(pos) <= freezeRadius) {
+                  if (typeof entity.applyFreeze === 'function') {
+                      entity.applyFreeze(5.0);
+                      frozenCount++;
+                  }
+              }
+          }
+      });
+
+      // Short-circuit any nearby Laser Gates / Switches
+      this.laserSwitches.forEach(sw => {
+          if (sw && sw.mesh && Math.hypot(sw.mesh.position.x - pos.x, sw.mesh.position.z - pos.z) <= freezeRadius) {
+              this.toggleLaserGates(sw);
+          }
+      });
+
+      // Chain-detonate other Cryo Barrels in radius
+      [...this.cryoBarrels].forEach(other => {
+          if (other !== barrel && other.userData && !other.userData.exploded) {
+              if (other.position.distanceTo(pos) < freezeRadius) {
+                  setTimeout(() => {
+                      if (this.isRunning && !this.isPaused) {
+                          this.triggerCryoBarrelExplosion(other);
+                      }
+                  }, 110);
+              }
+          }
+      });
+
+      if (frozenCount > 0) {
+          this.stats.score += frozenCount * 75;
+          this.updateUI();
+      }
+  }
+
+  triggerEmpPulse(sourceTank) {
+      if (!sourceTank || !sourceTank.mesh) return;
+      const pos = sourceTank.mesh.position.clone();
+      const empRadius = 26.0;
+
+      this.audio.play('powerup');
+      this.audio.play('big_explosion');
+      this.vfx.spawnShockwave(pos, 0x00E5FF, empRadius);
+      this.vfx.spawnPowerUpBurst(pos, 0x80D8FF);
+      this.vfx.spawnFloatingText(pos, '⚡ ¡PULSO EMP ORBITAL!', '#00e5ff', 1.25);
+      this.screenShake = Math.max(this.screenShake, 0.95);
+
+      // 1. Vaporize all enemy projectiles in mid-air!
+      let vaporizedBullets = 0;
+      for (let i = this.projectiles.length - 1; i >= 0; i--) {
+          const p = this.projectiles[i];
+          if (p && !p.isDead && !p.isPlayerBullet && p.mesh) {
+              if (p.mesh.position.distanceTo(pos) <= empRadius) {
+                  this.vfx.spawnExplosion(p.mesh.position, 0x00E5FF, 10, 0.45);
+                  this.scene.remove(p.mesh);
+                  this.projectiles.splice(i, 1);
+                  vaporizedBullets++;
+              }
+          }
+      }
+
+      // 2. Paralyze & freeze all enemy tanks within EMP radius for 3.8s + strip enemy energy shields!
+      let stunnedEnemies = 0;
+      this.entities.forEach(ent => {
+          if (ent instanceof EnemyTank && !ent.isDead && ent.mesh) {
+              if (ent.mesh.position.distanceTo(pos) <= empRadius) {
+                  if (ent.shieldActive) {
+                      ent.shieldActive = false;
+                      if (ent.shieldMesh) ent.shieldMesh.visible = false;
+                  }
+                  if (typeof ent.applyFreeze === 'function') {
+                      ent.applyFreeze(3.8);
+                      stunnedEnemies++;
+                  }
+              }
+          }
+      });
+
+      // 3. Toggle Laser Gates if any exist on the map
+      if (this.laserSwitches.length > 0) {
+          this.toggleLaserGates(this.laserSwitches[0]);
+      }
+
+      // 4. Detonate nearby Cryogenic Barrels
+      [...this.cryoBarrels].forEach(cb => {
+          if (cb && cb.userData && !cb.userData.exploded && cb.position.distanceTo(pos) <= empRadius) {
+              this.triggerCryoBarrelExplosion(cb);
+          }
+      });
+
+      const bonusPts = vaporizedBullets * 25 + stunnedEnemies * 50;
+      if (bonusPts > 0) {
+          this.stats.score += bonusPts;
+      }
+      this.stats.empReady = false;
+      this.stats.empCooldownProgress = 0;
+      this.updateUI();
   }
 
   collectPowerUp(crate, tank) {
@@ -5704,6 +6048,29 @@ export class GameEngine {
           return fired;
       }
       if (this.input) this.input.triggerBazooka();
+      return false;
+  }
+
+  triggerEmp() {
+      if (this.player) {
+          const fired = this.player.fireEmp();
+          if (fired && this.player.needsEmp) {
+              this.triggerEmpPulse(this.player);
+              this.player.needsEmp = false;
+          } else if (this.player.lockedWeaponAttempt) {
+              const lockedType = this.player.lockedWeaponAttempt;
+              this.player.lockedWeaponAttempt = null;
+              this.onEvent({
+                  type: 'WEAPON_LOCKED',
+                  data: { weapon: lockedType }
+              });
+          }
+          this.stats.empReady = this.player.empCooldown <= 0;
+          this.stats.empCooldownProgress = this.player.empCooldown <= 0 ? 1.0 : Math.max(0, 1.0 - (this.player.empCooldown / this.player.maxEmpCooldown));
+          this.updateUI();
+          return fired;
+      }
+      if (this.input) this.input.triggerEmp();
       return false;
   }
 

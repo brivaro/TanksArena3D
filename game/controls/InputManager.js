@@ -26,6 +26,7 @@ export class InputManager {
     this.shouldShoot = false;
     this.shouldMine = false;
     this.shouldBazooka = false;
+    this.shouldEmp = false;
     this.autoShootHold = false; // Hold fire button to shoot continuously when cooldown allows
 
     this.boundListeners = [];
@@ -57,6 +58,8 @@ export class InputManager {
         this.shouldMine = true;
       } else if (e.code === 'KeyQ' || e.code === 'KeyF' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         this.shouldBazooka = true;
+      } else if (e.code === 'KeyR') {
+        this.shouldEmp = true;
       }
     };
     const onKeyUp = (e) => {
@@ -369,6 +372,18 @@ export class InputManager {
   checkBazooka() {
     if (this.shouldBazooka) {
       this.shouldBazooka = false;
+      return true;
+    }
+    return false;
+  }
+
+  triggerEmp() {
+    this.shouldEmp = true;
+  }
+
+  checkEmp() {
+    if (this.shouldEmp) {
+      this.shouldEmp = false;
       return true;
     }
     return false;

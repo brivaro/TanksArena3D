@@ -1,8 +1,41 @@
 
 export class LevelLoader {
   static getLevelCount() {
-      // 120 full campaign missions across 15 tactical operations (8 per operation)
-      return 120; 
+      // 160 full campaign missions across 20 tactical operations (8 per operation)
+      return 160; 
+  }
+
+  static getUnlockedFeatures(levelIndex) {
+      const lvl = Math.max(1, Number(levelIndex) || 1);
+      return {
+          mineUnlocked: lvl >= 3,
+          barrelsUnlocked: lvl >= 4,
+          cratesUnlocked: lvl >= 5,
+          bazookaUnlocked: lvl >= 6,
+          prismsUnlocked: lvl >= 8,
+          portalsUnlocked: lvl >= 10,
+          laserGatesUnlocked: lvl >= 12,
+          cryoBarrelsUnlocked: lvl >= 14,
+          repairPadsUnlocked: lvl >= 16,
+          empUnlocked: lvl >= 18
+      };
+  }
+
+  static getMilestoneUnlockInfo(levelIndex) {
+      const MILESTONES = {
+          1:  { icon: '🎯', title: 'CAÑÓN DE REBOTE + CORCHO', desc: 'Tus balas rebotan en muros de madera. ¡Destruye cajas de corcho!', color: '#38bdf8' },
+          3:  { icon: '💣', title: '¡NUEVA ARMA: MINA DE PROXIMIDAD!', desc: 'Pulsa [ESPACIO / E] o el botón 💣 MINA para volar muros y tanques.', color: '#4ade80' },
+          4:  { icon: '💥', title: '¡NUEVO ELEMENTO: BARRILES TNT!', desc: 'Dispara o pon minas junto a los barriles rojos para reacciones en cadena.', color: '#f87171' },
+          5:  { icon: '📦', title: '¡SUMINISTROS Y PLATAFORMAS TURBO!', desc: 'Rompe cajas doradas antes que el enemigo para ganar Escudo, Ráfaga o Vida.', color: '#fbbf24' },
+          6:  { icon: '🚀', title: '¡NUEVA ARMA: COHETE BAZOCA!', desc: 'Pulsa [Q / SHIFT] o el botón 🚀 BAZOCA para demoler muros a distancia.', color: '#fb923c' },
+          8:  { icon: '👑', title: '¡PRIMER JEFE + PRISMAS LUMINOSOS!', desc: 'Dispara a los cristales azules y derrota al Coloso Blindado.', color: '#e879f9' },
+          10: { icon: '🌀', title: '¡DESBLOQUEADO: PORTALES WARP!', desc: 'Los portales teletransportan tanto tu tanque como tus disparos y cohetes.', color: '#22d3ee' },
+          12: { icon: '⚡', title: '¡BARRERAS LÁSER E INTERRUPTORES!', desc: 'Dispara a los orbes de cristal para desactivar las barreras láser.', color: '#f43f5e' },
+          14: { icon: '❄️', title: '¡NUEVO: BARRIL CRIOGÉNICO EMP!', desc: 'Los barriles azules congelan y paralizan a todos los enemigos cercanos.', color: '#38bdf8' },
+          16: { icon: '🩹', title: '¡ESTACIÓN DE REPARACIÓN MÉDICA!', desc: 'Pasa sobre las plataformas verdes (+) para reparar +1 corazón de blindaje.', color: '#4ade80' },
+          18: { icon: '⚡', title: '¡HABILIDAD SUPREMA: PULSO EMP ORBITAL!', desc: 'Pulsa [R] o el botón ⚡ EMP para destruir balas en el aire y congelar enemigos.', color: '#a855f7' }
+      };
+      return MILESTONES[levelIndex] || null;
   }
 
   static getLevel(levelIndex) {
@@ -18,14 +51,16 @@ export class LevelLoader {
       // 'L' = Lighthouse / Sentry Tower (Rotating Searchlight Beam)
       // 'R' = Tree / Cactus / Sakura (Natural Obstacle)
       
-      // INTERACTIVE OBJECTS:
-      // 'B' = Explosive Barrel (TNT Red Drum - massive area blast, chain reactions with mines!)
-      // 'U' = Power-Up Supply Crate (Drops Shield, Rapid Fire, Turbo, or Extra Life — enemies can steal!)
-      // 'A' = Speed Accelerator Pad (Boosts tanks rolling over it)
-      // 'M' = Laser Prism Reflector (Bounces bullets & illuminates battlefield)
-      // 'O' = Paired Warp Portal (Teleports tanks AND bullets between portals!)
-      // 'G' = Laser Forcefield Gate (Blocks tanks until switch 'K' is shot/blasted)
-      // 'K' = Shootable Laser Switch (Toggles Laser Gates 'G' ON/OFF)
+      // INTERACTIVE OBJECTS (Progressively Unlocked!):
+      // 'B' = Explosive Barrel (M4+ TNT Red Drum - massive area blast, chain reactions with mines!)
+      // 'U' = Power-Up Supply Crate (M5+ Drops Shield, Rapid Fire, Turbo, or Extra Life — enemies can steal!)
+      // 'A' = Speed Accelerator Pad (M5+ Boosts tanks rolling over it)
+      // 'M' = Laser Prism Reflector (M8+ Bounces bullets & illuminates battlefield)
+      // 'O' = Paired Warp Portal (M10+ Teleports tanks AND bullets between portals!)
+      // 'G' = Laser Forcefield Gate (M12+ Blocks tanks until switch 'K' is shot/blasted)
+      // 'K' = Shootable Laser Switch (M12+ Toggles Laser Gates 'G' ON/OFF)
+      // 'F' = Cryo-EMP Freeze Barrel (M14+ Freezes & paralyzes enemies in blast radius for 5s + disables lasers!)
+      // 'D' = Armor Repair Medical Pad (M16+ Heals +1 Armor Heart & grants tactical surge!)
 
       // ENEMIES:
       // '1' = Static/Green (Easy) - Turret
@@ -37,59 +72,59 @@ export class LevelLoader {
           // ==========================================
           // BIOME 1: TALLER DE JUGUETES (M1 - M8)
           // ==========================================
-          // 1. THE BASICS - Static enemies + First Barrel & Supply Crate!
+          // 1. THE BASICS - Pure classic Wii Play Tanks! Ricochet Walls + Cork Crates (No mines/bazooka/barrels yet!)
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', ' ', 'C', ' ', ' ', 'B', '1', 'W'],
+              ['W', 'P', ' ', ' ', 'C', ' ', ' ', ' ', '1', 'W'],
               ['W', ' ', 'W', ' ', 'C', ' ', 'W', ' ', ' ', 'W'],
               ['W', ' ', 'W', ' ', ' ', ' ', 'W', ' ', ' ', 'W'],
-              ['W', 'C', 'B', ' ', 'Y', 'U', 'C', 'C', ' ', 'W'],
+              ['W', 'C', 'C', ' ', 'Y', ' ', 'C', 'C', ' ', 'W'],
               ['W', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'W'],
-              ['W', ' ', 'W', ' ', 'C', ' ', 'W', 'B', ' ', 'W'],
+              ['W', ' ', 'W', ' ', 'C', ' ', 'W', ' ', ' ', 'W'],
               ['W', ' ', 'W', ' ', 'C', ' ', 'W', ' ', '1', 'W'],
               ['W', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 2. CORK CITY - Static + Basic + Barrels
+          // 2. CORK CITY - Pure Ricochet & Destructible Cork Walls + First Patrol Tank '2'
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', 'C', 'C', 'C', ' ', 'C', 'C', 'C', ' ', '1', 'W'],
               ['W', ' ', 'W', 'C', '1', 'C', ' ', 'C', '2', 'C', 'W', ' ', 'W'],
-              ['W', ' ', 'C', 'C', 'B', 'C', ' ', 'C', 'B', 'C', 'C', ' ', 'W'],
-              ['W', ' ', ' ', ' ', ' ', ' ', 'U', ' ', ' ', ' ', ' ', ' ', 'W'],
-              ['W', ' ', 'C', 'C', 'B', 'C', ' ', 'C', 'B', 'C', 'C', ' ', 'W'],
+              ['W', ' ', 'C', 'C', ' ', 'C', ' ', 'C', ' ', 'C', 'C', ' ', 'W'],
+              ['W', ' ', ' ', ' ', ' ', ' ', 'Y', ' ', ' ', ' ', ' ', ' ', 'W'],
+              ['W', ' ', 'C', 'C', ' ', 'C', ' ', 'C', ' ', 'C', 'C', ' ', 'W'],
               ['W', ' ', 'W', 'C', '2', 'C', ' ', 'C', '1', 'C', 'W', ' ', 'W'],
               ['W', '1', ' ', 'C', 'C', 'C', ' ', 'C', 'C', 'C', ' ', '1', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 3. THE BRIDGE - Holes + Bridge Barrels & Contested Power-Up
+          // 3. THE BRIDGE - UNLOCKS: 💣 MINES + Water Chasms ('H')! Blast the cork bridge or trap patrol tanks!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', 'W', 'H', 'H', 'H', 'W', 'B', '2', 'W'],
+              ['W', 'P', ' ', 'W', 'H', 'H', 'H', 'W', ' ', '2', 'W'],
               ['W', 'C', ' ', ' ', ' ', 'W', ' ', ' ', ' ', 'C', 'W'],
               ['W', 'W', ' ', 'W', 'H', 'H', 'H', 'W', ' ', 'W', 'W'],
-              ['W', 'H', 'A', 'C', 'B', 'Y', 'U', 'C', 'A', 'H', 'W'],
+              ['W', 'H', ' ', 'C', 'C', 'Y', 'C', 'C', ' ', 'H', 'W'],
               ['W', 'H', ' ', 'W', 'H', 'H', 'H', 'W', ' ', 'H', 'W'],
-              ['W', 'H', ' ', 'C', ' ', '2', 'B', 'C', ' ', 'H', 'W'],
+              ['W', 'H', ' ', 'C', ' ', '2', ' ', 'C', ' ', 'H', 'W'],
               ['W', 'W', ' ', 'W', 'H', 'H', 'H', 'W', ' ', 'W', 'W'],
               ['W', 'C', ' ', ' ', ' ', 'W', ' ', ' ', ' ', 'C', 'W'],
-              ['W', ' ', 'B', 'W', 'H', 'H', 'H', 'W', ' ', '1', 'W'],
+              ['W', ' ', ' ', 'W', 'H', 'H', 'H', 'W', ' ', '1', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 4. THE BUNKER - Siege with Explosive Barrels & Laser Gate
+          // 4. THE BUNKER - UNLOCKS: 💥 EXPLOSIVE TNT BARRELS ('B')! Shoot or mine the barrels to breach the bunker!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', ' ', ' ', 'K', ' ', ' ', ' ', ' ', 'W'],
+              ['W', 'P', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'W'],
               ['W', ' ', 'C', 'B', 'C', ' ', 'C', 'B', 'C', ' ', 'W'],
-              ['W', ' ', 'C', '2', 'C', 'U', 'C', '1', 'C', ' ', 'W'],
-              ['W', ' ', 'C', 'C', 'C', 'W', 'C', 'C', 'C', ' ', 'W'],
-              ['W', ' ', ' ', 'A', ' ', ' ', ' ', 'A', ' ', ' ', 'W'],
-              ['W', 'W', 'Y', 'W', 'H', 'G', 'H', 'W', 'Y', 'W', 'W'],
-              ['W', ' ', 'B', ' ', 'H', '3', 'H', ' ', 'B', ' ', 'W'],
-              ['W', ' ', ' ', ' ', 'H', 'U', 'H', ' ', ' ', ' ', 'W'],
+              ['W', ' ', 'C', '2', 'C', ' ', 'C', '1', 'C', ' ', 'W'],
+              ['W', ' ', 'C', 'B', 'C', 'W', 'C', 'B', 'C', ' ', 'W'],
+              ['W', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'W'],
+              ['W', 'W', 'Y', 'W', 'C', 'B', 'C', 'W', 'Y', 'W', 'W'],
+              ['W', ' ', 'B', ' ', ' ', '2', ' ', ' ', 'B', ' ', 'W'],
+              ['W', ' ', ' ', ' ', ' ', '1', ' ', ' ', ' ', ' ', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 5. ZIG ZAG - Introduce type 3 (Fast) + Turbo Pads & Barrel Traps
+          // 5. ZIG ZAG - UNLOCKS: 📦 SUPPLY CRATES ('U') & ⏩ TURBO PADS ('A') + Scout Tank '3'!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', 'W', ' ', 'B', ' ', 'W', ' ', 'U', ' ', 'W'],
@@ -103,35 +138,35 @@ export class LevelLoader {
               ['W', ' ', 'W', ' ', 'B', ' ', 'W', ' ', ' ', 'B', '3', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 6. FOUR ISLANDS - Connected by Warp Portals ('O') & Demolition Bridges
+          // 6. FOUR ISLANDS - UNLOCKS: 🚀 BAZOOKA ROCKET! Demolish walls from afar across the islands!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', 'W', 'H', 'H', 'H', 'H', 'H', 'W', '2', 'O', 'W'],
+              ['W', 'P', ' ', 'W', 'H', 'H', 'H', 'H', 'H', 'W', '2', ' ', 'W'],
               ['W', ' ', 'C', 'W', 'H', 'H', 'H', 'H', 'H', 'W', 'C', '1', 'W'],
               ['W', 'W', ' ', 'B', ' ', ' ', 'Y', ' ', ' ', 'B', ' ', 'W', 'W'],
-              ['W', 'H', 'H', 'H', 'H', 'H', 'C', 'H', 'H', 'H', 'H', 'H', 'W'],
-              ['W', 'H', 'H', 'H', 'H', 'H', 'U', 'H', 'H', 'H', 'H', 'H', 'W'],
-              ['W', 'H', 'H', 'H', 'H', 'H', 'C', 'H', 'H', 'H', 'H', 'H', 'W'],
+              ['W', 'H', 'H', 'H', 'H', ' ', 'C', ' ', 'H', 'H', 'H', 'H', 'W'],
+              ['W', 'H', 'H', 'H', 'H', ' ', 'U', ' ', 'H', 'H', 'H', 'H', 'W'],
+              ['W', 'H', 'H', 'H', 'H', ' ', 'C', ' ', 'H', 'H', 'H', 'H', 'W'],
               ['W', 'W', ' ', 'B', ' ', ' ', 'Y', ' ', ' ', 'B', ' ', 'W', 'W'],
               ['W', '1', 'C', 'W', 'H', 'H', 'H', 'H', 'H', 'W', 'C', '2', 'W'],
-              ['W', 'O', '2', 'W', 'H', 'H', 'H', 'H', 'H', 'W', ' ', ' ', 'W'],
+              ['W', ' ', '2', 'W', 'H', 'H', 'H', 'H', 'H', 'W', ' ', ' ', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 7. CANAL FORT (NEW - Workshop Water Hazards & Speed Boosts)
+          // 7. CANAL FORT - Workshop Water Hazards, Bazooka Demolition & Speed Boosts
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', ' ', 'H', 'H', 'H', ' ', ' ', ' ', 'B', '2', 'W'],
               ['W', ' ', 'W', ' ', 'H', 'U', 'H', ' ', 'W', ' ', ' ', ' ', 'W'],
               ['W', ' ', 'C', ' ', ' ', 'A', ' ', ' ', 'C', ' ', 'W', ' ', 'W'],
               ['W', ' ', 'C', 'B', 'W', ' ', 'W', 'B', 'C', ' ', 'C', ' ', 'W'],
-              ['W', ' ', ' ', ' ', 'M', ' ', 'M', ' ', ' ', ' ', ' ', ' ', 'W'],
+              ['W', ' ', ' ', ' ', 'Y', ' ', 'Y', ' ', ' ', ' ', ' ', ' ', 'W'],
               ['W', ' ', 'C', 'B', 'W', ' ', 'W', 'B', 'C', ' ', 'C', ' ', 'W'],
               ['W', ' ', 'C', ' ', ' ', 'A', ' ', ' ', 'C', ' ', 'W', ' ', 'W'],
               ['W', ' ', 'W', ' ', 'H', 'U', 'H', ' ', 'W', ' ', ' ', ' ', 'W'],
               ['W', '2', 'B', ' ', 'H', 'H', 'H', ' ', ' ', ' ', ' ', '3', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 8. TIMBER CROSSFIRE (NEW - Stockade fortress with snipers and reflector prisms)
+          // 8. TIMBER CROSSFIRE - UNLOCKS: 💎 PRISM PILLARS ('M') & 👑 FIRST BIOME BOSS!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', 'T', ' ', ' ', 'B', 'L', 'B', ' ', ' ', 'T', ' ', '3', 'W'],
@@ -149,7 +184,7 @@ export class LevelLoader {
           // ==========================================
           // BIOME 2: DESIERTO & RUINAS (M9 - M16)
           // ==========================================
-          // 9. THE COLOSSEUM - Introduce Type 4 (Heavy/Black) + Barrels & Power-Up
+          // 9. THE COLOSSEUM - Heavy Sniper '4' + Barrels & Power-Up
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', ' ', ' ', ' ', 'W', ' ', ' ', ' ', ' ', '2', 'W'],
@@ -163,7 +198,7 @@ export class LevelLoader {
               ['W', ' ', ' ', ' ', ' ', ' ', 'W', ' ', ' ', ' ', ' ', '4', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 10. THE SPIRAL - With Portal Shortcut & Barrel Traps
+          // 10. THE SPIRAL - UNLOCKS: 🌀 WARP PORTALS ('O')! Teleport your tank or shoot bullets through portals!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', ' ', ' ', 'B', ' ', ' ', ' ', ' ', ' ', 'O', 'W'],
@@ -192,72 +227,72 @@ export class LevelLoader {
               ['W', '2', ' ', 'W', ' ', 'C', ' ', 'W', ' ', 'C', ' ', '2', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 12. TOY FOREST - Introduce Trees 'R' + Barrels & Power-Up
+          // 12. TOY FOREST - UNLOCKS: ⚡ LASER FORCEFIELD GATES ('G') & CRYSTAL SWITCHES ('K') + Trees 'R'!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', 'R', ' ', 'B', 'R', ' ', ' ', 'R', 'B', ' ', 'R', ' ', 'W'],
-              ['W', ' ', ' ', ' ', ' ', 'R', ' ', 'U', 'R', ' ', ' ', 'R', ' ', '2', 'W'],
+              ['W', 'P', ' ', 'R', 'K', 'B', 'R', ' ', ' ', 'R', 'B', ' ', 'R', ' ', 'W'],
+              ['W', ' ', ' ', ' ', ' ', 'R', 'G', 'U', 'G', ' ', ' ', 'R', ' ', '2', 'W'],
               ['W', 'R', ' ', 'R', ' ', ' ', 'B', '1', 'B', ' ', 'R', ' ', 'R', ' ', 'W'],
-              ['W', ' ', 'A', ' ', 'R', ' ', 'C', 'C', 'C', 'R', ' ', ' ', 'A', ' ', 'W'],
+              ['W', ' ', 'A', ' ', 'R', ' ', 'C', 'G', 'C', 'R', ' ', ' ', 'A', ' ', 'W'],
               ['W', ' ', 'R', ' ', ' ', 'C', 'U', '3', 'U', 'C', ' ', ' ', 'R', ' ', 'W'],
-              ['W', ' ', 'A', ' ', 'R', ' ', 'C', 'C', 'C', 'R', ' ', ' ', 'A', ' ', 'W'],
+              ['W', ' ', 'A', ' ', 'R', ' ', 'C', 'G', 'C', 'R', ' ', ' ', 'A', ' ', 'W'],
               ['W', 'R', ' ', 'R', ' ', ' ', 'B', '1', 'B', ' ', 'R', ' ', 'R', ' ', 'W'],
-              ['W', ' ', '2', ' ', ' ', 'R', ' ', 'U', 'R', ' ', ' ', 'R', ' ', ' ', 'W'],
-              ['W', ' ', 'R', ' ', 'B', 'R', ' ', ' ', 'R', 'B', ' ', 'R', ' ', '2', 'W'],
+              ['W', ' ', '2', ' ', ' ', 'R', 'G', 'U', 'G', ' ', ' ', 'R', ' ', ' ', 'W'],
+              ['W', ' ', 'R', ' ', 'B', 'R', ' ', 'K', 'R', 'B', ' ', 'R', ' ', '2', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 13. THE HALLWAY - Demolition Shortcuts & Speed Boosts
+          // 13. THE HALLWAY - Demolition Shortcuts & Laser Switchboard
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', 'A', ' ', ' ', 'B', 'U', 'B', ' ', ' ', 'A', ' ', '4', 'W'],
-              ['W', 'W', 'W', 'W', 'C', 'W', 'W', 'W', 'W', 'W', 'C', 'W', 'W', ' ', 'W'],
-              ['W', '3', ' ', 'B', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'B', ' ', ' ', 'W'],
+              ['W', 'W', 'W', 'W', 'G', 'W', 'W', 'W', 'W', 'W', 'G', 'W', 'W', ' ', 'W'],
+              ['W', '3', ' ', 'B', ' ', ' ', 'K', 'M', 'K', ' ', ' ', 'B', ' ', ' ', 'W'],
               ['W', ' ', 'W', 'W', 'W', 'C', 'W', 'W', 'W', 'C', 'W', 'W', 'W', 'W', 'W'],
               ['W', ' ', ' ', 'A', ' ', 'B', 'U', '2', 'U', 'B', ' ', 'A', ' ', ' ', 'W'],
               ['W', 'W', 'W', 'W', 'C', 'W', 'W', 'W', 'W', 'W', 'C', 'W', 'W', ' ', 'W'],
               ['W', '4', ' ', ' ', ' ', 'B', ' ', ' ', ' ', 'B', ' ', ' ', ' ', ' ', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 14. SNIPER ALLEY - Heavy Tanks + Portals & Barrel Cover
+          // 14. SNIPER ALLEY - UNLOCKS: ❄️ CRYO-EMP BARRELS ('F')! Shoot the cyan barrels to freeze Heavy Snipers!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', 'H', 'O', 'H', 'B', '4', 'W'],
-              ['W', ' ', 'B', 'H', ' ', 'H', ' ', ' ', 'W'],
+              ['W', 'P', ' ', 'H', 'O', 'H', 'F', '4', 'W'],
+              ['W', ' ', 'F', 'H', ' ', 'H', ' ', ' ', 'W'],
               ['W', ' ', ' ', 'H', 'C', 'H', ' ', 'U', 'W'],
               ['W', 'A', ' ', 'H', 'B', 'H', ' ', 'A', 'W'],
               ['W', 'C', ' ', 'H', '1', 'H', ' ', 'C', 'W'],
               ['W', 'A', ' ', 'H', 'B', 'H', ' ', 'A', 'W'],
               ['W', 'U', ' ', 'H', 'C', 'H', ' ', ' ', 'W'],
-              ['W', ' ', 'B', 'H', ' ', 'H', 'B', ' ', 'W'],
-              ['W', '4', ' ', 'H', ' ', 'H', 'O', '4', 'W'],
+              ['W', ' ', 'B', 'H', ' ', 'H', 'F', ' ', 'W'],
+              ['W', '4', 'F', 'H', ' ', 'H', 'O', '4', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 15. DUNE CITADEL (NEW - Terracotta pyramid defense with snipers)
+          // 15. DUNE CITADEL - Terracotta pyramid defense with Cryo Barrels ('F') & Snipers
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
               ['W', 'P', ' ', 'R', ' ', ' ', 'H', ' ', ' ', 'R', ' ', '4', 'W'],
-              ['W', ' ', 'W', ' ', 'C', 'B', 'U', 'B', 'C', ' ', 'W', ' ', 'W'],
+              ['W', ' ', 'W', ' ', 'C', 'F', 'U', 'B', 'C', ' ', 'W', ' ', 'W'],
               ['W', 'R', ' ', ' ', 'A', ' ', 'M', ' ', 'A', ' ', ' ', 'R', 'W'],
               ['W', ' ', 'C', 'A', 'W', 'C', '3', 'C', 'W', 'A', 'C', ' ', 'W'],
-              ['W', ' ', 'B', ' ', 'C', '4', 'U', '4', 'C', ' ', 'B', ' ', 'W'],
+              ['W', ' ', 'F', ' ', 'C', '4', 'U', '4', 'C', ' ', 'F', ' ', 'W'],
               ['W', ' ', 'C', 'A', 'W', 'C', '3', 'C', 'W', 'A', 'C', ' ', 'W'],
               ['W', 'R', ' ', ' ', 'A', ' ', 'M', ' ', 'A', ' ', ' ', 'R', 'W'],
-              ['W', ' ', 'W', ' ', 'C', 'B', 'U', 'B', 'C', ' ', 'W', ' ', 'W'],
+              ['W', ' ', 'W', ' ', 'C', 'B', 'U', 'F', 'C', ' ', 'W', ' ', 'W'],
               ['W', '3', ' ', 'R', ' ', ' ', 'H', ' ', ' ', 'R', ' ', '4', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
-          // 16. MIRAGE OASIS (NEW - Palm grove surrounding oasis channels)
+          // 16. MIRAGE OASIS - UNLOCKS: 🩹 MEDICAL REPAIR STATIONS ('D') + Desert Boss Finale!
           [
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-              ['W', 'P', ' ', ' ', 'R', 'B', ' ', 'L', ' ', 'B', 'R', ' ', ' ', '3', 'W'],
+              ['W', 'P', ' ', 'D', 'R', 'F', ' ', 'L', ' ', 'B', 'R', ' ', ' ', '3', 'W'],
               ['W', ' ', 'W', ' ', 'H', 'H', ' ', 'U', ' ', 'H', 'H', ' ', 'W', ' ', 'W'],
               ['W', ' ', 'H', ' ', 'H', 'M', ' ', '3', ' ', 'M', 'H', ' ', 'H', ' ', 'W'],
               ['W', 'R', 'H', ' ', ' ', ' ', 'C', 'A', 'C', ' ', ' ', ' ', 'H', 'R', 'W'],
-              ['W', 'B', ' ', 'M', ' ', 'C', 'B', '4', 'B', 'C', ' ', 'M', ' ', 'B', 'W'],
+              ['W', 'B', ' ', 'M', ' ', 'C', 'F', '4', 'B', 'C', ' ', 'M', ' ', 'B', 'W'],
               ['W', 'R', 'H', ' ', ' ', ' ', 'C', 'A', 'C', ' ', ' ', ' ', 'H', 'R', 'W'],
               ['W', ' ', 'H', ' ', 'H', 'M', ' ', '3', ' ', 'M', 'H', ' ', 'H', ' ', 'W'],
               ['W', ' ', 'W', ' ', 'H', 'H', ' ', 'U', ' ', 'H', 'H', ' ', 'W', ' ', 'W'],
-              ['W', '4', ' ', ' ', 'R', 'B', ' ', 'L', ' ', 'B', 'R', ' ', ' ', '4', 'W'],
+              ['W', '4', ' ', ' ', 'R', 'B', ' ', 'L', ' ', 'F', 'R', 'D', ' ', '4', 'W'],
               ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
           ],
 
@@ -1793,20 +1828,553 @@ export class LevelLoader {
               ['S', '4', ' ', ' ', ' ', 'L', 'B', 'G', 'H', 'U', 'H', 'G', 'B', 'L', ' ', 'O', ' ', '4', 'S'],
               ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
           ],
-          // 120. OMEGA PRIME: SUPREME COMMANDER (120th Mission Ultimate Campaign Finale Boss!)
+          // 120. OMEGA PRIME: SUPREME COMMANDER (120th Mission Milestone Boss!)
           [
               ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
               ['S', 'P', ' ', 'O', ' ', 'L', 'B', 'G', 'H', 'U', 'H', 'G', 'B', 'L', ' ', 'W', ' ', '4', 'S'],
-              ['S', ' ', 'W', 'T', ' ', 'C', 'U', 'K', 'H', 'A', 'H', 'K', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
-              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', 'D', 'C', 'U', 'K', 'H', 'A', 'H', 'K', 'U', 'C', 'D', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
               ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
-              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
               ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'A', 'U', 'A', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
-              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
               ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
-              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
-              ['S', ' ', 'W', 'T', ' ', 'C', 'U', 'K', 'H', 'A', 'H', 'K', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', 'D', 'C', 'U', 'K', 'H', 'A', 'H', 'K', 'U', 'C', 'D', 'T', 'W', ' ', 'S'],
               ['S', '4', ' ', 'W', ' ', 'L', 'B', 'G', 'H', 'U', 'H', 'G', 'B', 'L', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+
+          // ==================================================================
+          // CHAPTER 16: OPERACIÓN CERO ABSOLUTO (M121 - M128 • ARCTIC CRYO)
+          // ==================================================================
+          // 121. ABSOLUTE ZERO OUTPOST (Cryo Barrels 'F' & Medical Repair Pads 'D')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'C', 'F', 'C', ' ', 'C', 'F', 'C', ' ', '3', 'S'],
+              ['S', ' ', 'S', ' ', ' ', ' ', '2', ' ', 'U', ' ', '3', ' ', ' ', 'S', 'S'],
+              ['S', ' ', ' ', 'A', 'S', 'F', 'C', 'B', 'M', 'B', 'C', 'F', 'S', 'A', 'S'],
+              ['S', ' ', 'C', 'F', 'C', ' ', ' ', 'Y', '4', 'Y', ' ', ' ', 'C', 'F', 'S'],
+              ['S', ' ', ' ', 'A', 'S', 'F', 'C', 'B', 'M', 'B', 'C', 'F', 'S', 'A', 'S'],
+              ['S', ' ', 'S', ' ', ' ', ' ', '3', ' ', 'U', ' ', '2', ' ', ' ', 'S', 'S'],
+              ['S', '3', ' ', ' ', ' ', 'C', 'F', 'C', ' ', 'C', 'F', 'C', 'D', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 122. CRYOGENIC REACTOR CORE (Chain-freeze sniper squads around the central core)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'H', 'H', 'F', 'U', 'F', 'H', 'H', ' ', '4', 'S'],
+              ['S', ' ', 'T', ' ', ' ', 'H', 'H', ' ', '3', ' ', 'H', 'H', ' ', 'T', 'S'],
+              ['S', 'D', ' ', 'F', 'C', ' ', ' ', 'B', 'M', 'B', ' ', ' ', 'C', 'F', 'S'],
+              ['S', ' ', 'C', '4', 'F', ' ', 'Y', 'U', '4', 'U', 'Y', ' ', 'F', '4', 'S'],
+              ['S', ' ', ' ', 'F', 'C', ' ', ' ', 'B', 'M', 'B', ' ', ' ', 'C', 'F', 'S'],
+              ['S', ' ', 'T', ' ', ' ', 'H', 'H', ' ', '3', ' ', 'H', 'H', ' ', 'T', 'S'],
+              ['S', '3', ' ', ' ', ' ', 'H', 'H', 'F', 'D', 'F', 'H', 'H', 'O', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 123. FROSTBIKE CONVOY (Speed Pads 'A' + Cryo Traps 'F')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'A', ' ', 'F', ' ', 'C', 'U', 'C', ' ', 'F', ' ', 'A', ' ', '3', 'S'],
+              ['S', ' ', 'S', 'S', 'C', 'S', ' ', 'B', '3', 'B', ' ', 'S', 'C', 'S', 'S', ' ', 'S'],
+              ['S', ' ', 'D', ' ', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', ' ', 'D', ' ', 'S'],
+              ['S', ' ', 'S', 'C', 'B', 'C', 'T', 'F', '4', 'F', 'T', 'C', 'B', 'C', 'S', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'S', 'S', 'C', 'S', ' ', 'B', '3', 'B', ' ', 'S', 'C', 'S', 'S', ' ', 'S'],
+              ['S', '3', ' ', 'A', ' ', 'F', ' ', 'C', 'U', 'C', ' ', 'F', ' ', 'A', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 124. SUB-ZERO LASER VAULT (Cryo Barrels disable Laser Gates 'G' on blast!)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'F', ' ', 'S', 'G', 'S', ' ', 'S', 'G', 'S', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'C', ' ', 'S', 'U', 'S', 'D', 'S', 'U', 'S', ' ', 'C', 'S'],
+              ['S', ' ', 'C', 'F', ' ', ' ', 'B', ' ', 'M', ' ', 'B', ' ', ' ', 'F', 'S'],
+              ['S', 'S', 'G', 'S', ' ', 'T', '3', 'F', '4', 'F', '3', 'T', ' ', 'S', 'S'],
+              ['S', ' ', 'U', ' ', 'A', ' ', 'Y', ' ', 'K', ' ', 'Y', ' ', 'A', 'U', 'S'],
+              ['S', 'S', 'G', 'S', ' ', 'T', '4', 'F', '3', 'F', '4', 'T', ' ', 'S', 'S'],
+              ['S', ' ', 'C', 'F', ' ', ' ', 'B', ' ', 'M', ' ', 'B', ' ', ' ', 'F', 'S'],
+              ['S', '4', ' ', 'K', ' ', 'S', 'G', 'S', 'D', 'S', 'G', 'S', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 125. ICEBERG REPAIR BAY (Strategic Medical Stations 'D' under heavy crossfire)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'H', 'H', 'F', 'U', 'F', 'H', 'H', ' ', 'D', ' ', '4', 'S'],
+              ['S', ' ', 'R', ' ', ' ', 'H', 'H', 'C', '3', 'C', 'H', 'H', ' ', ' ', 'R', ' ', 'S'],
+              ['S', ' ', ' ', 'A', 'F', ' ', ' ', 'M', ' ', 'M', ' ', ' ', 'F', 'A', ' ', ' ', 'S'],
+              ['S', 'S', 'C', 'B', 'S', ' ', 'T', 'F', '4', 'F', 'T', ' ', 'S', 'B', 'C', 'S', 'S'],
+              ['S', ' ', 'U', 'C', ' ', ' ', 'B', ' ', 'D', ' ', 'B', ' ', ' ', 'C', 'U', ' ', 'S'],
+              ['S', 'S', 'C', 'B', 'S', ' ', 'T', 'F', '4', 'F', 'T', ' ', 'S', 'B', 'C', 'S', 'S'],
+              ['S', ' ', ' ', 'A', 'F', ' ', ' ', 'M', ' ', 'M', ' ', ' ', 'F', 'A', ' ', ' ', 'S'],
+              ['S', '3', ' ', 'R', ' ', 'H', 'H', 'F', 'U', 'F', 'H', 'H', ' ', 'R', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 126. POLAR PORTAL PINCER (Twin Portals 'O' flanking a frozen fortress)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'W', ' ', 'F', 'U', 'F', ' ', 'W', ' ', ' ', '3', 'S'],
+              ['S', ' ', 'D', ' ', 'W', ' ', 'C', '3', 'C', ' ', 'W', ' ', 'D', ' ', 'S'],
+              ['S', ' ', 'C', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', 'C', ' ', 'S'],
+              ['S', 'W', 'W', 'C', 'W', 'T', 'B', '4', 'B', 'T', 'W', 'C', 'W', 'W', 'S'],
+              ['S', ' ', 'C', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', 'C', ' ', 'S'],
+              ['S', ' ', 'D', ' ', 'W', ' ', 'C', '3', 'C', ' ', 'W', ' ', 'D', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'W', ' ', 'F', 'U', 'F', ' ', 'W', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 127. AVALANCHE DOMINOES (Mixed Red TNT 'B' + Cyan Cryo 'F' Chain Reactions!)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'F', 'C', 'B', ' ', 'D', 'U', 'D', ' ', 'B', 'C', 'F', ' ', '3', 'S'],
+              ['S', ' ', 'R', 'C', 'U', 'C', 'F', ' ', 'A', ' ', 'F', 'C', 'U', 'C', 'R', ' ', 'S'],
+              ['S', 'F', 'C', 'B', ' ', 'F', 'M', ' ', '3', ' ', 'M', 'F', ' ', 'B', 'C', 'F', 'S'],
+              ['S', ' ', 'B', ' ', 'T', ' ', 'C', 'F', '4', 'F', 'C', ' ', 'T', ' ', 'B', ' ', 'S'],
+              ['S', 'F', 'C', 'B', ' ', 'F', 'M', ' ', '3', ' ', 'M', 'F', ' ', 'B', 'C', 'F', 'S'],
+              ['S', ' ', 'R', 'C', 'U', 'C', 'F', ' ', 'A', ' ', 'F', 'C', 'U', 'C', 'R', ' ', 'S'],
+              ['S', '4', ' ', 'F', 'C', 'B', ' ', 'D', 'U', 'D', ' ', 'B', 'C', 'F', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 128. EMPEROR OF ABSOLUTE ZERO (Boss Finale M128 - Glacial Cryo Dreadnought)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'D', ' ', 'L', 'F', 'H', 'U', 'H', 'F', 'L', ' ', 'D', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'S', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'S', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'D', 'U', 'D', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'S', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'S', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'D', ' ', 'L', 'F', 'H', 'U', 'H', 'F', 'L', ' ', 'D', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+
+          // ==================================================================
+          // CHAPTER 17: PROTOCOLO PULSO ORBITAL (M129 - M136 • CYBER EMP)
+          // ==================================================================
+          // 129. EMP GRID OVERLOAD (Laser Gates 'G', Switches 'K' & Cryo Barrels 'F')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'K', ' ', 'W', 'G', 'W', 'D', 'W', 'G', 'W', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'F', ' ', 'W', 'U', 'W', ' ', 'W', 'U', 'W', ' ', 'F', 'S'],
+              ['S', ' ', 'C', 'B', ' ', ' ', 'F', ' ', 'M', ' ', 'F', ' ', ' ', 'B', 'S'],
+              ['S', 'W', 'G', 'W', ' ', 'T', '3', 'T', '4', 'T', '3', 'T', ' ', 'W', 'S'],
+              ['S', ' ', 'U', ' ', 'A', ' ', 'Y', ' ', 'K', ' ', 'Y', ' ', 'A', 'U', 'S'],
+              ['S', 'W', 'G', 'W', ' ', 'T', '4', 'T', '3', 'T', '4', 'T', ' ', 'W', 'S'],
+              ['S', ' ', 'C', 'B', ' ', ' ', 'F', ' ', 'M', ' ', 'F', ' ', ' ', 'B', 'S'],
+              ['S', '4', ' ', 'K', ' ', 'W', 'G', 'W', 'D', 'W', 'G', 'W', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 130. QUANTUM TELEPORT MATRIX (Portals 'O' + Prisms 'M' + Cryo Traps 'F')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'W', 'F', 'U', 'D', 'U', 'F', 'W', ' ', ' ', ' ', '3', 'S'],
+              ['S', ' ', 'T', ' ', 'A', 'W', 'C', ' ', '3', ' ', 'C', 'W', 'A', ' ', 'T', ' ', 'S'],
+              ['S', ' ', ' ', 'M', ' ', ' ', 'B', 'T', '4', 'T', 'B', ' ', ' ', 'M', ' ', ' ', 'S'],
+              ['S', 'W', 'F', 'C', 'W', ' ', 'Y', 'U', 'M', 'U', 'Y', ' ', 'W', 'C', 'F', 'W', 'S'],
+              ['S', ' ', ' ', 'M', ' ', ' ', 'B', 'T', '4', 'T', 'B', ' ', ' ', 'M', ' ', ' ', 'S'],
+              ['S', ' ', 'T', ' ', 'A', 'W', 'C', ' ', '3', ' ', 'C', 'W', 'A', ' ', 'T', ' ', 'S'],
+              ['S', '4', ' ', ' ', ' ', 'W', 'F', 'U', 'D', 'U', 'F', 'W', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 131. FIREWALL BREAKER (Demolish Cyber Walls with Bazooka/Mines & Repair Pads 'D')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', 'W', 'C', 'B', 'C', 'W', 'C', 'F', 'C', ' ', '3', 'S'],
+              ['S', ' ', 'W', ' ', 'W', ' ', '3', ' ', 'W', ' ', '4', ' ', 'W', ' ', 'S'],
+              ['S', ' ', 'C', 'F', 'C', ' ', 'U', ' ', 'C', ' ', 'U', ' ', 'C', 'F', 'S'],
+              ['S', 'W', 'W', 'C', 'W', 'B', 'M', 'B', 'W', 'F', 'M', 'F', 'W', 'W', 'S'],
+              ['S', ' ', 'C', 'F', 'C', ' ', 'U', ' ', 'C', ' ', 'U', ' ', 'C', 'F', 'S'],
+              ['S', ' ', 'W', ' ', 'W', ' ', '4', ' ', 'W', ' ', '3', ' ', 'W', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'W', 'C', 'F', 'C', 'W', 'C', 'B', 'C', 'D', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 132. CYBERNETIC GAUNTLET (High-speed corridors with Laser Locks 'G' & Turbo 'A')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'A', ' ', 'K', ' ', 'G', 'U', 'G', ' ', 'K', ' ', 'A', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'W', 'W', 'W', 'C', ' ', 'F', ' ', 'C', 'W', 'W', 'W', 'W', ' ', 'S'],
+              ['S', ' ', 'D', ' ', 'B', ' ', ' ', '3', 'M', '3', ' ', ' ', 'B', ' ', 'D', ' ', 'S'],
+              ['S', 'W', 'W', 'C', 'W', 'G', 'W', 'F', '4', 'F', 'W', 'G', 'W', 'C', 'W', 'W', 'S'],
+              ['S', ' ', 'D', ' ', 'B', ' ', ' ', '3', 'M', '3', ' ', ' ', 'B', ' ', 'D', ' ', 'S'],
+              ['S', ' ', 'W', 'W', 'W', 'W', 'C', ' ', 'F', ' ', 'C', 'W', 'W', 'W', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'A', ' ', 'K', ' ', 'G', 'U', 'G', ' ', 'K', ' ', 'A', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 133. HOLOGRAPHIC PRISM ARENA (6 Prism Pillars 'M' + Cryo-EMP Barrels 'F')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'M', ' ', 'F', ' ', 'D', ' ', 'F', ' ', 'M', ' ', '3', 'S'],
+              ['S', ' ', 'T', ' ', 'C', 'B', 'U', '3', 'U', 'B', 'C', ' ', 'T', ' ', 'S'],
+              ['S', 'M', ' ', 'F', ' ', 'Y', ' ', '4', ' ', 'Y', ' ', 'F', ' ', 'M', 'S'],
+              ['S', ' ', 'T', ' ', 'C', 'B', 'U', '3', 'U', 'B', 'C', ' ', 'T', ' ', 'S'],
+              ['S', '4', ' ', 'M', ' ', 'F', ' ', 'D', ' ', 'F', ' ', 'M', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 134. MAINFRAME TURRET BUNKER (Static Sentries '1' + Heavy Snipers '4' behind Laser Gates)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'K', ' ', 'G', '1', 'G', ' ', 'K', ' ', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'C', 'F', 'C', ' ', 'C', 'U', 'C', ' ', 'C', 'F', 'C', 'W', ' ', 'S'],
+              ['S', ' ', 'C', '1', 'B', ' ', 'A', ' ', '3', ' ', 'A', ' ', 'B', '1', 'C', ' ', 'S'],
+              ['S', 'D', 'F', 'B', ' ', 'T', 'F', '4', 'M', '4', 'F', 'T', ' ', 'B', 'F', 'D', 'S'],
+              ['S', ' ', 'C', '1', 'B', ' ', 'A', ' ', '3', ' ', 'A', ' ', 'B', '1', 'C', ' ', 'S'],
+              ['S', ' ', 'W', 'C', 'F', 'C', ' ', 'C', 'U', 'C', ' ', 'C', 'F', 'C', 'W', ' ', 'S'],
+              ['S', '4', ' ', ' ', ' ', 'K', ' ', 'G', '1', 'G', ' ', 'K', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 135. SILICON VALLEY CROSSFIRE (Fast Interceptors '3' + Turbo Pads + Cryo Barrels)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'A', ' ', 'F', ' ', 'H', 'U', 'H', ' ', 'F', ' ', 'A', ' ', '3', 'S'],
+              ['S', ' ', 'T', ' ', 'W', 'C', 'B', 'H', 'D', 'H', 'B', 'C', 'W', ' ', 'T', ' ', 'S'],
+              ['S', ' ', ' ', '3', ' ', 'F', ' ', ' ', 'M', ' ', ' ', 'F', ' ', '3', ' ', ' ', 'S'],
+              ['S', 'H', 'H', ' ', 'C', 'B', 'Y', '4', 'U', '4', 'Y', 'B', 'C', ' ', 'H', 'H', 'S'],
+              ['S', ' ', ' ', '3', ' ', 'F', ' ', ' ', 'M', ' ', ' ', 'F', ' ', '3', ' ', ' ', 'S'],
+              ['S', ' ', 'T', ' ', 'W', 'C', 'B', 'H', 'D', 'H', 'B', 'C', 'W', ' ', 'T', ' ', 'S'],
+              ['S', '3', ' ', 'A', ' ', 'F', ' ', 'H', 'U', 'H', ' ', 'F', ' ', 'A', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 136. SUPREME EMP NEXUS (Boss Finale M136 - Cybernetic EMP Overlord)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'D', ' ', 'K', 'G', 'H', 'U', 'H', 'G', 'K', ' ', 'D', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'F', ' ', 'H', 'A', 'H', ' ', 'F', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'D', 'U', 'D', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'F', ' ', 'H', 'A', 'H', ' ', 'F', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'D', ' ', 'K', 'G', 'H', 'U', 'H', 'G', 'K', ' ', 'D', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+
+          // ==================================================================
+          // CHAPTER 18: CHOQUE TÉRMICO (M137 - M144 • VOLCANO & CRYO)
+          // ==================================================================
+          // 137. THERMAL SHOCK CRUCIBLE (Lava Pits 'H' + Cryo Barrels 'F' + TNT 'B')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'H', 'H', 'B', 'F', 'B', 'H', 'H', ' ', '3', 'S'],
+              ['S', ' ', 'W', ' ', ' ', 'H', 'H', 'C', 'U', 'C', 'H', 'H', ' ', 'W', 'S'],
+              ['S', ' ', 'C', 'F', 'B', ' ', ' ', 'A', '3', 'A', ' ', ' ', 'B', 'F', 'S'],
+              ['S', 'H', 'H', 'B', 'C', 'Y', 'F', '4', 'M', '4', 'F', 'Y', 'C', 'H', 'S'],
+              ['S', ' ', 'C', 'F', 'B', ' ', ' ', 'A', '3', 'A', ' ', ' ', 'B', 'F', 'S'],
+              ['S', ' ', 'W', ' ', ' ', 'H', 'H', 'C', 'U', 'C', 'H', 'H', ' ', 'W', 'S'],
+              ['S', '4', ' ', ' ', ' ', 'H', 'H', 'B', 'D', 'B', 'H', 'H', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 138. MAGMA & ICE LABYRINTH (Alternating Fire & Ice Barrels through narrow corridors)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'B', 'C', 'F', ' ', 'W', 'D', 'W', ' ', 'F', 'C', 'B', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'W', ' ', 'W', ' ', 'W', 'U', 'W', ' ', 'W', ' ', 'W', 'W', ' ', 'S'],
+              ['S', ' ', 'F', ' ', ' ', 'C', 'B', ' ', '3', ' ', 'B', 'C', ' ', ' ', 'F', ' ', 'S'],
+              ['S', 'W', 'C', 'B', 'W', ' ', 'T', 'F', '4', 'F', 'T', ' ', 'W', 'B', 'C', 'W', 'S'],
+              ['S', ' ', 'F', ' ', ' ', 'C', 'B', ' ', '3', ' ', 'B', 'C', ' ', ' ', 'F', ' ', 'S'],
+              ['S', ' ', 'W', 'W', ' ', 'W', ' ', 'W', 'U', 'W', ' ', 'W', ' ', 'W', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'B', 'C', 'F', ' ', 'W', 'D', 'W', ' ', 'F', 'C', 'B', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 139. VOLCANIC TELEPORTER FORGE (Portals 'O' over molten lava channels 'H')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'H', 'H', 'B', 'U', 'B', 'H', 'H', 'D', ' ', '3', 'S'],
+              ['S', ' ', 'C', 'F', 'H', 'H', 'C', '3', 'C', 'H', 'H', 'F', 'C', ' ', 'S'],
+              ['S', ' ', 'B', ' ', ' ', ' ', ' ', 'M', ' ', ' ', ' ', ' ', 'B', ' ', 'S'],
+              ['S', 'H', 'H', 'C', 'T', 'F', 'B', '4', 'B', 'F', 'T', 'C', 'H', 'H', 'S'],
+              ['S', ' ', 'B', ' ', ' ', ' ', ' ', 'M', ' ', ' ', ' ', ' ', 'B', ' ', 'S'],
+              ['S', ' ', 'C', 'F', 'H', 'H', 'C', '3', 'C', 'H', 'H', 'F', 'C', ' ', 'S'],
+              ['S', '4', ' ', 'D', 'H', 'H', 'B', 'U', 'B', 'H', 'H', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 140. OBSIDIAN LASER CITADEL (Laser Gates 'G' guarding Medical Repair Pads 'D')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'K', ' ', 'S', 'G', 'D', 'U', 'D', 'G', 'S', ' ', 'K', ' ', '3', 'S'],
+              ['S', ' ', 'S', 'C', 'B', 'S', ' ', 'F', '3', 'F', ' ', 'S', 'B', 'C', 'S', ' ', 'S'],
+              ['S', ' ', 'B', ' ', ' ', ' ', 'A', ' ', 'M', ' ', 'A', ' ', ' ', ' ', 'B', ' ', 'S'],
+              ['S', 'S', 'G', 'S', 'F', 'T', 'B', '4', 'Y', '4', 'B', 'T', 'F', 'S', 'G', 'S', 'S'],
+              ['S', ' ', 'B', ' ', ' ', ' ', 'A', ' ', 'M', ' ', 'A', ' ', ' ', ' ', 'B', ' ', 'S'],
+              ['S', ' ', 'S', 'C', 'B', 'S', ' ', 'F', '3', 'F', ' ', 'S', 'B', 'C', 'S', ' ', 'S'],
+              ['S', '4', ' ', 'K', ' ', 'S', 'G', 'D', 'U', 'D', 'G', 'S', ' ', 'K', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 141. PYRO-CRYO PINBALL (Ricochet Wedges 'T' + Speed Pads 'A' + Barrels 'B'/'F')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'T', ' ', 'A', ' ', 'F', ' ', 'A', ' ', 'T', ' ', '3', 'S'],
+              ['S', ' ', 'T', 'B', 'C', ' ', 'U', '3', 'U', ' ', 'C', 'B', 'T', ' ', 'S'],
+              ['S', 'D', ' ', 'F', ' ', 'T', 'B', 'M', 'B', 'T', ' ', 'F', ' ', 'D', 'S'],
+              ['S', ' ', 'C', ' ', 'Y', 'F', '4', 'U', '4', 'F', 'Y', ' ', 'C', ' ', 'S'],
+              ['S', 'D', ' ', 'F', ' ', 'T', 'B', 'M', 'B', 'T', ' ', 'F', ' ', 'D', 'S'],
+              ['S', ' ', 'T', 'B', 'C', ' ', 'U', '3', 'U', ' ', 'C', 'B', 'T', ' ', 'S'],
+              ['S', '4', ' ', 'T', ' ', 'A', ' ', 'F', ' ', 'A', ' ', 'T', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 142. CALDERA DEMOLITION RING (Circular stone fortress with TNT & Cryo breaches)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'C', 'B', 'C', 'U', 'C', 'F', 'C', ' ', 'D', ' ', '3', 'S'],
+              ['S', ' ', 'S', 'C', 'B', 'S', ' ', ' ', '3', ' ', ' ', 'S', 'F', 'C', 'S', ' ', 'S'],
+              ['S', ' ', 'C', 'F', ' ', ' ', 'B', 'Y', 'M', 'Y', 'F', ' ', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', 'B', ' ', '3', 'Y', '4', 'U', 'D', 'U', '4', 'Y', '3', ' ', 'F', ' ', 'S'],
+              ['S', ' ', 'C', 'F', ' ', ' ', 'B', 'Y', 'M', 'Y', 'F', ' ', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', 'S', 'C', 'B', 'S', ' ', ' ', '3', ' ', ' ', 'S', 'F', 'C', 'S', ' ', 'S'],
+              ['S', '4', ' ', 'D', ' ', 'C', 'F', 'C', 'U', 'C', 'B', 'C', ' ', 'D', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 143. INFERNO FREEZE CROSSING (Bridge battles over lava with Cryo Barrels)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'H', 'H', 'H', 'D', 'H', 'H', 'H', ' ', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'F', ' ', 'H', 'H', 'H', ' ', 'H', 'H', 'H', ' ', 'B', 'W', ' ', 'S'],
+              ['S', ' ', 'B', 'C', 'A', ' ', 'F', 'U', '3', 'U', 'B', ' ', 'A', 'C', 'F', ' ', 'S'],
+              ['S', 'H', 'H', ' ', 'C', 'B', 'M', '4', 'Y', '4', 'M', 'F', 'C', ' ', 'H', 'H', 'S'],
+              ['S', ' ', 'B', 'C', 'A', ' ', 'F', 'U', '3', 'U', 'B', ' ', 'A', 'C', 'F', ' ', 'S'],
+              ['S', ' ', 'W', 'F', ' ', 'H', 'H', 'H', ' ', 'H', 'H', 'H', ' ', 'B', 'W', ' ', 'S'],
+              ['S', '3', ' ', ' ', ' ', 'H', 'H', 'H', 'D', 'H', 'H', 'H', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 144. THERMONUCLEAR DRAGON (Boss Finale M144 - Fire & Ice Dreadnought)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'D', ' ', 'L', 'B', 'H', 'U', 'H', 'F', 'L', ' ', 'D', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'S', 'T', ' ', 'C', 'F', ' ', 'H', 'A', 'H', ' ', 'B', 'C', ' ', 'T', 'S', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'D', 'U', 'D', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'S', 'T', ' ', 'C', 'B', ' ', 'H', 'A', 'H', ' ', 'F', 'C', ' ', 'T', 'S', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'D', ' ', 'L', 'F', 'H', 'U', 'H', 'B', 'L', ' ', 'D', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+
+          // ==================================================================
+          // CHAPTER 19: ASEDIO ANFIBIO DE ÉLITE (M145 - M152 • TROPICAL & SUNSET)
+          // ==================================================================
+          // 145. CORAL ATOLL FORTRESS (Lagoon Bridges, Cryo Barrels & Repair Pads)
+          [
+              ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
+              ['W', 'P', ' ', 'D', 'R', 'H', 'H', 'F', 'U', 'B', 'H', 'H', 'R', '3', 'W'],
+              ['W', ' ', 'R', ' ', ' ', 'H', 'H', ' ', 'A', ' ', 'H', 'H', ' ', ' ', 'W'],
+              ['W', ' ', ' ', 'C', 'F', ' ', ' ', 'M', '3', 'M', ' ', ' ', 'B', 'C', 'W'],
+              ['W', 'H', 'H', 'B', 'U', 'Y', 'F', '4', 'D', '4', 'F', 'Y', 'U', 'H', 'W'],
+              ['W', ' ', ' ', 'C', 'F', ' ', ' ', 'M', '3', 'M', ' ', ' ', 'B', 'C', 'W'],
+              ['W', ' ', 'R', ' ', ' ', 'H', 'H', ' ', 'A', ' ', 'H', 'H', ' ', 'R', 'W'],
+              ['W', '4', ' ', 'R', ' ', 'H', 'H', 'B', 'U', 'F', 'H', 'H', 'D', '4', 'W'],
+              ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
+          ],
+          // 146. SUNSET BOULEVARD BLOCKADE (Urban Skyscraper Lanes + Laser Gates 'G')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'A', ' ', 'K', ' ', 'W', 'G', 'W', ' ', 'K', ' ', 'A', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'C', 'F', 'W', ' ', 'W', 'U', 'W', ' ', 'W', 'B', 'C', 'W', ' ', 'S'],
+              ['S', ' ', 'D', ' ', ' ', ' ', 'B', ' ', '3', ' ', 'F', ' ', ' ', ' ', 'D', ' ', 'S'],
+              ['S', 'W', 'G', 'W', 'T', 'F', 'C', '4', 'M', '4', 'C', 'B', 'T', 'W', 'G', 'W', 'S'],
+              ['S', ' ', 'D', ' ', ' ', ' ', 'F', ' ', '3', ' ', 'B', ' ', ' ', ' ', 'D', ' ', 'S'],
+              ['S', ' ', 'W', 'C', 'B', 'W', ' ', 'W', 'U', 'W', ' ', 'W', 'F', 'C', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'A', ' ', 'K', ' ', 'W', 'G', 'W', ' ', 'K', ' ', 'A', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 147. TYPHOON LIGHTHOUSE HARBOR (Rotating Searchlights 'L' + Portals 'O' + Cryo 'F')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'L', ' ', 'H', 'D', 'H', ' ', 'L', ' ', ' ', ' ', '3', 'S'],
+              ['S', ' ', 'R', 'F', ' ', ' ', ' ', 'H', 'U', 'H', ' ', ' ', ' ', 'B', 'R', ' ', 'S'],
+              ['S', ' ', ' ', 'C', 'B', 'T', ' ', 'M', '3', 'M', ' ', 'T', 'F', 'C', ' ', ' ', 'S'],
+              ['S', 'H', 'H', ' ', 'U', ' ', 'F', '4', 'Y', '4', 'B', ' ', 'U', ' ', 'H', 'H', 'S'],
+              ['S', ' ', ' ', 'C', 'F', 'T', ' ', 'M', '3', 'M', ' ', 'T', 'B', 'C', ' ', ' ', 'S'],
+              ['S', ' ', 'R', 'B', ' ', ' ', ' ', 'H', 'U', 'H', ' ', ' ', ' ', 'F', 'R', ' ', 'S'],
+              ['S', '4', ' ', ' ', ' ', 'L', ' ', 'H', 'D', 'H', ' ', 'L', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 148. DOWNTOWN EXPRESSWAY DERBY (High-speed Turbo Pads 'A' & Explosive Convoys)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'A', ' ', 'B', 'C', 'F', 'C', 'B', ' ', 'A', ' ', '3', 'S'],
+              ['S', ' ', 'W', 'W', ' ', 'C', 'U', '3', 'U', 'C', ' ', 'W', 'W', ' ', 'S'],
+              ['S', 'D', ' ', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', ' ', 'D', 'S'],
+              ['S', ' ', 'W', 'B', 'T', 'F', '4', 'Y', '4', 'F', 'T', 'B', 'W', ' ', 'S'],
+              ['S', 'D', ' ', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', ' ', 'D', 'S'],
+              ['S', ' ', 'W', 'W', ' ', 'C', 'U', '3', 'U', 'C', ' ', 'W', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'A', ' ', 'B', 'C', 'F', 'C', 'B', ' ', 'A', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 149. ARCHIPELAGO TELEPORT NETWORK (Island hopping with Portals 'O' & Repair Stations 'D')
+          [
+              ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
+              ['W', 'P', ' ', 'O', 'W', 'H', 'H', 'F', 'D', 'B', 'H', 'H', 'W', ' ', ' ', '3', 'W'],
+              ['W', ' ', 'C', 'F', 'W', 'H', 'H', ' ', 'U', ' ', 'H', 'H', 'W', 'B', 'C', ' ', 'W'],
+              ['W', ' ', 'B', ' ', ' ', ' ', ' ', 'M', '3', 'M', ' ', ' ', ' ', ' ', 'F', ' ', 'W'],
+              ['W', 'H', 'H', ' ', 'T', 'F', 'B', '4', 'Y', '4', 'F', 'B', 'T', ' ', 'H', 'H', 'W'],
+              ['W', ' ', 'F', ' ', ' ', ' ', ' ', 'M', '3', 'M', ' ', ' ', ' ', ' ', 'B', ' ', 'W'],
+              ['W', ' ', 'C', 'B', 'W', 'H', 'H', ' ', 'U', ' ', 'H', 'H', 'W', 'F', 'C', ' ', 'W'],
+              ['W', '4', ' ', ' ', 'W', 'H', 'H', 'B', 'D', 'F', 'H', 'H', 'W', 'O', ' ', '4', 'W'],
+              ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W']
+          ],
+          // 150. METROPOLIS ROOFTOP CITADEL (Milestone Mission #150! Multi-gated urban fortress)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'L', 'F', 'G', 'H', 'D', 'H', 'G', 'B', 'L', ' ', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'K', ' ', 'H', 'A', 'H', ' ', 'K', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'D', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', 'D', ' ', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'A', 'D', 'A', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', ' ', 'D', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', 'D', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'K', ' ', 'H', 'A', 'H', ' ', 'K', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', '4', ' ', ' ', ' ', 'L', 'B', 'G', 'H', 'D', 'H', 'G', 'F', 'L', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 151. HURRICANE BRIDGE DEMOLITION (Blast bridges & freeze heavy patrols)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'H', 'H', 'B', 'C', 'F', 'H', 'H', ' ', 'D', ' ', '3', 'S'],
+              ['S', ' ', 'R', 'F', ' ', 'H', 'H', ' ', 'U', ' ', 'H', 'H', ' ', 'B', 'R', ' ', 'S'],
+              ['S', ' ', ' ', 'C', 'B', ' ', 'A', 'M', '3', 'M', 'A', ' ', 'F', 'C', ' ', ' ', 'S'],
+              ['S', 'H', 'H', 'B', 'C', 'F', 'Y', '4', 'U', '4', 'Y', 'B', 'C', 'F', 'H', 'H', 'S'],
+              ['S', ' ', ' ', 'C', 'F', ' ', 'A', 'M', '3', 'M', 'A', ' ', 'B', 'C', ' ', ' ', 'S'],
+              ['S', ' ', 'R', 'B', ' ', 'H', 'H', ' ', 'U', ' ', 'H', 'H', ' ', 'F', 'R', ' ', 'S'],
+              ['S', '4', ' ', 'D', ' ', 'H', 'H', 'F', 'C', 'B', 'H', 'H', ' ', 'D', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 152. ADMIRAL OF THE STORM (Boss Finale M152 - Amphibious Dreadnought)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'R', 'D', 'L', 'F', 'H', 'U', 'H', 'B', 'L', 'D', 'R', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', 'R', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', 'R', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'W', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'W', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'D', 'U', 'D', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'W', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'W', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'R', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', 'R', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'U', ' ', 'H', 'A', 'H', ' ', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'R', 'D', 'L', 'B', 'H', 'U', 'H', 'F', 'L', 'D', 'R', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+
+          // ==================================================================
+          // CHAPTER 20: LA GRAN CAMPAÑA IMPERIAL (M153 - M160 • NIGHT STEALTH & CYBER)
+          // ==================================================================
+          // 153. SHADOW EMP INFILTRATION (Night Stealth + Cryo Barrels 'F' + Lighthouses 'L')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'L', ' ', 'F', 'U', 'F', ' ', 'L', ' ', 'D', ' ', '3', 'S'],
+              ['S', ' ', 'W', ' ', ' ', ' ', ' ', 'C', '3', 'C', ' ', ' ', ' ', ' ', 'W', ' ', 'S'],
+              ['S', ' ', ' ', 'T', 'S', 'F', 'B', ' ', 'M', ' ', 'B', 'F', 'S', 'T', ' ', ' ', 'S'],
+              ['S', ' ', 'D', ' ', 'G', ' ', 'Y', '4', 'U', '4', 'Y', ' ', 'G', ' ', 'D', ' ', 'S'],
+              ['S', ' ', ' ', 'T', 'S', 'F', 'B', ' ', 'M', ' ', 'B', 'F', 'S', 'T', ' ', ' ', 'S'],
+              ['S', ' ', 'W', ' ', ' ', ' ', ' ', 'C', '3', 'C', ' ', ' ', ' ', ' ', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'K', ' ', 'L', ' ', 'F', 'U', 'F', ' ', 'L', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 154. BLACKOUT CRYO VAULT (Freeze sentries before Searchlights spot you!)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'K', ' ', 'W', 'G', 'F', 'U', 'F', 'G', 'W', ' ', 'K', ' ', '3', 'S'],
+              ['S', ' ', 'L', ' ', ' ', 'W', 'C', 'B', '3', 'B', 'C', 'W', ' ', ' ', 'L', ' ', 'S'],
+              ['S', ' ', ' ', 'A', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', 'A', ' ', ' ', 'S'],
+              ['S', 'W', 'G', 'W', 'C', 'T', 'B', '4', 'D', '4', 'B', 'T', 'C', 'W', 'G', 'W', 'S'],
+              ['S', ' ', ' ', 'A', 'F', ' ', ' ', ' ', 'M', ' ', ' ', ' ', 'F', 'A', ' ', ' ', 'S'],
+              ['S', ' ', 'L', ' ', ' ', 'W', 'C', 'B', '3', 'B', 'C', 'W', ' ', ' ', 'L', ' ', 'S'],
+              ['S', '4', ' ', 'K', ' ', 'W', 'G', 'F', 'U', 'F', 'G', 'W', ' ', 'K', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 155. FORTRESS OF THE FIVE RINGS (Concentric defensive rings with Repair Pads 'D')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'C', 'B', 'C', 'U', 'C', 'F', 'C', ' ', 'D', ' ', '3', 'S'],
+              ['S', ' ', 'S', 'C', 'F', 'S', ' ', ' ', '3', ' ', ' ', 'S', 'B', 'C', 'S', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', ' ', 'T', 'F', 'M', 'F', 'T', ' ', ' ', 'F', 'C', ' ', 'S'],
+              ['S', ' ', 'F', ' ', '3', 'T', '4', 'Y', 'D', 'Y', '4', 'T', '3', ' ', 'B', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', ' ', 'T', 'F', 'M', 'F', 'T', ' ', ' ', 'F', 'C', ' ', 'S'],
+              ['S', ' ', 'S', 'C', 'F', 'S', ' ', ' ', '3', ' ', ' ', 'S', 'B', 'C', 'S', ' ', 'S'],
+              ['S', '4', ' ', 'D', ' ', 'C', 'F', 'C', 'U', 'C', 'B', 'C', ' ', 'D', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 156. ORBITAL STRIKE TESTGROUNDS (Packed enemy formations ideal for Orbital EMP + Chains!)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'F', 'C', 'B', 'U', 'B', 'C', 'F', ' ', 'D', ' ', '3', 'S'],
+              ['S', ' ', 'T', ' ', 'A', 'C', '3', 'F', '2', 'F', '3', 'C', 'A', ' ', 'T', ' ', 'S'],
+              ['S', ' ', ' ', 'M', ' ', 'B', 'F', ' ', '4', ' ', 'F', 'B', ' ', 'M', ' ', ' ', 'S'],
+              ['S', 'D', 'A', ' ', 'Y', 'U', '4', 'M', 'D', 'M', '4', 'U', 'Y', ' ', 'A', 'D', 'S'],
+              ['S', ' ', ' ', 'M', ' ', 'B', 'F', ' ', '4', ' ', 'F', 'B', ' ', 'M', ' ', ' ', 'S'],
+              ['S', ' ', 'T', ' ', 'A', 'C', '3', 'F', '2', 'F', '3', 'C', 'A', ' ', 'T', ' ', 'S'],
+              ['S', '4', ' ', 'D', ' ', 'F', 'C', 'B', 'U', 'B', 'C', 'F', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 157. IMPERIAL LASER LABYRINTH (Interlocking Laser Gates 'G', Switches 'K' & Portals 'O')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', ' ', 'K', ' ', 'G', 'D', 'G', ' ', 'K', ' ', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'S', 'G', 'S', ' ', 'F', ' ', 'U', ' ', 'F', ' ', 'S', 'G', 'S', ' ', 'S'],
+              ['S', ' ', 'C', '3', ' ', 'W', 'C', 'B', 'M', 'B', 'C', 'W', ' ', '3', 'C', ' ', 'S'],
+              ['S', ' ', 'B', 'F', ' ', 'G', 'U', '4', 'Y', '4', 'U', 'G', ' ', 'F', 'B', ' ', 'S'],
+              ['S', ' ', 'C', '3', ' ', 'W', 'C', 'B', 'M', 'B', 'C', 'W', ' ', '3', 'C', ' ', 'S'],
+              ['S', ' ', 'S', 'G', 'S', ' ', 'F', ' ', 'U', ' ', 'F', ' ', 'S', 'G', 'S', ' ', 'S'],
+              ['S', '4', ' ', ' ', ' ', 'K', ' ', 'G', 'D', 'G', ' ', 'K', ' ', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 158. VALKYRIE'S ANTECHAMBER (Elite Heavy Snipers '4' + Fast Interceptors '3')
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'D', ' ', 'L', 'F', 'G', 'H', 'U', 'H', 'G', 'F', 'L', ' ', 'D', ' ', '4', 'S'],
+              ['S', ' ', 'S', 'T', ' ', 'C', 'K', ' ', 'H', 'A', 'H', ' ', 'K', 'C', ' ', 'T', 'S', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'D', 'U', 'D', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'S', 'T', ' ', 'C', 'K', ' ', 'H', 'A', 'H', ' ', 'K', 'C', ' ', 'T', 'S', ' ', 'S'],
+              ['S', '4', ' ', 'D', ' ', 'L', 'F', 'G', 'H', 'U', 'H', 'G', 'F', 'L', ' ', 'D', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 159. THE PANTHEON OF LEGENDS (Penultimate 159th Mission - Full Arsenal Showdown)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'D', 'L', 'B', 'G', 'H', 'U', 'H', 'G', 'F', 'L', 'D', ' ', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'K', ' ', 'H', 'A', 'H', ' ', 'K', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'B', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'F', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'B', 'T', 'S', ' ', 'F', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'A', 'D', 'A', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'F', ' ', 'S', 'T', 'B', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'F', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'B', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'K', ' ', 'H', 'A', 'H', ' ', 'K', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', '4', ' ', ' ', 'D', 'L', 'F', 'G', 'H', 'U', 'H', 'G', 'B', 'L', 'D', 'O', ' ', '4', 'S'],
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
+          ],
+          // 160. GENERALISSIMO VALKYRIE OMEGA (160th Mission Grand Campaign Finale Boss!)
+          [
+              ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+              ['S', 'P', ' ', 'O', 'D', 'L', 'B', 'G', 'H', 'U', 'H', 'G', 'F', 'L', 'D', 'W', ' ', '4', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'U', 'K', 'H', 'A', 'H', 'K', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', 'L', 'U', 'C', 'M', 'T', '4', 'Y', 'D', 'U', 'D', 'Y', '4', 'T', 'M', 'C', 'U', 'L', 'S'],
+              ['S', ' ', 'C', 'B', ' ', 'S', 'T', 'F', 'U', '4', 'U', 'F', 'T', 'S', ' ', 'B', 'C', ' ', 'S'],
+              ['S', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'B', 'Y', 'B', ' ', ' ', ' ', 'A', ' ', ' ', ' ', 'S'],
+              ['S', 'T', ' ', '3', ' ', 'F', 'C', 'M', ' ', '4', ' ', 'M', 'C', 'F', ' ', '3', ' ', 'T', 'S'],
+              ['S', ' ', 'W', 'T', ' ', 'C', 'U', 'K', 'H', 'A', 'H', 'K', 'U', 'C', ' ', 'T', 'W', ' ', 'S'],
+              ['S', '4', ' ', 'W', 'D', 'L', 'F', 'G', 'H', 'U', 'H', 'G', 'B', 'L', 'D', 'O', ' ', '4', 'S'],
               ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S']
           ]
       ];
@@ -1822,7 +2390,7 @@ export class LevelLoader {
   }
 
   static getBiome(levelIndex) {
-      const idx = ((levelIndex - 1) % 120) + 1;
+      const idx = ((levelIndex - 1) % 160) + 1;
       if (idx <= 8) return 'workshop';        // M1 - M8: Warm cozy oak wood workshop
       if (idx <= 16) return 'desert';         // M9 - M16: Sandstone ruins & terracotta
       if (idx <= 24) return 'cyber';          // M17 - M24: Neon cyberpunk grid & chrome
@@ -1837,7 +2405,12 @@ export class LevelLoader {
       if (idx <= 96) return 'volcano';        // M89 - M96: Demolition & Pyrotechnic Arenas
       if (idx <= 104) return 'arctic';        // M97 - M104: Centurion Colosseum & Mirror Halls
       if (idx <= 112) return 'matsuri';       // M105 - M112: Urban Chaos & Hanabi Mega-Blast
-      return 'night_stealth';                 // M113 - M120: Special Operations Omega
+      if (idx <= 120) return 'night_stealth'; // M113 - M120: Special Operations Omega
+      if (idx <= 128) return 'arctic';        // M121 - M128: Absolute Zero Cryo Ops
+      if (idx <= 136) return 'cyber';         // M129 - M136: Orbital EMP Protocol
+      if (idx <= 144) return 'volcano';       // M137 - M144: Thermal Shock Crucible
+      if (idx <= 152) return 'tropical_island';// M145 - M152: Elite Amphibious Siege
+      return 'night_stealth';                 // M153 - M160: Grand Imperial Finale
   }
 
   static getAllLevelNames() {
@@ -1990,7 +2563,57 @@ export class LevelLoader {
           "Blackout Chain Reaction",
           "Radar Jammer Complex",
           "The Penultimate Gauntlet",
-          "Omega Prime: Supreme Commander"
+          "Omega Prime: Supreme Commander",
+
+          // Chapter 16: Absolute Zero Cryo Ops (M121 - M128)
+          "Absolute Zero Outpost",
+          "Cryogenic Reactor Core",
+          "Frostbite Convoy",
+          "Sub-Zero Laser Vault",
+          "Iceberg Repair Bay",
+          "Polar Portal Pincer",
+          "Avalanche Dominoes",
+          "Emperor of Absolute Zero",
+
+          // Chapter 17: Orbital EMP Protocol (M129 - M136)
+          "EMP Grid Overload",
+          "Quantum Teleport Matrix",
+          "Firewall Breaker",
+          "Cybernetic Gauntlet",
+          "Holographic Prism Arena",
+          "Mainframe Turret Bunker",
+          "Silicon Valley Crossfire",
+          "Supreme EMP Nexus",
+
+          // Chapter 18: Thermal Shock Crucible (M137 - M144)
+          "Thermal Shock Crucible",
+          "Magma & Ice Labyrinth",
+          "Volcanic Teleporter Forge",
+          "Obsidian Laser Citadel",
+          "Pyro-Cryo Pinball",
+          "Caldera Demolition Ring",
+          "Inferno Freeze Crossing",
+          "Thermonuclear Dragon",
+
+          // Chapter 19: Elite Amphibious Siege (M145 - M152)
+          "Coral Atoll Fortress",
+          "Sunset Boulevard Blockade",
+          "Typhoon Lighthouse Harbor",
+          "Downtown Expressway Derby",
+          "Archipelago Teleport Network",
+          "Metropolis Rooftop Citadel",
+          "Hurricane Bridge Demolition",
+          "Admiral of the Storm",
+
+          // Chapter 20: Grand Imperial Finale (M153 - M160)
+          "Shadow EMP Infiltration",
+          "Blackout Cryo Vault",
+          "Fortress of the Five Rings",
+          "Orbital Strike Testgrounds",
+          "Imperial Laser Labyrinth",
+          "Valkyrie's Antechamber",
+          "The Pantheon of Legends",
+          "Generalissimo Valkyrie Omega"
       ];
   }
 
